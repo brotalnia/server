@@ -912,10 +912,10 @@ void Group::CountTheRoll(Rolls::iterator& rollI)
             SendLootRollWon(maxguid, maxresul, ROLL_GREED, *roll);
             player = sObjectMgr.GetPlayer(maxguid);
 
+            LootItem *item = &(roll->getLoot()->items[roll->itemSlot]);
             if (player && player->GetSession())
             {
                 ItemPosCountVec dest;
-                LootItem *item = &(roll->getLoot()->items[roll->itemSlot]);
                 InventoryResult msg = player->CanStoreNewItem(NULL_BAG, NULL_SLOT, dest, roll->itemid, item->count);
                 if (msg == EQUIP_ERR_OK)
                 {
@@ -923,16 +923,19 @@ void Group::CountTheRoll(Rolls::iterator& rollI)
                     roll->getLoot()->NotifyItemRemoved(roll->itemSlot);
                     --roll->getLoot()->unlootedCount;
                     sLog.out(LOG_LOOTS, "%s wins greed roll for %ux%u [loot from %s]",
-                             player->GetShortDescription().c_str(), item->count, item->itemid, roll->lootedTargetGUID.GetString().c_str());
+                        player->GetShortDescription().c_str(), item->count, item->itemid, roll->lootedTargetGUID.GetString().c_str());
                     if (Item* newItem = player->StoreNewItem(dest, roll->itemid, true, item->randomPropertyId))
                         player->OnReceivedItem(newItem);
                 }
                 else
                 {
                     item->is_blocked = false;
+                    item->lootOwner = maxguid;
                     player->SendEquipError(msg, NULL, NULL, roll->itemid);
                 }
             }
+            else
+                item->lootOwner = maxguid;
         }
     }
     else
