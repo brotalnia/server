@@ -551,6 +551,23 @@ void WorldSession::HandleTurnInPetitionOpcode(WorldPacket & recv_data)
         return;
 
     uint32 petitionguid = charter->GetEnchantmentId(EnchantmentSlot(0));
+
+    // If charter is not in backpack the client will send the wrong guid
+    // Search for the charter manually
+    if (petitionguid == 0)
+    {
+        for (int i = INVENTORY_SLOT_BAG_START; i < INVENTORY_SLOT_BAG_END; ++i)
+            if (Bag* pBag = (Bag*)_player->GetItemByPos(INVENTORY_SLOT_BAG_0, i))
+                for (uint32 j = 0; j < pBag->GetBagSize(); ++j)
+                    if (Item* pItem = _player->GetItemByPos(i, j))
+                        if (pItem->GetEntry() == GUILD_CHARTER)
+                        {
+                            charter = pItem;
+                            petitionguid = charter->GetEnchantmentId(EnchantmentSlot(0));
+                            break;
+                        }
+    }
+
     DEBUG_LOG("Petition %s turned in by %s", petitionguid, _player->GetGuidStr().c_str());
 
     /// Collect petition info data
