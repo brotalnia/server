@@ -309,11 +309,8 @@ typedef std::list<Item*> ItemDurationList;
 
 enum RaidGroupError
 {
-    ERR_RAID_GROUP_NONE                 = 0,
-    ERR_RAID_GROUP_LOWLEVEL             = 1,
-    ERR_RAID_GROUP_ONLY                 = 2,
-    ERR_RAID_GROUP_FULL                 = 3,
-    ERR_RAID_GROUP_REQUIREMENTS_UNMATCH = 4
+    ERR_RAID_GROUP_REQUIRED = 1,
+    ERR_RAID_GROUP_FULL     = 2
 };
 
 enum DrunkenState
@@ -1141,6 +1138,7 @@ class MANGOS_DLL_SPEC Player final: public Unit
         void SendEquipError( InventoryResult msg, Item* pItem, Item *pItem2 = NULL, uint32 itemid = 0 ) const;
         void SendBuyError( BuyResult msg, Creature* pCreature, uint32 item, uint32 param );
         void SendSellError( SellResult msg, Creature* pCreature, ObjectGuid itemGuid, uint32 param );
+        void SendOpenContainer();
         void AddWeaponProficiency(uint32 newflag) { m_WeaponProficiency |= newflag; }
         void AddArmorProficiency(uint32 newflag) { m_ArmorProficiency |= newflag; }
         uint32 GetWeaponProficiency() const { return m_WeaponProficiency; }

@@ -195,6 +195,20 @@ bool ChatHandler::HandleDebugSendBuyErrorCommand(char* args)
     return true;
 }
 
+bool ChatHandler::HandleDebugSendOpenBagCommand(char *args)
+{
+    Player *pTarget = getSelectedPlayer();
+    if (!pTarget)
+    {
+        SendSysMessage(LANG_PLAYER_NOT_FOUND);
+        SetSentErrorMessage(true);
+        return false;
+    }
+
+    pTarget->SendOpenContainer();
+    return true;
+}
+
 bool ChatHandler::HandleDebugSendOpcodeCommand(char* /*args*/)
 {
     Unit *unit = getSelectedUnit();
