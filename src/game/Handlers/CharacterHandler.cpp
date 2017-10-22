@@ -943,4 +943,5 @@ void WorldSession::HandleChangePlayerNameOpcodeCallBack(QueryResult *result, uin
     session->SendPacket(&data);
 
     sObjectMgr.ChangePlayerNameInCache(guidLow, oldname, newname);
+    sWorld.InvalidatePlayerDataToAllClient(guid);
 }
