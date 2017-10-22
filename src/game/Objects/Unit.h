@@ -1163,8 +1163,8 @@ class MANGOS_DLL_SPEC Unit : public WorldObject
 
         bool IsMounted() const { return (GetMountID() != 0); }
         uint32 GetMountID() const { return GetUInt32Value(UNIT_FIELD_MOUNTDISPLAYID); }
-        void Mount(uint32 mount, uint32 spellId = 0);
-        void Unmount(bool from_aura = false);
+        virtual void Mount(uint32 mount, uint32 spellId = 0);
+        virtual void Unmount(bool from_aura = false);
 
         // Tuer cette unite.
         void DoKillUnit(Unit *victim = nullptr);

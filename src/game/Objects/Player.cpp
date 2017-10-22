@@ -17085,6 +17085,71 @@ void Player::ContinueTaxiFlight()
     GetSession()->SendDoFlight(mountDisplayId, path, startNode);
 }
 
+void Player::Mount(uint32 mount, uint32 spellId)
+{
+    if (!mount)
+    {
+        SendMountResult(MOUNTRESULT_NOTMOUNTABLE);
+        return;
+    }
+
+    Unit::Mount(mount, spellId);
+
+    // Called by Taxi system / GM command
+    if (!spellId)
+        UnsummonPetTemporaryIfAny();
+    // Called by mount aura
+    else
+    {
+        // Normal case (Unsummon only permanent pet)
+        if (Pet* pet = GetPet())
+        {
+            if (pet->IsPermanentPetFor((Player*)this) &&
+                sWorld.getConfig(CONFIG_BOOL_PET_UNSUMMON_AT_MOUNT))
+                UnsummonPetTemporaryIfAny();
+            else
+                pet->SetEnabled(false);
+        }
+    }
+
+    SendMountResult(MOUNTRESULT_OK);
+}
+
+void Player::Unmount(bool from_aura)
+{
+    if (!IsMounted())
+    {
+        SendDismountResult(DISMOUNTRESULT_NOTMOUNTED);
+        return;
+    }
+
+    Unit::Unmount(from_aura);
+
+    // only resummon old pet if the player is already added to a map
+    // this prevents adding a pet to a not created map which would otherwise cause a crash
+    // (it could probably happen when logging in after a previous crash)
+    if (Pet* pet = GetPet())
+        pet->SetEnabled(true);
+    else
+        ResummonPetTemporaryUnSummonedIfAny();
+
+    SendDismountResult(DISMOUNTRESULT_OK);
+}
+
+void Player::SendMountResult(PlayerMountResult result)
+{
+    WorldPacket data(SMSG_MOUNTRESULT, 4);
+    data << uint32(result);
+    GetSession()->SendPacket(&data);
+}
+
+void Player::SendDismountResult(PlayerDismountResult result)
+{
+    WorldPacket data(SMSG_DISMOUNTRESULT, 4);
+    data << uint32(result);
+    GetSession()->SendPacket(&data);
+}
+
 void Player::InitDataForForm(bool reapplyMods)
 {
     ShapeshiftForm form = GetShapeshiftForm();
