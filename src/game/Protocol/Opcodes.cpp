@@ -357,7 +357,7 @@ void Opcodes::BuildOpcodeList()
     /*0x12D*/  StoreOpcode(CMSG_NEW_SPELL_SLOT,               "CMSG_NEW_SPELL_SLOT",              STATUS_NEVER,     PACKET_PROCESS_MAX_TYPE,      &WorldSession::Handle_NULL);
     /*0x12E*/  StoreOpcode(CMSG_CAST_SPELL,                   "CMSG_CAST_SPELL",                  STATUS_LOGGEDIN,  PACKET_PROCESS_SPELLS,   &WorldSession::HandleCastSpellOpcode);
     /*0x12F*/  StoreOpcode(CMSG_CANCEL_CAST,                  "CMSG_CANCEL_CAST",                 STATUS_LOGGEDIN,  PACKET_PROCESS_SPELLS,   &WorldSession::HandleCancelCastOpcode);
-    /*0x130*/  StoreOpcode(SMSG_CAST_FAILED,                  "SMSG_CAST_FAILED",                 STATUS_NEVER,     PACKET_PROCESS_MAX_TYPE,      &WorldSession::Handle_ServerSide);
+    /*0x130*/  StoreOpcode(SMSG_CAST_RESULT,                  "SMSG_CAST_RESULT",                 STATUS_NEVER,     PACKET_PROCESS_MAX_TYPE,      &WorldSession::Handle_ServerSide);
     /*0x131*/  StoreOpcode(SMSG_SPELL_START,                  "SMSG_SPELL_START",                 STATUS_NEVER,     PACKET_PROCESS_MAX_TYPE,      &WorldSession::Handle_ServerSide);
     /*0x132*/  StoreOpcode(SMSG_SPELL_GO,                     "SMSG_SPELL_GO",                    STATUS_NEVER,     PACKET_PROCESS_MAX_TYPE,      &WorldSession::Handle_ServerSide);
     /*0x133*/  StoreOpcode(SMSG_SPELL_FAILURE,                "SMSG_SPELL_FAILURE",               STATUS_NEVER,     PACKET_PROCESS_MAX_TYPE,      &WorldSession::Handle_ServerSide);
