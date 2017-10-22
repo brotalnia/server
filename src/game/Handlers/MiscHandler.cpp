@@ -1230,27 +1230,6 @@ void WorldSession::HandleResetInstancesOpcode(WorldPacket & /*recv_data*/)
         _player->ResetInstances(INSTANCE_RESET_ALL);
 }
 
-void WorldSession::HandleCancelMountAuraOpcode(WorldPacket & /*recv_data*/)
-{
-    DEBUG_LOG("WORLD: CMSG_CANCEL_MOUNT_AURA");
-
-    //If player is not mounted, so go out :)
-    if (!_player->IsMounted())                              // not blizz like; no any messages on blizz
-    {
-        ChatHandler(this).SendSysMessage(LANG_CHAR_NON_MOUNTED);
-        return;
-    }
-
-    if (_player->IsTaxiFlying())                            // not blizz like; no any messages on blizz
-    {
-        ChatHandler(this).SendSysMessage(LANG_YOU_IN_FLIGHT);
-        return;
-    }
-
-    _player->Unmount(_player->HasAuraType(SPELL_AURA_MOUNTED));
-    _player->RemoveSpellsCausingAura(SPELL_AURA_MOUNTED);
-}
-
 void WorldSession::HandleRequestPetInfoOpcode(WorldPacket & /*recv_data */)
 {
     DEBUG_LOG("WORLD: CMSG_REQUEST_PET_INFO");
@@ -1259,14 +1238,6 @@ void WorldSession::HandleRequestPetInfoOpcode(WorldPacket & /*recv_data */)
         _player->PetSpellInitialize();
     else if (_player->GetCharm())
         _player->CharmSpellInitialize();
-}
-
-void WorldSession::HandleSetTaxiBenchmarkOpcode(WorldPacket & recv_data)
-{
-    uint8 mode;
-    recv_data >> mode;
-
-    DEBUG_LOG("Client used \"/timetest %d\" command", mode);
 }
 
 void WorldSession::HandleWardenDataOpcode(WorldPacket & recv_data)
