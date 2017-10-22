@@ -622,10 +622,23 @@ void Channel::Say(ObjectGuid p, const char *what, const char* chanName, uint32 l
 
     uint32 sec = 0;
     PlayerPointer plr = GetPlayer(p);
-    int32 playerRank = 0;
+    uint32 playerRank = 0;
 
     if (plr)
+    {
         sec = plr->GetSession()->GetSecurity();
+        if (GetChannelId() == CHANNEL_ID_LOCAL_DEFENSE || GetChannelId() == CHANNEL_ID_WORLD_DEFENSE)
+        {
+            playerRank = plr->ToPlayer()->GetHonorMgr().GetRank().rank;
+            if (playerRank < 9)
+            {
+                WorldPacket data;
+                MakeMuted(&data, chanName);
+                SendToOne(&data, p);
+                return;
+            }
+        }
+    }
 
     if (!skipCheck && !IsOn(p))
     {
@@ -679,7 +692,7 @@ void Channel::Say(ObjectGuid p, const char *what, const char* chanName, uint32 l
                     data << uint8(CHAT_MSG_CHANNEL);
                     data << uint32(lang);
                     data << localizedChannelName.c_str();
-                    data << uint32(0);
+                    data << uint32(playerRank);
                     data << ObjectGuid(p);
                     data << uint32(messageLength);
                     data << what;
