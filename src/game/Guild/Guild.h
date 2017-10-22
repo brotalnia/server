@@ -78,10 +78,10 @@ enum Typecommand
 {
     GUILD_CREATE_S  = 0x00,
     GUILD_INVITE_S  = 0x01,
-    GUILD_QUIT_S = 0x03,
+    GUILD_QUIT_S    = 0x03,
     GUILD_FOUNDER_S = 0x0E,
-    GUILD_UNK19 = 0x13,
-    GUILD_UNK20 = 0x14
+    GUILD_UNK19     = 0x13,
+    GUILD_UNK20     = 0x14
     // [ZERO] in SMSG_GUILD_COMMAND_RESULT: 2,4-13,15-18 no effect for no error
 };
 
