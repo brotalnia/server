@@ -648,11 +648,10 @@ void Channel::Say(ObjectGuid p, const char *what, const char* chanName, uint32 l
     else if (GetChannelId() == 0)
     {
         uint32 messageLength = strlen(what) + 1;
-        std::string localizedChannelName = GetLocalName(plr->GetSession()->GetSessionDbcLocale());
-        WorldPacket data(SMSG_MESSAGECHAT, 1 + 4 + 8 + 4 + localizedChannelName.size() + 1 + 8 + 4 + messageLength + 1);
+        WorldPacket data(SMSG_MESSAGECHAT, 1 + 4 + 8 + 4 + GetName().size() + 1 + 8 + 4 + messageLength + 1);
         data << uint8(CHAT_MSG_CHANNEL);
         data << uint32(lang);
-        data << localizedChannelName.c_str();
+        data << GetName().c_str();
         data << uint32(0);
         data << ObjectGuid(p);
         data << uint32(messageLength);
