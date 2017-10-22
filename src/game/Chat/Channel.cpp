@@ -625,11 +625,7 @@ void Channel::Say(ObjectGuid p, const char *what, const char* chanName, uint32 l
     int32 playerRank = 0;
 
     if (plr)
-    {
         sec = plr->GetSession()->GetSecurity();
-        if (GetChannelId() == CHANNEL_ID_LOCAL_DEFENSE || GetChannelId() == CHANNEL_ID_WORLD_DEFENSE)
-            playerRank = plr->GetHonorRankInfo().rank;
-    }
 
     if (!skipCheck && !IsOn(p))
     {
@@ -657,7 +653,7 @@ void Channel::Say(ObjectGuid p, const char *what, const char* chanName, uint32 l
         data << uint8(CHAT_MSG_CHANNEL);
         data << uint32(lang);
         data << localizedChannelName.c_str();
-        data << uint32(playerRank);
+        data << uint32(0);
         data << ObjectGuid(p);
         data << uint32(messageLength);
         data << what;
@@ -684,7 +680,7 @@ void Channel::Say(ObjectGuid p, const char *what, const char* chanName, uint32 l
                     data << uint8(CHAT_MSG_CHANNEL);
                     data << uint32(lang);
                     data << localizedChannelName.c_str();
-                    data << uint32(playerRank);
+                    data << uint32(0);
                     data << ObjectGuid(p);
                     data << uint32(messageLength);
                     data << what;

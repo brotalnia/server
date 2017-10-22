@@ -183,8 +183,7 @@ void ChannelMgr::CreateDefaultChannels()
 
 void ChannelMgr::AnnounceBothFactionsChannel(std::string channelName, ObjectGuid playerGuid, const char* message)
 {
-    Player *p = sObjectAccessor.FindPlayer(playerGuid);
-    PlayerPointer plr = PlayerPointer(p ? new PlayerWrapper<Player>(p) : NULL);
+    PlayerPointer plr = sObjectAccessor.FindPlayerPointer(playerGuid);
     if (Channel* c = channelMgr(HORDE)->GetChannel(channelName, plr))
         c->Say(playerGuid, message, channelName.c_str(), LANG_UNIVERSAL, true);
     if (!sWorld.getConfig(CONFIG_BOOL_ALLOW_TWO_SIDE_INTERACTION_CHANNEL))

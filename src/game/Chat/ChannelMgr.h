@@ -27,6 +27,7 @@
 #include "Policies/Singleton.h"
 #include "ObjectGuid.h"
 #include "AbstractPlayer.h"
+#include "ObjectAccessor.h"
 
 #include <map>
 #include <string>
