@@ -326,7 +326,7 @@ void WorldSession::HandleItemQuerySingleOpcode(WorldPacket & recv_data)
         data << pProto->Class;
         // client known only 0 subclass (and 1-2 obsolute subclasses)
         data << (pProto->Class == ITEM_CLASS_CONSUMABLE ? uint32(0) : pProto->SubClass);
-        data << Name;
+        data << Name;                                       // max length of any of 4 names: 256 bytes
         data << uint8(0x00);                                //pProto->Name2; // blizz not send name there, just uint8(0x00); <-- \0 = empty string = empty name...
         data << uint8(0x00);                                //pProto->Name3; // blizz not send name there, just uint8(0x00);
         data << uint8(0x00);                                //pProto->Name4; // blizz not send name there, just uint8(0x00);
