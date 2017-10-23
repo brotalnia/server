@@ -11582,7 +11582,7 @@ void Player::SendNewItem(Item *item, uint32 count, bool received, bool created, 
     data << uint32(item->GetItemSuffixFactor());            // SuffixFactor
     data << uint32(item->GetItemRandomPropertyId());        // random item property id
     data << uint32(count);                                  // count of items
-    data << uint32(GetItemCount(item->GetEntry()));         // count of items in inventory
+    //data << uint32(GetItemCount(item->GetEntry()));       // [-ZERO] count of items in inventory
 
     if (broadcast && GetGroup())
         GetGroup()->BroadcastPacket(&data, true);
@@ -13162,28 +13162,43 @@ bool Player::CanGiveQuestSourceItemIfNeed(Quest const *pQuest, ItemPosCountVec* 
 {
     if (uint32 srcitem = pQuest->GetSrcItemId())
     {
-        uint32 count = pQuest->GetSrcItemCount();
-
-        // player already have max amount required item (including bank), just report success
-        uint32 has_count = GetItemCount(srcitem, true);
-        if (has_count >= count)
-            return true;
-
-        count -= has_count;                                 // real need amount
-
-        InventoryResult msg;
-        if (!dest)
+        
+        if (ItemPrototype const *pProto = ObjectMgr::GetItemPrototype(srcitem))
         {
-            ItemPosCountVec destTemp;
-            msg = CanStoreNewItem(NULL_BAG, NULL_SLOT, destTemp, srcitem, count);
-        }
-        else
-            msg = CanStoreNewItem(NULL_BAG, NULL_SLOT, *dest, srcitem, count);
+            uint32 count = pQuest->GetSrcItemCount();
+            uint32 has_count = GetItemCount(srcitem, true);
 
-        if (msg == EQUIP_ERR_OK)
-            return true;
-        else
-            SendEquipError(msg, NULL, NULL, srcitem);
+            if (pProto->MaxCount && pProto->StartQuest != pQuest->GetQuestId() && (has_count >= pProto->MaxCount))
+            {
+                // player already have max amount of source item (including bank)
+                SendQuestFailedAtTaker(pQuest->GetQuestId(), INVALIDREASON_QUEST_FAILED_DUPLICATE_ITEM);
+                return false;
+            }
+
+            count -= has_count;                                 // real need amount
+
+            InventoryResult msg;
+            if (!dest)
+            {
+                ItemPosCountVec destTemp;
+                msg = CanStoreNewItem(NULL_BAG, NULL_SLOT, destTemp, srcitem, count);
+            }
+            else
+                msg = CanStoreNewItem(NULL_BAG, NULL_SLOT, *dest, srcitem, count);
+
+            if (msg == EQUIP_ERR_OK)
+                return true;
+            else
+            {
+                if (msg == EQUIP_ERR_INVENTORY_FULL)
+                    SendQuestFailedAtTaker(pQuest->GetQuestId(), INVALIDREASON_QUEST_FAILED_INVENTORY_FULL);
+                else if (msg == EQUIP_ERR_CANT_CARRY_MORE_OF_THIS)
+                    SendQuestFailedAtTaker(pQuest->GetQuestId(), INVALIDREASON_QUEST_FAILED_DUPLICATE_ITEM);
+                else
+                    SendEquipError(msg, NULL, NULL, srcitem);
+            }
+        }
+
         return false;
     }
 
@@ -13876,14 +13891,29 @@ void Player::SendQuestReward(Quest const *pQuest, uint32 XP, Object * questGiver
     GetSession()->SendPacket(&data);
 }
 
+/// Sent when a quest is failed to be given off at questtaker. Specifically handled reasons:
+/// INVALIDREASON_QUEST_FAILED_INVENTORY_FULL=4 (or 50)
+/// INVALIDREASON_QUEST_FAILED_DUPLICATE_ITEM=17
+void Player::SendQuestFailedAtTaker(uint32 quest_id, uint32 reason) const
+{
+    if (quest_id)
+    {
+        WorldPacket data(SMSG_QUESTGIVER_QUEST_FAILED, 8);
+        data << uint32(quest_id);
+        data << uint32(reason);
+        GetSession()->SendPacket(&data);
+        DEBUG_LOG("WORLD: Sent SMSG_QUESTGIVER_QUEST_FAILED");
+    }
+}
+
 void Player::SendQuestFailed(uint32 quest_id)
 {
     if (quest_id)
     {
-        WorldPacket data(SMSG_QUESTGIVER_QUEST_FAILED, 4);
+        WorldPacket data(SMSG_QUESTUPDATE_FAILED, 4);
         data << quest_id;
         GetSession()->SendPacket(&data);
-        DEBUG_LOG("WORLD: Sent SMSG_QUESTGIVER_QUEST_FAILED");
+        DEBUG_LOG("WORLD: Sent SMSG_QUESTUPDATE_FAILED");
     }
 }
 
