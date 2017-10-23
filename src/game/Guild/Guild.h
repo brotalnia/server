@@ -137,20 +137,14 @@ enum GuildEvents
     GE_SIGNED_OFF                   = 0x0D,                 // ERR_FRIEND_OFFLINE_S
 };
 
-enum PetitionTurns
-{
-    PETITION_TURN_OK                    = 0,
-    PETITION_TURN_ALREADY_IN_GUILD      = 2,
-    PETITION_TURN_NEED_MORE_SIGNATURES  = 4,
-};
-
 enum PetitionSigns
 {
     PETITION_SIGN_OK                = 0,
     PETITION_SIGN_ALREADY_SIGNED    = 1,
     PETITION_SIGN_ALREADY_IN_GUILD  = 2,
     PETITION_SIGN_CANT_SIGN_OWN     = 3,
-    PETITION_SIGN_NOT_SERVER        = 4,
+    PETITION_SIGN_NEED_MORE         = 4,
+    PETITION_SIGN_NOT_SERVER        = 5
 };
 
 enum GuildEventLogTypes
@@ -170,7 +164,7 @@ enum GuildEmblem
     ERR_GUILDEMBLEM_NOGUILD               = 2,
     ERR_GUILDEMBLEM_NOTGUILDMASTER        = 3,
     ERR_GUILDEMBLEM_NOTENOUGHMONEY        = 4,
-    ERR_GUILDEMBLEM_INVALIDVENDOR         = 5
+    ERR_GUILDEMBLEM_FAIL_NO_MESSAGE       = 5
 };
 
 struct GuildEventLogEntry
