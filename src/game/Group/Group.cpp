@@ -1727,24 +1727,27 @@ void Group::ResetInstances(InstanceResetMethod method, Player* SendMsgTo)
                 ++itr;
                 continue;
             }
-        }
 
-        bool offline_players = false;
-        for (member_citerator citr = m_memberSlots.begin(); citr != m_memberSlots.end(); ++citr)
-        {
-            Player *pl = sObjectMgr.GetPlayer(citr->guid);
-            if (!pl || !pl->GetSession())
+            if (SendMsgTo)
             {
-                offline_players = true;
-                break;
-            }
-        }
+                bool offline_players = false;
+                for (member_citerator citr = m_memberSlots.begin(); citr != m_memberSlots.end(); ++citr)
+                {
+                    Player *pl = sObjectMgr.GetPlayer(citr->guid);
+                    if (!pl || !pl->GetSession())
+                    {
+                        offline_players = true;
+                        break;
+                    }
+                }
 
-        if (offline_players)
-        {
-            SendMsgTo->SendResetInstanceFailed(INSTANCERESET_FAIL_OFFLINE, state->GetMapId());
-            ++itr;
-            continue;
+                if (offline_players)
+                {
+                    SendMsgTo->SendResetInstanceFailed(INSTANCERESET_FAIL_OFFLINE, state->GetMapId());
+                    ++itr;
+                    continue;
+                }
+            }
         }
 
         bool isEmpty = true;
