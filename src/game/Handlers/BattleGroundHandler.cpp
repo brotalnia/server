@@ -209,7 +209,10 @@ void WorldSession::HandleBattlemasterJoinOpcode(WorldPacket & recv_data)
             return;
         }
         else if (err != BG_JOIN_ERR_OK)
+        {
+            SendBattleGroundJoinError(err);
             return;
+        }
 
         // if we're here, then the conditions to join a bg are met. We can proceed in joining.
 
