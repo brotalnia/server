@@ -360,7 +360,7 @@ public:
         {
             // Petite animation pour redevenir visible
             UpdateVisibility(true);
-            me->SendGameObjectCustomAnim(me->GetObjectGuid());
+            me->SendGameObjectCustomAnim();
             // Je m'identifie aupres du relay (pour qu'il transmette mon GUID jusqu'aux pylones)
             if (Creature* crea = me->FindNearestCreature(NPC_NECROPOLIS_RELAY, 100.0f))
                 crea->AI()->InformGuid(me->GetObjectGuid());
@@ -518,7 +518,7 @@ struct NecropolisPylonAI : public ScriptedAI, public NecropolisRelatedObject
     void JustDied(Unit* pKiller)
     {
         if (GameObject* necropolis = m_creature->GetMap()->GetGameObject(_necropolisGuid))
-            necropolis->SendGameObjectCustomAnim(necropolis->GetObjectGuid());
+            necropolis->SendGameObjectCustomAnim();
         DespawnAdds();
     }
     void SpellHit(Unit* pCaster, const SpellEntry* pSpell)
