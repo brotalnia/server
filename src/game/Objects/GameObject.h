@@ -638,6 +638,8 @@ class MANGOS_DLL_SPEC GameObject : public WorldObject
         void SetDisplayId(uint32 modelId);
 
         void SendGameObjectCustomAnim(uint32 animId = 0);
+        void SendGameObjectReset();
+
         float GetObjectBoundingRadius() const;              // overwrite WorldObject version
 
         void Use(Unit* user);
