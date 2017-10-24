@@ -1729,6 +1729,24 @@ void Group::ResetInstances(InstanceResetMethod method, Player* SendMsgTo)
             }
         }
 
+        bool offline_players = false;
+        for (member_citerator citr = m_memberSlots.begin(); citr != m_memberSlots.end(); ++citr)
+        {
+            Player *pl = sObjectMgr.GetPlayer(citr->guid);
+            if (!pl || !pl->GetSession())
+            {
+                offline_players = true;
+                break;
+            }
+        }
+
+        if (offline_players)
+        {
+            SendMsgTo->SendResetInstanceFailed(INSTANCERESET_FAIL_OFFLINE, state->GetMapId());
+            ++itr;
+            continue;
+        }
+
         bool isEmpty = true;
         // if the map is loaded, reset it
         if (Map *map = sMapMgr.FindMap(state->GetMapId(), state->GetInstanceId()))
@@ -1740,7 +1758,7 @@ void Group::ResetInstances(InstanceResetMethod method, Player* SendMsgTo)
             if (isEmpty)
                 SendMsgTo->SendResetInstanceSuccess(state->GetMapId());
             else
-                SendMsgTo->SendResetInstanceFailed(0, state->GetMapId());
+                SendMsgTo->SendResetInstanceFailed(INSTANCERESET_FAIL_GENERAL, state->GetMapId());
         }
 
         if (isEmpty || method == INSTANCE_RESET_GROUP_DISBAND)
