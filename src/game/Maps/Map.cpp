@@ -2518,13 +2518,27 @@ void Map::ScriptsProcess()
                 }
 
                 Unit * unit = (Unit*)source;
+                float x = step.script->x;
+                float y = step.script->y;
+                float z = step.script->z;
+
+                if (step.script->moveTo.relativeToTarget && target && target->isType(TYPEMASK_WORLDOBJECT))
+                {
+                    if (WorldObject* pTarget = (WorldObject*)target)
+                    {
+                        x += pTarget->GetPositionX();
+                        y += pTarget->GetPositionY();
+                        z += pTarget->GetPositionZ();
+                    }
+                }
+
                 if (step.script->moveTo.travelTime != 0)
                 {
-                    float speed = unit->GetDistance(step.script->x, step.script->y, step.script->z) / ((float)step.script->moveTo.travelTime * 0.001f);
-                    unit->MonsterMoveWithSpeed(step.script->x, step.script->y, step.script->z, speed);
+                    float speed = unit->GetDistance(x, y, z) / ((float)step.script->moveTo.travelTime * 0.001f);
+                    unit->MonsterMoveWithSpeed(x, y, z, speed);
                 }
                 else
-                    unit->GetMotionMaster()->MovePoint(0, step.script->x, step.script->y, step.script->z, MOVE_PATHFINDING);
+                    unit->GetMotionMaster()->MovePoint(0, x, y, z, MOVE_PATHFINDING);
                 break;
             }
             case SCRIPT_COMMAND_FLAG_SET:
@@ -4395,7 +4409,7 @@ public:
     }
     void operator()(WorldPacket& data, int32 loc_idx)
     {
-        char const* text = i_textId > 0 ? sObjectMgr.GetBroadcastText(i_textId, LocaleConstant(loc_idx)) : sObjectMgr.GetMangosString(i_textId, loc_idx);
+        char const* text = i_textId > 0 ? sObjectMgr.GetBroadcastText(i_textId, loc_idx) : sObjectMgr.GetMangosString(i_textId, loc_idx);
 
         std::string nameForLocale = "";
         if (loc_idx >= 0)

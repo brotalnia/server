@@ -7074,32 +7074,20 @@ void ObjectMgr::LoadBroadcastTextLocales()
 
         BroadcastText& data = mBroadcastTextLocaleMap[id];
 
+        // This works on black magic. Don't try to understand it.
         for (int i = 1; i < MAX_LOCALE; ++i)
         {
-            // Load MaleText locales.
             std::string str = fields[i].GetCppString();
             if (!str.empty())
             {
                 int idx = GetOrNewIndexForLocale(LocaleConstant(i));
                 if (idx >= 0)
                 {
-                    if ((int32)data.MaleText.size() <= idx)
-                        data.MaleText.resize(idx + 1);
+                    // 0 -> default, idx in to idx+1
+                    if ((int32)data.MaleText.size() <= idx + 1)
+                        data.MaleText.resize(idx + 2);
 
-                    data.MaleText[idx] = str;
-                }
-            }
-            // Load FemaleText locales.
-            str = fields[8 + i].GetCppString();
-            if (!str.empty())
-            {
-                int idx = GetOrNewIndexForLocale(LocaleConstant(i));
-                if (idx >= 0)
-                {
-                    if ((int32)data.FemaleText.size() <= idx)
-                        data.FemaleText.resize(idx + 1);
-
-                    data.FemaleText[idx] = str;
+                    data.MaleText[idx + 1] = str;
                 }
             }
         }
@@ -7111,21 +7099,29 @@ void ObjectMgr::LoadBroadcastTextLocales()
     sLog.outString(">> Loaded %u broadcast text locales.", count);
 }
 
-const char *ObjectMgr::GetBroadcastText(uint32 id, LocaleConstant locale, uint8 gender, bool forceGender) const
+const char *ObjectMgr::GetBroadcastText(uint32 id, int locale_index, uint8 gender, bool forceGender) const
 {
     if (BroadcastText const* bct = GetBroadcastTextLocale(id))
     {
         if ((gender == GENDER_FEMALE || gender == GENDER_NONE) && (forceGender || !bct->FemaleText[LOCALE_enUS].empty()))
         {
-            if (bct->FemaleText.size() > size_t(locale) && !bct->FemaleText[locale].empty())
-                return bct->FemaleText[locale].c_str();
-            return bct->FemaleText[LOCALE_enUS].c_str();
+            // havent managed to get female locales to work yet
+            //if (bct->FemaleText.size() > size_t(locale_index) && !bct->FemaleText[locale_index].empty())
+            //    return bct->FemaleText[locale_index].c_str();
+            //return bct->FemaleText[LOCALE_enUS].c_str();
+
+            //if ((int32)bct->FemaleText.size() > locale_index + 2 && !bct->FemaleText[locale_index + 2].empty())
+            //    return bct->FemaleText[locale_index + 2].c_str();
+            //else
+            //    return bct->FemaleText[0].c_str();
+            return "<error>";
         }
         // else if (gender == GENDER_MALE)
         {
-            if (bct->MaleText.size() > size_t(locale) && !bct->MaleText[locale].empty())
-                return bct->MaleText[locale].c_str();
-            return bct->MaleText[LOCALE_enUS].c_str();
+            if ((int32)bct->MaleText.size() > locale_index + 1 && !bct->MaleText[locale_index + 1].empty())
+                return bct->MaleText[locale_index + 1].c_str();
+            else
+                return bct->MaleText[0].c_str();
         }
     }
 

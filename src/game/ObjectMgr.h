@@ -107,9 +107,6 @@ struct BroadcastText
     uint32 EmoteDelay0;
     uint32 EmoteDelay1;
     uint32 EmoteDelay2;
-    
-
-    
 };
 
 typedef std::unordered_map<uint32, BroadcastText> BroadcastTextLocaleMap;
@@ -1042,7 +1039,7 @@ class ObjectMgr
             return nullptr;
         }
 
-        const char *GetBroadcastText(uint32 id, LocaleConstant locale = LOCALE_enUS, uint8 gender = GENDER_MALE, bool forceGender = false) const;
+        const char *GetBroadcastText(uint32 id, int locale_idx = LOCALE_enUS, uint8 gender = GENDER_MALE, bool forceGender = false) const;
 
         MangosStringLocale const* GetMangosStringLocale(int32 entry) const
         {

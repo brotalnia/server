@@ -879,6 +879,11 @@ void CreatureEventAI::ProcessAction(CreatureEventAI_Action const& action, uint32
             sObjectMgr.SetSavedVariable(action.setVariable.variableEntry, action.setVariable.value, true);
             break;
         }
+        case ACTION_T_EVENT_SCRIPT:
+        {
+            m_creature->GetMap()->ScriptsStart(sEventScripts, action.eventScript.eventScriptId, m_creature, pActionInvoker ? pActionInvoker : m_creature);
+            break;
+        }
     }
 }
 

@@ -120,6 +120,7 @@ enum EventAI_ActionType
     ACTION_T_SET_STAND_STATE            = 47,               // StandState, unused, unused
     ACTION_T_CHANGE_MOVEMENT            = 48,               // MovementType, WanderDistance, unused
     ACTION_T_SET_VARIABLE               = 49,               // VariableEntry, Value, unused
+    ACTION_T_EVENT_SCRIPT               = 50,               // EventScriptId
     ACTION_T_END,
 };
 
@@ -414,6 +415,11 @@ struct CreatureEventAI_Action
             uint32 value;
             uint32 unused1;
         } setVariable;
+        // ACTION_T_EVENT_SCRIPT                            = 50
+        struct
+        {
+            uint32 eventScriptId;
+        } eventScript;
         // RAW
         struct
         {

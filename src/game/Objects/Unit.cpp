@@ -11732,7 +11732,7 @@ namespace MaNGOS
             : i_source(obj), i_msgtype(msgtype), i_textId(textId), i_language(language), i_target(target), i_vaList(vaList) {}
         void operator()(WorldPacket& data, int32 loc_idx)
         {
-            char const* text = i_textId > 0 ? sObjectMgr.GetBroadcastText(i_textId, LocaleConstant(loc_idx), i_source.getGender()) : sObjectMgr.GetMangosString(i_textId, loc_idx);
+            char const* text = i_textId > 0 ? sObjectMgr.GetBroadcastText(i_textId, loc_idx, i_source.getGender()) : sObjectMgr.GetMangosString(i_textId, loc_idx);
             char textFinal[2048];
             va_list argsCpy;
             va_copy(argsCpy, *i_vaList);
@@ -11837,7 +11837,7 @@ namespace MaNGOS
             : i_source(obj), i_msgtype(msgtype), i_textId(textId), i_language(language), i_target(target) {}
         void operator()(WorldPacket& data, int32 loc_idx) const
         {
-            char const* text = i_textId > 0 ? sObjectMgr.GetBroadcastText(i_textId, LocaleConstant(loc_idx), i_source.getGender()) : sObjectMgr.GetMangosString(i_textId, loc_idx);
+            char const* text = i_textId > 0 ? sObjectMgr.GetBroadcastText(i_textId, loc_idx, i_source.getGender()) : sObjectMgr.GetMangosString(i_textId, loc_idx);
 
             Unit::BuildMonsterChat(&data, i_source.GetObjectGuid(), i_msgtype, text, i_language, i_source.GetNameForLocaleIdx(loc_idx),
                 i_target ? i_target->GetObjectGuid() : ObjectGuid());
@@ -11912,7 +11912,7 @@ void Unit::MonsterWhisper(int32 textId, Unit* target, bool IsBossWhisper) const
         return;
 
     uint32 loc_idx = ((Player*)target)->GetSession()->GetSessionDbLocaleIndex();
-    char const* text = textId > 0 ? sObjectMgr.GetBroadcastText(textId, LocaleConstant(loc_idx), getGender()) : sObjectMgr.GetMangosString(textId, loc_idx);
+    char const* text = textId > 0 ? sObjectMgr.GetBroadcastText(textId, loc_idx, getGender()) : sObjectMgr.GetMangosString(textId, loc_idx);
 
     WorldPacket data(SMSG_MESSAGECHAT, 200);
     BuildMonsterChat(&data, GetObjectGuid(), IsBossWhisper ? CHAT_MSG_RAID_BOSS_WHISPER : CHAT_MSG_MONSTER_WHISPER, text, LANG_UNIVERSAL,

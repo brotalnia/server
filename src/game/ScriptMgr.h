@@ -55,7 +55,7 @@ enum eScriptCommand
                                                             // datalong2 = creature entry (searching for a buddy, closest to source), datalong3 = creature search radius
                                                             // data_flags = flag_target_as_source           = 0x01
     SCRIPT_COMMAND_FIELD_SET                = 2,            // source = any, datalong = field_id, datalong2 = value
-    SCRIPT_COMMAND_MOVE_TO                  = 3,            // source = Creature, datalong2 = time, x/y/z
+    SCRIPT_COMMAND_MOVE_TO                  = 3,            // source = Creature, datalong = 1 if coordinates are relative to target, datalong2 = time, x/y/z
     SCRIPT_COMMAND_FLAG_SET                 = 4,            // source = any, datalong = field_id, datalong2 = bitmask
     SCRIPT_COMMAND_FLAG_REMOVE              = 5,            // source = any, datalong = field_id, datalong2 = bitmask
     SCRIPT_COMMAND_TELEPORT_TO              = 6,            // source or target with Player, datalong = map_id, x/y/z
@@ -178,7 +178,7 @@ struct ScriptInfo
 
         struct                                              // SCRIPT_COMMAND_MOVE_TO (3)
         {
-            uint32 unused1;                                 // datalong
+            uint32 relativeToTarget;                        // datalong
             uint32 travelTime;                              // datalong2
         } moveTo;
 
