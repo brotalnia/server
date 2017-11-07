@@ -7074,7 +7074,7 @@ void ObjectMgr::LoadBroadcastTextLocales()
 
         BroadcastText& data = mBroadcastTextLocaleMap[id];
 
-        // This works on black magic. Don't try to understand it.
+        // Load MaleText
         for (int i = 1; i < MAX_LOCALE; ++i)
         {
             std::string str = fields[i].GetCppString();
@@ -7092,6 +7092,24 @@ void ObjectMgr::LoadBroadcastTextLocales()
             }
         }
 
+        // Load FemaleText
+        for (int i = 1; i < MAX_LOCALE; ++i)
+        {
+            std::string str = fields[8 + i].GetCppString();
+            if (!str.empty())
+            {
+                int idx = GetOrNewIndexForLocale(LocaleConstant(i));
+                if (idx >= 0)
+                {
+                    // 0 -> default, idx in to idx+1
+                    if ((int32)data.FemaleText.size() <= idx + 1)
+                        data.FemaleText.resize(idx + 2);
+
+                    data.FemaleText[idx + 1] = str;
+                }
+            }
+        }
+
         ++count;
     } while (result->NextRow());
 
@@ -7105,16 +7123,10 @@ const char *ObjectMgr::GetBroadcastText(uint32 id, int locale_index, uint8 gende
     {
         if ((gender == GENDER_FEMALE || gender == GENDER_NONE) && (forceGender || !bct->FemaleText[LOCALE_enUS].empty()))
         {
-            // havent managed to get female locales to work yet
-            //if (bct->FemaleText.size() > size_t(locale_index) && !bct->FemaleText[locale_index].empty())
-            //    return bct->FemaleText[locale_index].c_str();
-            //return bct->FemaleText[LOCALE_enUS].c_str();
-
-            //if ((int32)bct->FemaleText.size() > locale_index + 2 && !bct->FemaleText[locale_index + 2].empty())
-            //    return bct->FemaleText[locale_index + 2].c_str();
-            //else
-            //    return bct->FemaleText[0].c_str();
-            return "<error>";
+            if ((int32)bct->FemaleText.size() > locale_index + 1 && !bct->FemaleText[locale_index + 1].empty())
+                return bct->FemaleText[locale_index + 1].c_str();
+            else
+                return bct->FemaleText[0].c_str();
         }
         // else if (gender == GENDER_MALE)
         {
