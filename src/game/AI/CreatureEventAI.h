@@ -636,7 +636,7 @@ class MANGOS_DLL_SPEC CreatureEventAI : public CreatureAI
         inline int32 GetRandActionParam(uint32 rnd, int32 param1, int32 param2, int32 param3);
         inline Unit* GetTargetByType(uint32 Target, Unit* pActionInvoker) const;
 
-        void DoScriptText(int32 textEntry, WorldObject* pSource, Unit* target);
+        void DoScriptText(int32 textEntry, Unit* pSource, Unit* target);
         bool CanCast(Unit* Target, SpellEntry const *Spell, bool Triggered);
 
         bool SpawnedEventConditionsCheck(CreatureEventAI_Event const& event);

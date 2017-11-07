@@ -1640,7 +1640,7 @@ void ScriptMgr::CollectPossibleEventIds(std::set<uint32>& eventIds)
     }
 }
 
-void DoScriptText(int32 iTextEntry, WorldObject* pSource, Unit* pTarget)
+void DoScriptText(int32 iTextEntry, Unit* pSource, Unit* pTarget)
 {
     if (!pSource)
     {
@@ -1648,58 +1648,77 @@ void DoScriptText(int32 iTextEntry, WorldObject* pSource, Unit* pTarget)
         return;
     }
 
+    uint8 Type;
+    uint32 Emote;
+    uint32 Language;
+    uint32 SoundId;
+
     if (iTextEntry >= 0)
     {
-        sLog.outError("DoScriptText with source entry %u (TypeId=%u, guid=%u) attempts to process text entry %i, but text entry must be negative.",
-            pSource->GetEntry(), pSource->GetTypeId(), pSource->GetGUIDLow(), iTextEntry);
-
-        return;
+        if (const BroadcastText* bct = sObjectMgr.GetBroadcastTextLocale(iTextEntry))
+        {
+            Type = bct->Type;
+            Emote = bct->EmoteId0;
+            Language = bct->Language;
+            SoundId = bct->SoundId;
+        }
+        else
+        {
+            sLog.outError("DoScriptText with source entry %u (TypeId=%u, guid=%u) attempts to process broadcast text id %i, but text id does not exist.", pSource->GetEntry(), pSource->GetTypeId(), pSource->GetGUIDLow(), iTextEntry);
+            return;
+        }
     }
-
-    const StringTextData* pData = sScriptMgr.GetTextData(iTextEntry);
-
-    if (!pData)
+    else
     {
-        sLog.outError("DoScriptText with source entry %u (TypeId=%u, guid=%u) could not find text entry %i.",
-            pSource->GetEntry(), pSource->GetTypeId(), pSource->GetGUIDLow(), iTextEntry);
-
-        return;
+        const StringTextData* pData = sScriptMgr.GetTextData(iTextEntry);
+        if (!pData)
+        {
+            sLog.outError("DoScriptText with source entry %u (TypeId=%u, guid=%u) could not find text entry %i.", pSource->GetEntry(), pSource->GetTypeId(), pSource->GetGUIDLow(), iTextEntry);
+            return;
+        }
+        else
+        {
+            Type = pData->Type;
+            Emote = pData->Emote;
+            Language = pData->Language;
+            SoundId = pData->SoundId;
+        }
     }
 
     DEBUG_LOG("DoScriptText: text entry=%i, Sound=%u, Type=%u, Language=%u, Emote=%u",
-        iTextEntry, pData->SoundId, pData->Type, pData->Language, pData->Emote);
+        iTextEntry, SoundId, Type, Language, Emote);
 
-    if (pData->SoundId)
+    if (SoundId)
     {
-        if (GetSoundEntriesStore()->LookupEntry(pData->SoundId))
+        if (GetSoundEntriesStore()->LookupEntry(SoundId))
         {
-            if(pData->Type == CHAT_TYPE_ZONE_YELL)
+            if(Type == CHAT_TYPE_ZONE_YELL)
             {
                 if(Map* pZone = pSource->GetMap())
-                    pZone->PlayDirectSoundToMap(pData->SoundId);
+                    pZone->PlayDirectSoundToMap(SoundId);
             }
             else
-                pSource->PlayDirectSound(pData->SoundId);
+                pSource->PlayDirectSound(SoundId);
         }
         else
-            sLog.outError("DoScriptText entry %i tried to process invalid sound id %u.", iTextEntry, pData->SoundId);
+            sLog.outError("DoScriptText entry %i tried to process invalid sound id %u.", iTextEntry, SoundId);
     }
 
-    if (pData->Emote)
+    if (Emote)
     {
         if (pSource->GetTypeId() == TYPEID_UNIT || pSource->GetTypeId() == TYPEID_PLAYER)
-            ((Unit*)pSource)->HandleEmoteCommand(pData->Emote);
+            ((Unit*)pSource)->HandleEmoteCommand(Emote);
         else
             sLog.outError("DoScriptText entry %i tried to process emote for invalid TypeId (%u).", iTextEntry, pSource->GetTypeId());
     }
 
-    switch (pData->Type)
+    switch (Type)
     {
         case CHAT_TYPE_SAY:
-            pSource->MonsterSay(iTextEntry, pData->Language, pTarget);
+            pSource->MonsterSay(iTextEntry, Language, pTarget);
             break;
         case CHAT_TYPE_YELL:
-            pSource->MonsterYell(iTextEntry, pData->Language, pTarget);
+            pSource->MonsterYell(iTextEntry, Language, pTarget);
             break;
         case CHAT_TYPE_TEXT_EMOTE:
             pSource->MonsterTextEmote(iTextEntry, pTarget);
@@ -1718,7 +1737,7 @@ void DoScriptText(int32 iTextEntry, WorldObject* pSource, Unit* pTarget)
             break;
         }
         case CHAT_TYPE_ZONE_YELL:
-            pSource->MonsterYellToZone(iTextEntry, pData->Language, pTarget);
+            pSource->MonsterYellToZone(iTextEntry, Language, pTarget);
             break;
     }
 }

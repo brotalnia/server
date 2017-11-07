@@ -11699,3 +11699,224 @@ void Unit::InitPlayerDisplayIds()
     }
 
 }
+
+void Unit::BuildMonsterChat(WorldPacket *data, ObjectGuid senderGuid, uint8 msgtype, char const* text, uint32 language, char const* name, ObjectGuid targetGuid)
+{
+    *data << uint8(msgtype);
+    *data << uint32(language);
+    // Nostalrius : Fix emotes des mobs.
+    switch (msgtype)
+    {
+    case CHAT_MSG_MONSTER_EMOTE:
+    case CHAT_MSG_RAID_BOSS_EMOTE:
+    case CHAT_MSG_MONSTER_WHISPER:
+        break;
+    default:
+        *data << ObjectGuid(senderGuid);
+    }
+
+    *data << uint32(strlen(name) + 1);
+    *data << name;
+    *data << ObjectGuid(targetGuid);                        // Unit Target
+    *data << (uint32)(strlen(text) + 1);
+    *data << text;
+    *data << (uint8)0;                                      // ChatTag
+}
+
+namespace MaNGOS
+{
+    class MonsterChatBuilderFormat
+    {
+    public:
+        MonsterChatBuilderFormat(Unit const& obj, ChatMsg msgtype, int32 textId, uint32 language, Unit* target, va_list* vaList = nullptr)
+            : i_source(obj), i_msgtype(msgtype), i_textId(textId), i_language(language), i_target(target), i_vaList(vaList) {}
+        void operator()(WorldPacket& data, int32 loc_idx)
+        {
+            char const* text = i_textId > 0 ? sObjectMgr.GetBroadcastText(i_textId, LocaleConstant(loc_idx), i_source.getGender()) : sObjectMgr.GetMangosString(i_textId, loc_idx);
+            char textFinal[2048];
+            va_list argsCpy;
+            va_copy(argsCpy, *i_vaList);
+            vsnprintf(textFinal, 2048, text, argsCpy);
+            va_end(argsCpy);
+            Unit::BuildMonsterChat(&data, i_source.GetObjectGuid(), i_msgtype, textFinal, i_language, i_source.GetNameForLocaleIdx(loc_idx), i_target ? i_target->GetObjectGuid() : ObjectGuid());
+        }
+
+    private:
+        Unit const& i_source;
+        ChatMsg i_msgtype;
+        int32 i_textId;
+        uint32 i_language;
+        Unit* i_target;
+        va_list* i_vaList;
+    };
+}
+
+void Unit::PMonsterSay(int32 textId, ...) const
+{
+    va_list ap;
+    va_start(ap, textId);
+    float range = sWorld.getConfig(CONFIG_FLOAT_LISTEN_RANGE_SAY);
+    MaNGOS::MonsterChatBuilderFormat say_build(*this, CHAT_MSG_MONSTER_SAY, textId, 0, nullptr, &ap);
+    MaNGOS::LocalizedPacketDo<MaNGOS::MonsterChatBuilderFormat> say_do(say_build);
+    MaNGOS::CameraDistWorker<MaNGOS::LocalizedPacketDo<MaNGOS::MonsterChatBuilderFormat> > say_worker(this, range, say_do);
+    Cell::VisitWorldObjects(this, say_worker, range);
+    va_end(ap);
+}
+
+void Unit::PMonsterSay(const char* text, ...)
+{
+    va_list ap;
+    char str[2048];
+    va_start(ap, text);
+    vsnprintf(str, 2048, text, ap);
+    va_end(ap);
+    MonsterSay(str);
+}
+
+void Unit::PMonsterYell(int32 textId, ...) const
+{
+    va_list ap;
+    va_start(ap, textId);
+    float range = sWorld.getConfig(CONFIG_FLOAT_LISTEN_RANGE_YELL);
+    MaNGOS::MonsterChatBuilderFormat say_build(*this, CHAT_MSG_MONSTER_SAY, textId, 0, nullptr, &ap);
+    MaNGOS::LocalizedPacketDo<MaNGOS::MonsterChatBuilderFormat> say_do(say_build);
+    MaNGOS::CameraDistWorker<MaNGOS::LocalizedPacketDo<MaNGOS::MonsterChatBuilderFormat> > say_worker(this, range, say_do);
+    Cell::VisitWorldObjects(this, say_worker, range);
+    va_end(ap);
+}
+
+void Unit::PMonsterYell(const char* text, ...)
+{
+    va_list ap;
+    char str[2048];
+    va_start(ap, text);
+    vsnprintf(str, 2048, text, ap);
+    va_end(ap);
+    MonsterYell(str);
+}
+
+void Unit::MonsterSay(const char* text, uint32 language, Unit* target)
+{
+    WorldPacket data(SMSG_MESSAGECHAT, 200);
+    BuildMonsterChat(&data, GetObjectGuid(), CHAT_MSG_MONSTER_SAY, text, language, GetName(), target ? target->GetObjectGuid() : ObjectGuid());
+    SendMessageToSetInRange(&data, sWorld.getConfig(CONFIG_FLOAT_LISTEN_RANGE_SAY), true);
+}
+
+void Unit::MonsterYell(const char* text, uint32 language, Unit* target)
+{
+    WorldPacket data(SMSG_MESSAGECHAT, 200);
+    BuildMonsterChat(&data, GetObjectGuid(), CHAT_MSG_MONSTER_YELL, text, language, GetName(), target ? target->GetObjectGuid() : ObjectGuid());
+    SendMessageToSetInRange(&data, sWorld.getConfig(CONFIG_FLOAT_LISTEN_RANGE_YELL), true);
+}
+
+void Unit::MonsterTextEmote(const char* text, Unit* target, bool IsBossEmote)
+{
+    WorldPacket data(SMSG_MESSAGECHAT, 200);
+    BuildMonsterChat(&data, GetObjectGuid(), IsBossEmote ? CHAT_MSG_RAID_BOSS_EMOTE : CHAT_MSG_MONSTER_EMOTE, text, LANG_UNIVERSAL,
+        GetName(), target ? target->GetObjectGuid() : ObjectGuid());
+    SendMessageToSetInRange(&data, sWorld.getConfig(IsBossEmote ? CONFIG_FLOAT_LISTEN_RANGE_YELL : CONFIG_FLOAT_LISTEN_RANGE_TEXTEMOTE), true);
+}
+
+void Unit::MonsterWhisper(const char* text, Unit* target, bool IsBossWhisper) const
+{
+    if (!target || target->GetTypeId() != TYPEID_PLAYER)
+        return;
+
+    WorldPacket data(SMSG_MESSAGECHAT, 200);
+    BuildMonsterChat(&data, GetObjectGuid(), IsBossWhisper ? CHAT_MSG_RAID_BOSS_WHISPER : CHAT_MSG_MONSTER_WHISPER, text, LANG_UNIVERSAL,
+        GetName(), target->GetObjectGuid());
+    ((Player*)target)->GetSession()->SendPacket(&data);
+}
+
+namespace MaNGOS
+{
+    class MonsterChatBuilder
+    {
+    public:
+        MonsterChatBuilder(Unit const& obj, ChatMsg msgtype, int32 textId, uint32 language, Unit* target)
+            : i_source(obj), i_msgtype(msgtype), i_textId(textId), i_language(language), i_target(target) {}
+        void operator()(WorldPacket& data, int32 loc_idx) const
+        {
+            char const* text = i_textId > 0 ? sObjectMgr.GetBroadcastText(i_textId, LocaleConstant(loc_idx), i_source.getGender()) : sObjectMgr.GetMangosString(i_textId, loc_idx);
+
+            Unit::BuildMonsterChat(&data, i_source.GetObjectGuid(), i_msgtype, text, i_language, i_source.GetNameForLocaleIdx(loc_idx),
+                i_target ? i_target->GetObjectGuid() : ObjectGuid());
+        }
+
+    private:
+        Unit const& i_source;
+        ChatMsg i_msgtype;
+        int32 i_textId;
+        uint32 i_language;
+        Unit* i_target;
+    };
+}                                                           // namespace MaNGOS
+
+void Unit::MonsterSay(int32 textId, uint32 language, Unit* target) const
+{
+    float range = sWorld.getConfig(CONFIG_FLOAT_LISTEN_RANGE_SAY);
+    MaNGOS::MonsterChatBuilder say_build(*this, CHAT_MSG_MONSTER_SAY, textId, language, target);
+    MaNGOS::LocalizedPacketDo<MaNGOS::MonsterChatBuilder> say_do(say_build);
+    MaNGOS::CameraDistWorker<MaNGOS::LocalizedPacketDo<MaNGOS::MonsterChatBuilder> > say_worker(this, range, say_do);
+    Cell::VisitWorldObjects(this, say_worker, range);
+}
+
+void Unit::MonsterYell(int32 textId, uint32 language, Unit* target) const
+{
+    float range = sWorld.getConfig(CONFIG_FLOAT_LISTEN_RANGE_YELL);
+    MaNGOS::MonsterChatBuilder say_build(*this, CHAT_MSG_MONSTER_YELL, textId, language, target);
+    MaNGOS::LocalizedPacketDo<MaNGOS::MonsterChatBuilder> say_do(say_build);
+    MaNGOS::CameraDistWorker<MaNGOS::LocalizedPacketDo<MaNGOS::MonsterChatBuilder> > say_worker(this, range, say_do);
+    Cell::VisitWorldObjects(this, say_worker, range);
+}
+
+void Unit::MonsterYellToZone(int32 textId, uint32 language, Unit* target) const
+{
+    MaNGOS::MonsterChatBuilder say_build(*this, CHAT_MSG_MONSTER_YELL, textId, language, target);
+    MaNGOS::LocalizedPacketDo<MaNGOS::MonsterChatBuilder> say_do(say_build);
+
+    uint32 zoneid = GetZoneId();
+
+    auto const& pList = GetMap()->GetPlayers();
+    for (auto itr = pList.begin(); itr != pList.end(); ++itr)
+        if (itr->getSource()->GetZoneId() == zoneid)
+            say_do(itr->getSource());
+}
+
+void Unit::MonsterScriptToZone(int32 textId, ChatMsg type, uint32 language, Unit* target) const
+{
+    MaNGOS::MonsterChatBuilder say_build(*this, type, textId, language, target);
+    MaNGOS::LocalizedPacketDo<MaNGOS::MonsterChatBuilder> say_do(say_build);
+
+    uint32 zoneid = GetZoneId();
+
+    auto const& pList = GetMap()->GetPlayers();
+    for (auto itr = pList.begin(); itr != pList.end(); ++itr)
+        if (itr->getSource()->GetZoneId() == zoneid)
+            say_do(itr->getSource());
+}
+
+void Unit::MonsterTextEmote(int32 textId, Unit* target, bool IsBossEmote) const
+{
+    float range = sWorld.getConfig(IsBossEmote ? CONFIG_FLOAT_LISTEN_RANGE_YELL : CONFIG_FLOAT_LISTEN_RANGE_TEXTEMOTE);
+
+    MaNGOS::MonsterChatBuilder say_build(*this, IsBossEmote ? CHAT_MSG_RAID_BOSS_EMOTE : CHAT_MSG_MONSTER_EMOTE, textId, LANG_UNIVERSAL, target);
+    MaNGOS::LocalizedPacketDo<MaNGOS::MonsterChatBuilder> say_do(say_build);
+    MaNGOS::CameraDistWorker<MaNGOS::LocalizedPacketDo<MaNGOS::MonsterChatBuilder> > say_worker(this, range, say_do);
+    Cell::VisitWorldObjects(this, say_worker, range);
+}
+
+void Unit::MonsterWhisper(int32 textId, Unit* target, bool IsBossWhisper) const
+{
+    if (!target || target->GetTypeId() != TYPEID_PLAYER)
+        return;
+
+    uint32 loc_idx = ((Player*)target)->GetSession()->GetSessionDbLocaleIndex();
+    char const* text = textId > 0 ? sObjectMgr.GetBroadcastText(textId, LocaleConstant(loc_idx), getGender()) : sObjectMgr.GetMangosString(textId, loc_idx);
+
+    WorldPacket data(SMSG_MESSAGECHAT, 200);
+    BuildMonsterChat(&data, GetObjectGuid(), IsBossWhisper ? CHAT_MSG_RAID_BOSS_WHISPER : CHAT_MSG_MONSTER_WHISPER, text, LANG_UNIVERSAL,
+        GetNameForLocaleIdx(loc_idx), target->GetObjectGuid());
+
+    ((Player*)target)->GetSession()->SendPacket(&data);
+}

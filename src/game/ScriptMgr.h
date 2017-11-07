@@ -725,7 +725,7 @@ class ScriptMgr
 };
 
 //Generic scripting text function
-void DoScriptText(int32 textEntry, WorldObject* pSource, Unit* target = nullptr);
+void DoScriptText(int32 textEntry, Unit* pSource, Unit* target = nullptr);
 void DoOrSimulateScriptTextForMap(int32 iTextEntry, uint32 uiCreatureEntry, Map* pMap, Creature* pCreatureSource = nullptr, Unit* pTarget = nullptr);
 
 #define sScriptMgr MaNGOS::Singleton<ScriptMgr>::Instance()

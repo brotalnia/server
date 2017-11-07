@@ -2345,6 +2345,17 @@ void Map::ScriptsProcess()
                     }
                 }
 
+                if (!((pSource->GetTypeId() == TYPEID_UNIT) || (pSource->GetTypeId() == TYPEID_PLAYER)))
+                {
+                    sLog.outError("SCRIPT_COMMAND_TALK (script id %u) call with unsupported non-unit as source of text (TypeId: %u), skipping.", step.script->id, source->GetTypeId());
+                    break;
+                }
+
+                Unit* pTextSource = pSource->ToUnit();
+
+                if (!pTextSource)
+                    return;
+
                 // If we should talk to the original source instead of target
                 if (step.script->talk.flags & 0x02)
                     target = source;
@@ -2369,16 +2380,16 @@ void Map::ScriptsProcess()
                 switch (step.script->talk.chatType)
                 {
                     case CHAT_TYPE_SAY:
-                        pSource->MonsterSay(textId, step.script->talk.language, unitTarget);
+                        pTextSource->MonsterSay(textId, step.script->talk.language, unitTarget);
                         break;
                     case CHAT_TYPE_YELL:
-                        pSource->MonsterYell(textId, step.script->talk.language, unitTarget);
+                        pTextSource->MonsterYell(textId, step.script->talk.language, unitTarget);
                         break;
                     case CHAT_TYPE_TEXT_EMOTE:
-                        pSource->MonsterTextEmote(textId, unitTarget);
+                        pTextSource->MonsterTextEmote(textId, unitTarget);
                         break;
                     case CHAT_TYPE_BOSS_EMOTE:
-                        pSource->MonsterTextEmote(textId, unitTarget, true);
+                        pTextSource->MonsterTextEmote(textId, unitTarget, true);
                         break;
                     case CHAT_TYPE_WHISPER:
                         if (!unitTarget || unitTarget->GetTypeId() != TYPEID_PLAYER)
@@ -2386,7 +2397,7 @@ void Map::ScriptsProcess()
                             sLog.outError("SCRIPT_COMMAND_TALK (script id %u) attempt to whisper (%u) to %s, skipping.", step.script->id, step.script->talk.chatType, unitTarget ? unitTarget->GetGuidStr().c_str() : "<no target>");
                             break;
                         }
-                        pSource->MonsterWhisper(textId, unitTarget);
+                        pTextSource->MonsterWhisper(textId, unitTarget);
                         break;
                     case CHAT_TYPE_BOSS_WHISPER:
                         if (!unitTarget || unitTarget->GetTypeId() != TYPEID_PLAYER)
@@ -2394,10 +2405,10 @@ void Map::ScriptsProcess()
                             sLog.outError("SCRIPT_COMMAND_TALK (script id %u) attempt to whisper (%u) to %s, skipping.", step.script->id, step.script->talk.chatType, unitTarget ? unitTarget->GetGuidStr().c_str() : "<no target>");
                             break;
                         }
-                        pSource->MonsterWhisper(textId, unitTarget, true);
+                        pTextSource->MonsterWhisper(textId, unitTarget, true);
                         break;
                     case CHAT_TYPE_ZONE_YELL:
-                        pSource->MonsterYellToZone(textId, step.script->talk.language, unitTarget);
+                        pTextSource->MonsterYellToZone(textId, step.script->talk.language, unitTarget);
                         break;
                     default:
                         break;                              // must be already checked at load
@@ -4384,7 +4395,7 @@ public:
     }
     void operator()(WorldPacket& data, int32 loc_idx)
     {
-        char const* text = sObjectMgr.GetMangosString(i_textId, loc_idx);
+        char const* text = i_textId > 0 ? sObjectMgr.GetBroadcastText(i_textId, LocaleConstant(loc_idx)) : sObjectMgr.GetMangosString(i_textId, loc_idx);
 
         std::string nameForLocale = "";
         if (loc_idx >= 0)
@@ -4400,7 +4411,7 @@ public:
         if (nameForLocale.empty())
             nameForLocale = i_cInfo->Name;
 
-        WorldObject::BuildMonsterChat(&data, i_senderGuid, i_msgtype, text, i_language, nameForLocale.c_str(), i_target ? i_target->GetObjectGuid() : ObjectGuid());
+        Unit::BuildMonsterChat(&data, i_senderGuid, i_msgtype, text, i_language, nameForLocale.c_str(), i_target ? i_target->GetObjectGuid() : ObjectGuid());
     }
 
 private:
