@@ -698,7 +698,7 @@ class ScriptMgr
     private:
         void CollectPossibleEventIds(std::set<uint32>& eventIds);
         void LoadScripts(ScriptMapMap& scripts, const char* tablename);
-        void CheckScriptTexts(ScriptMapMap const& scripts, std::set<int32>& ids);
+        void CheckScriptTexts(ScriptMapMap const& scripts);
 
         typedef std::vector<std::string> ScriptNameMap;
         typedef UNORDERED_MAP<uint32, uint32> AreaTriggerScriptMap;
