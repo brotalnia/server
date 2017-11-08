@@ -2344,18 +2344,7 @@ void Map::ScriptsProcess()
                             pSource = (WorldObject*)pBuddy;
                     }
                 }
-
-                if (!((pSource->GetTypeId() == TYPEID_UNIT) || (pSource->GetTypeId() == TYPEID_PLAYER)))
-                {
-                    sLog.outError("SCRIPT_COMMAND_TALK (script id %u) call with unsupported non-unit as source of text (TypeId: %u), skipping.", step.script->id, source->GetTypeId());
-                    break;
-                }
-
-                Unit* pTextSource = pSource->ToUnit();
-
-                if (!pTextSource)
-                    return;
-
+                
                 // If we should talk to the original source instead of target
                 if (step.script->talk.flags & 0x02)
                     target = source;
@@ -2377,42 +2366,21 @@ void Map::ScriptsProcess()
                     textId = step.script->talk.textId[rand() % i];
                 }
 
-                switch (step.script->talk.chatType)
+                if (step.script->talk.gameobjectGuid)
                 {
-                    case CHAT_TYPE_SAY:
-                        pTextSource->MonsterSay(textId, step.script->talk.language, unitTarget);
-                        break;
-                    case CHAT_TYPE_YELL:
-                        pTextSource->MonsterYell(textId, step.script->talk.language, unitTarget);
-                        break;
-                    case CHAT_TYPE_TEXT_EMOTE:
-                        pTextSource->MonsterTextEmote(textId, unitTarget);
-                        break;
-                    case CHAT_TYPE_BOSS_EMOTE:
-                        pTextSource->MonsterTextEmote(textId, unitTarget, true);
-                        break;
-                    case CHAT_TYPE_WHISPER:
-                        if (!unitTarget || unitTarget->GetTypeId() != TYPEID_PLAYER)
-                        {
-                            sLog.outError("SCRIPT_COMMAND_TALK (script id %u) attempt to whisper (%u) to %s, skipping.", step.script->id, step.script->talk.chatType, unitTarget ? unitTarget->GetGuidStr().c_str() : "<no target>");
-                            break;
-                        }
-                        pTextSource->MonsterWhisper(textId, unitTarget);
-                        break;
-                    case CHAT_TYPE_BOSS_WHISPER:
-                        if (!unitTarget || unitTarget->GetTypeId() != TYPEID_PLAYER)
-                        {
-                            sLog.outError("SCRIPT_COMMAND_TALK (script id %u) attempt to whisper (%u) to %s, skipping.", step.script->id, step.script->talk.chatType, unitTarget ? unitTarget->GetGuidStr().c_str() : "<no target>");
-                            break;
-                        }
-                        pTextSource->MonsterWhisper(textId, unitTarget, true);
-                        break;
-                    case CHAT_TYPE_ZONE_YELL:
-                        pTextSource->MonsterYellToZone(textId, step.script->talk.language, unitTarget);
-                        break;
-                    default:
-                        break;                              // must be already checked at load
+                    uint32 guidlow = step.script->talk.gameobjectGuid;
+                    GameObjectData const* goData = sObjectMgr.GetGOData(guidlow);
+                    if (!goData)
+                        break;                                  // checked at load
+
+                    GameObject *go = pSource->GetMap()->GetGameObject(ObjectGuid(HIGHGUID_GAMEOBJECT, goData->id, guidlow));
+
+                    if (go)
+                        pSource = go;
                 }
+
+                DoScriptText(textId, pSource, unitTarget, step.script->talk.chatType);
+                
                 break;
             }
             case SCRIPT_COMMAND_EMOTE:
@@ -4425,7 +4393,7 @@ public:
         if (nameForLocale.empty())
             nameForLocale = i_cInfo->Name;
 
-        Unit::BuildMonsterChat(&data, i_senderGuid, i_msgtype, text, i_language, nameForLocale.c_str(), i_target ? i_target->GetObjectGuid() : ObjectGuid());
+        WorldObject::BuildWorldObjectChat(&data, i_senderGuid, i_msgtype, text, i_language, nameForLocale.c_str(), i_target ? i_target->GetObjectGuid() : ObjectGuid());
     }
 
 private:

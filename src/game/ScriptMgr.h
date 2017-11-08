@@ -45,7 +45,7 @@ class WorldObject;
 enum eScriptCommand
 {
     SCRIPT_COMMAND_TALK                     = 0,            // source = WorldObject, target = any/none, datalong (see enum ChatType for supported CHAT_TYPE_'s)
-                                                            // datalong2 = creature entry (searching for a buddy, closest to source), datalong3 = creature search radius, datalong4 = language
+                                                            // datalong2 = creature entry (searching for a buddy, closest to source), datalong3 = creature search radius, datalong4 = gameobject db guid
                                                             // data_flags = flag_target_player_as_source    = 0x01
                                                             //              flag_original_source_as_target  = 0x02
                                                             //              flag_buddy_as_target            = 0x04
@@ -155,7 +155,7 @@ struct ScriptInfo
             uint32 chatType;                                // datalong
             uint32 creatureEntry;                           // datalong2
             uint32 searchRadius;                            // datalong3
-            uint32 language;                                // datalong4
+            uint32 gameobjectGuid;                          // datalong4
             uint32 flags;                                   // data_flags
             int32  textId[MAX_TEXT_ID];                     // dataint to dataint4
         } talk;
@@ -412,6 +412,7 @@ struct ScriptInfo
     {
         switch(command)
         {
+            case SCRIPT_COMMAND_TALK: return talk.gameobjectGuid;
             case SCRIPT_COMMAND_RESPAWN_GAMEOBJECT: return respawnGo.goGuid;
             case SCRIPT_COMMAND_OPEN_DOOR: return openDoor.goGuid;
             case SCRIPT_COMMAND_CLOSE_DOOR: return closeDoor.goGuid;
@@ -725,7 +726,7 @@ class ScriptMgr
 };
 
 //Generic scripting text function
-void DoScriptText(int32 textEntry, Unit* pSource, Unit* target = nullptr);
+void DoScriptText(int32 textEntry, WorldObject* pSource, Unit* target = nullptr, uint32 chatTypeOverride = 0);
 void DoOrSimulateScriptTextForMap(int32 iTextEntry, uint32 uiCreatureEntry, Map* pMap, Creature* pCreatureSource = nullptr, Unit* pTarget = nullptr);
 
 #define sScriptMgr MaNGOS::Singleton<ScriptMgr>::Instance()
