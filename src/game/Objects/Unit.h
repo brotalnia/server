@@ -1914,8 +1914,6 @@ class MANGOS_DLL_SPEC Unit : public WorldObject
         float getNativeScale() const;
         void setNativeScale(float scale);
 
-        
-        
     protected:
         explicit Unit ();
 
