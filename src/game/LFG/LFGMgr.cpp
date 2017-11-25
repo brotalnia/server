@@ -56,7 +56,7 @@ void LFGQueue::AddToQueue(Player* leader, uint32 queAreaID)
         LFGGroupQueueInfo& i_Group = m_QueuedGroups[grp->GetId()];
 
         grp->CalculateLFGRoles(i_Group);
-       i_Group.team = leader->GetTeam();
+        i_Group.team = leader->GetTeam();
         i_Group.areaId = queAreaID;
         i_Group.groupTimer = 5 * MINUTE * IN_MILLISECONDS; // Minute timer for SMSG_MEETINGSTONE_IN_PROGRESS
 
@@ -73,7 +73,7 @@ void LFGQueue::AddToQueue(Player* leader, uint32 queAreaID)
         LFGPlayerQueueInfo& i_Player = m_QueuedPlayers[leader->GetObjectGuid()];
 
         i_Player.roleMask = CalculateRoles((Classes)leader->getClass());
-       i_Player.team = leader->GetTeam();
+        i_Player.team = leader->GetTeam();
         i_Player.areaId = queAreaID;
         i_Player.hasQueuePriority = false;
 
