@@ -228,6 +228,14 @@ INSERT INTO `gossip_scripts` (`id`, `delay`, `command`, `datalong`, `datalong2`,
 INSERT INTO `gossip_scripts` (`id`, `delay`, `command`, `datalong`, `datalong2`, `datalong3`, `datalong4`, `data_flags`, `dataint`, `dataint2`, `dataint3`, `dataint4`, `x`, `y`, `z`, `o`, `comments`) VALUES (2017, 0, 36, 2017, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 'Meetingstone - Stratholme');
 INSERT INTO `gossip_scripts` (`id`, `delay`, `command`, `datalong`, `datalong2`, `datalong3`, `datalong4`, `data_flags`, `dataint`, `dataint2`, `dataint3`, `dataint4`, `x`, `y`, `z`, `o`, `comments`) VALUES (2018, 0, 36, 2057, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 'Meetingstone - Scholomance');
 
+-- Add min and max patch support to gameobject table.
+ALTER TABLE `gameobject`
+	ADD COLUMN `patch_min` TINYINT(3) UNSIGNED NOT NULL DEFAULT '0' AFTER `visibilitymod`,
+	ADD COLUMN `patch_max` TINYINT(3) UNSIGNED NOT NULL DEFAULT '10' AFTER `patch_min`;
+
+-- Assign minimum patch to meeting stone spawns.
+UPDATE `gameobject` SET `patch_min`=1 WHERE `id` IN (178824, 178825, 178826, 178827, 178828, 178829, 178831, 178832, 178833, 178834, 178844, 178845, 178884, 179554, 179555, 179584, 179585, 179595, 179596);
+
 
 -- End of migration.
 END IF;
