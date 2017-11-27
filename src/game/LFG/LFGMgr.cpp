@@ -46,6 +46,9 @@ void LFGQueue::AddToQueue(Player* leader, uint32 queAreaID)
     if(!leader)
         return;
 
+    if (sWorld.GetWowPatch() < WOW_PATCH_103)
+        return;
+
     Group* grp = leader->GetGroup();
 
     //add players from group to queue list & group to group list
@@ -141,9 +144,9 @@ RolesPriority LFGQueue::getPriority(Classes playerClass, ClassRoles playerRoles)
             switch (playerClass)
             {
                 case CLASS_DRUID:   return LFG_PRIORITY_HIGH;
-                case CLASS_PALADIN: return LFG_PRIORITY_NORMAL;
+                case CLASS_PALADIN: return LFG_PRIORITY_HIGH;
                 case CLASS_PRIEST:  return LFG_PRIORITY_HIGH;
-                case CLASS_SHAMAN:  return LFG_PRIORITY_NORMAL;
+                case CLASS_SHAMAN:  return LFG_PRIORITY_HIGH;
                 default:            return LFG_PRIORITY_NONE;
             }
 
@@ -511,6 +514,14 @@ bool LFGQueue::FindRoleToGroup(Player* plr, Group* grp, ClassRoles role)
             }
         }
     }
+
+    return false;
+}
+
+bool LFGQueue::IsPlayerInQueue(ObjectGuid plrGuid) const
+{
+    if (m_QueuedPlayers.find(plrGuid) != m_QueuedPlayers.end())
+        return true;
 
     return false;
 }

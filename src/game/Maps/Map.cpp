@@ -4012,7 +4012,8 @@ void Map::ScriptsProcess()
                     break;
                 }
 
-                sLFGMgr.AddToQueue(pPlayer, step.script->meetingstone.areaId);
+                if (!sLFGMgr.IsPlayerInQueue(pPlayer->GetObjectGuid()))
+                    sLFGMgr.AddToQueue(pPlayer, step.script->meetingstone.areaId);
                 break;
             }
             default:

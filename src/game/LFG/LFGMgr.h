@@ -88,6 +88,7 @@ class LFGQueue
         void AddToQueue(Player* leader, uint32 queAreaID);
         void RestoreOfflinePlayer(ObjectGuid plrGuid);
         bool FindRoleToGroup(Player* plr, Group* grp, ClassRoles role);
+        bool IsPlayerInQueue(ObjectGuid plrGuid) const;
         void RemovePlayerFromQueue(ObjectGuid plrGuid, PlayerLeaveMethod leaveMethod = PLAYER_CLIENT_LEAVE); // 0 == by default system (cmsg, leader leave), 1 == by lfg system (no need report text you left queu)
         void RemoveGroupFromQueue(uint32 groupId, GroupLeaveMethod leaveMethod = GROUP_CLIENT_LEAVE);
         void Update(uint32 diff);
