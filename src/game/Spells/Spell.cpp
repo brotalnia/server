@@ -1129,7 +1129,7 @@ void Spell::DoAllEffectOnTarget(TargetInfo *target)
             // chain lightning + clearcasting. Leave positive effects
             // eg. Chain heal/lightning & Zandalarian Hero Charm
             procAttacker &= ~(PROC_FLAG_SUCCESSFUL_SPELL_CAST | PROC_FLAG_SUCCESSFUL_MANA_SPELL_CAST | 
-                              PROC_FLAG_SUCCESSFUL_NEGATIVE_SPELL_HIT);
+                              PROC_FLAG_SUCCESSFUL_NEGATIVE_SPELL_HIT | PROC_FLAG_SUCCESSFUL_POSITIVE_SPELL);
         }
         else if (procAttacker & (PROC_FLAG_SUCCESSFUL_AOE | PROC_FLAG_SUCCESSFUL_NEGATIVE_SPELL_HIT)) {
             // Do not allow secondary hits for negative aoe spells (such as Arcane Explosion) 
