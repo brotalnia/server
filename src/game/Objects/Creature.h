@@ -74,7 +74,6 @@ enum CreatureFlagsExtra
 
 #define MAX_KILL_CREDIT 2
 #define MAX_CREATURE_MODEL 4                                // only single send to client in static data
-#define CREATURE_FLEE_TEXT 1150
 
 // from `creature_template` table
 struct CreatureInfo
@@ -539,7 +538,7 @@ class MANGOS_DLL_SPEC Creature : public Unit
         void FillGuidsListFromThreatList(std::vector<ObjectGuid>& guids, uint32 maxamount = 0);
 
         bool IsImmuneToSpell(SpellEntry const *spellInfo, bool castOnSelf) override;
-        bool IsImmuneToDamage(SpellSchoolMask meleeSchoolMask) override;
+        bool IsImmuneToDamage(SpellSchoolMask meleeSchoolMask, SpellEntry const* spellInfo = nullptr) override;
         bool IsImmuneToSpellEffect(SpellEntry const *spellInfo, SpellEffectIndex index, bool castOnSelf) const override;
 
         bool IsElite() const
