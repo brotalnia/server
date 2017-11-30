@@ -401,11 +401,11 @@ WowPatch = 0
 
 LogSQL = 1
 PidFile = ""
-LogLevel = 3
+LogLevel = 1
 LogTime = 0
 LogFile = "Server.log"
 LogTimestamp = 0
-LogFileLevel = 0
+LogFileLevel = 1
 LogFilter_TransportMoves = 1
 LogFilter_CreatureMoves = 1
 LogFilter_VisibilityChanges = 1
@@ -807,7 +807,7 @@ Event.Announce = 0
 BeepAtStart = 1
 ShowProgressBars = 0
 WaitAtStartupError = 0
-Motd = "Welcome to Elysium Project!"
+Motd = "Welcome to Light's Hope!"
 
 ###################################################################################################################
 # PLAYER INTERACTION
@@ -849,6 +849,7 @@ Motd = "Welcome to Elysium Project!"
 
 AllowTwoSide.Accounts = 0
 AllowTwoSide.Interaction.Chat = 0
+AllowTwoSide.Interaction.Whisper = 0
 AllowTwoSide.Interaction.Channel = 0
 GMJoinOppositeFactionChannels = 0
 AllowTwoSide.Interaction.Group = 0
@@ -882,10 +883,6 @@ TalentsInspecting = 1
 #        Creatures won't search for stealthed units farther than this.
 #        Reduce for better performances.
 #        Default: 15 yards
-#
-#    MaxCreatureSummonLimit
-#       Game objects (and other creatures) won't be able to summon more creatures than this limit
-#       Default: 100
 #
 #    Rate.Creature.Aggro
 #        Aggro radius percent or off.
@@ -937,24 +934,30 @@ TalentsInspecting = 1
 #    Rate.Creature.Elite.RAREELITE.Damage
 #    Rate.Creature.Elite.WORLDBOSS.Damage
 #    Rate.Creature.Elite.RARE.Damage
+#    Rate.Creature.Raid.Damage
 #        Creature Damage Rates.
 #        Examples: 2 - creatures will damage 2x, 1.7 - 1.7x.
+#        Note: Raid damage rates stack with other rates
 #
 #    Rate.Creature.Normal.SpellDamage
 #    Rate.Creature.Elite.Elite.SpellDamage
 #    Rate.Creature.Elite.RAREELITE.SpellDamage
 #    Rate.Creature.Elite.WORLDBOSS.SpellDamag
 #    Rate.Creature.Elite.RARE.SpellDamage
+#    Rate.Creature.Raid.SpellDamage
 #        Creature Spell Damage Rates.
 #        Examples: 2 - creatures will damage with spells 2x, 1.7 - 1.7x.
+#        Note: Raid spell damage rates stack with other rates
 #
 #    Rate.Creature.Normal.HP
 #    Rate.Creature.Elite.Elite.HP
 #    Rate.Creature.Elite.RAREELITE.HP
 #    Rate.Creature.Elite.WORLDBOSS.HP
 #    Rate.Creature.Elite.RARE.HP
+#    Rate.Creature.Raid.HP
 #        Creature Health Ammount Modifier.
 #        Examples: 2 - creatures have 2x health, 1.7 - 1.7x.
+#        Note: Raid HP rates stack with other rates.
 #
 #    ListenRange.Say
 #        Distance from player to listen text that creature (or other world object) say
@@ -983,7 +986,6 @@ Rate.Creature.Aggro = 1
 MaxCreaturesAttackRadius = 40
 MaxPlayersStealthDetectRange = 40
 MaxCreaturesStealthDetectRange = 15
-MaxCreatureSummonLimit = 100
 CreatureFamilyFleeAssistanceRadius = 30
 CreatureFamilyAssistanceRadius = 10
 CreatureFamilyAssistanceDelay = 1500
@@ -1001,16 +1003,19 @@ Rate.Creature.Elite.Elite.Damage = 1
 Rate.Creature.Elite.RAREELITE.Damage = 1
 Rate.Creature.Elite.WORLDBOSS.Damage = 1
 Rate.Creature.Elite.RARE.Damage = 1
+Rate.Creature.Raid.Damage = 1
 Rate.Creature.Normal.SpellDamage = 1
 Rate.Creature.Elite.Elite.SpellDamage = 1
 Rate.Creature.Elite.RAREELITE.SpellDamage = 1
 Rate.Creature.Elite.WORLDBOSS.SpellDamage = 1
 Rate.Creature.Elite.RARE.SpellDamage = 1
+Rate.Creature.Raid.SpellDamage = 1
 Rate.Creature.Normal.HP = 1
 Rate.Creature.Elite.Elite.HP = 1
 Rate.Creature.Elite.RAREELITE.HP = 1
 Rate.Creature.Elite.WORLDBOSS.HP = 1
 Rate.Creature.Elite.RARE.HP = 1
+Rate.Creature.Raid.HP = 1
 ListenRange.Say = 40
 ListenRange.TextEmote = 40
 ListenRange.Yell = 300
@@ -1257,8 +1262,14 @@ Visibility.AIRelocationNotifyDelay = 1000
 #        Minimum auction deposit size in copper
 #        Default: 0
 #
-#    Rate.Honor
-#        Honor gain rate
+#    Rate.Honor.Dishonor
+#        Dishonor rate
+#
+#    Rate.Honor.Battleground
+#        Honor gain rate in battle grounds
+#
+#    Rate.Honor.World
+#        Honor gain rate in the world
 #
 #    Rate.Mining.Amount
 #    Rate.Mining.Next
@@ -1405,7 +1416,9 @@ Rate.Auction.Time = 1
 Rate.Auction.Deposit = 1
 Rate.Auction.Cut = 1
 Auction.Deposit.Min = 0
-Rate.Honor = 1
+Rate.Honor.Dishonor = 1
+Rate.Honor.Battleground = 1
+Rate.Honor.World = 1
 Rate.Mining.Amount = 1
 Rate.Mining.Next   = 1
 Rate.Talent = 1
@@ -1726,8 +1739,8 @@ MapUpdate.VisibilityUpdate.MaxThreads   = 4
 MapUpdate.VisibilityUpdate.Timeout      = 100
 
 # Hardcode multithreading options
-MapUpdate.UpdatePacketsDiff             = 0
-MapUpdate.UpdatePlayersDiff             = 0
+MapUpdate.UpdatePacketsDiff             = 100
+MapUpdate.UpdatePlayersDiff             = 100
 MapUpdate.UpdateCellsDiff               = 100
 
 # Parallelized execution of cells from same map
@@ -1742,8 +1755,8 @@ AsyncTasks.Threads                      = 1
 
 # Recommended value: 1. Else, can cause crashes if 'MapUpdate.Threads' > 1 (one map loads a tile, while the other uses pathfinding etc ...)
 # Disable on dev realms (speedup startup by 90%)
-Terrain.Preload.Continents = 1
-Terrain.Preload.Instances  = 1
+Terrain.Preload.Continents = 0
+Terrain.Preload.Instances  = 0
 
 AsyncQueriesTickTimeout = 0
 
