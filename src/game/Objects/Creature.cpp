@@ -801,7 +801,7 @@ void Creature::Update(uint32 update_diff, uint32 diff)
                     // Reset after 24 secs
                     if (!GetMap()->IsDungeon() && m_TargetNotReachableTimer > 24000)
                         AI()->EnterEvadeMode();
-                    else if (!IsEvadeBecauseTargetNotReachable())
+                    else
                         AI()->UpdateAI(diff);   // AI not react good at real update delays (while freeze in non-active part of map)
                 }
                 catch (std::runtime_error& e)
@@ -948,7 +948,7 @@ void Creature::DoFleeToGetAssistance()
             GetMotionMaster()->MoveSeekAssistance(pCreature->GetPositionX(), pCreature->GetPositionY(), pCreature->GetPositionZ());
             SetTargetGuid(ObjectGuid());
         }
-        MonsterTextEmote(LANG_FLEE, getVictim());
+        MonsterTextEmote(CREATURE_FLEE_TEXT, getVictim());
         UpdateSpeed(MOVE_RUN, false);
         InterruptSpellsWithInterruptFlags(SPELL_INTERRUPT_FLAG_MOVEMENT);
     }
@@ -1393,8 +1393,6 @@ void Creature::SaveToDB(uint32 mapid)
 
 void Creature::SelectLevel(const CreatureInfo *cinfo, float percentHealth, float percentMana)
 {
-    uint32 rank = IsPet() ? 0 : cinfo->rank;
-
     // level
     uint32 minlevel = std::min(cinfo->maxlevel, cinfo->minlevel);
     uint32 maxlevel = std::max(cinfo->maxlevel, cinfo->minlevel);
@@ -1404,7 +1402,7 @@ void Creature::SelectLevel(const CreatureInfo *cinfo, float percentHealth, float
     float rellevel = maxlevel == minlevel ? 0 : (float(level - minlevel)) / (maxlevel - minlevel);
 
     // health
-    float healthmod = _GetHealthMod(rank);
+    float healthmod = GetHealthMod();
 
     uint32 minhealth = std::min(cinfo->maxhealth, cinfo->minhealth);
     uint32 maxhealth = std::max(cinfo->maxhealth, cinfo->minhealth);
@@ -1433,7 +1431,7 @@ void Creature::SelectLevel(const CreatureInfo *cinfo, float percentHealth, float
     SetModifierValue(UNIT_MOD_MANA, BASE_VALUE, float(mana));
 
     // damage
-    float damagemod = _GetDamageMod(rank);
+    float damagemod = GetDamageMod();
 
     SetBaseWeaponDamage(BASE_ATTACK, MINDAMAGE, cinfo->mindmg * damagemod);
     SetBaseWeaponDamage(BASE_ATTACK, MAXDAMAGE, cinfo->maxdmg * damagemod);
@@ -1447,60 +1445,78 @@ void Creature::SelectLevel(const CreatureInfo *cinfo, float percentHealth, float
     SetModifierValue(UNIT_MOD_ATTACK_POWER, BASE_VALUE, cinfo->attackpower * damagemod);
 }
 
-float Creature::_GetHealthMod(int32 Rank)
+float Creature::GetHealthMod() const
 {
-    switch (Rank)                                           // define rates for each elite rank
+    float mod = 1.f;
+
+    if (GetMap()->IsRaid())
+        mod *= sWorld.getConfig(CONFIG_FLOAT_RATE_CREATURE_RAID_HP);
+
+    int rank = IsPet() ? 0 : GetCreatureInfo()->rank;
+    switch (rank)                                           // define rates for each elite rank
     {
         case CREATURE_ELITE_NORMAL:
-            return sWorld.getConfig(CONFIG_FLOAT_RATE_CREATURE_NORMAL_HP);
+            return mod * sWorld.getConfig(CONFIG_FLOAT_RATE_CREATURE_NORMAL_HP);
         case CREATURE_ELITE_ELITE:
-            return sWorld.getConfig(CONFIG_FLOAT_RATE_CREATURE_ELITE_ELITE_HP);
+            return mod * sWorld.getConfig(CONFIG_FLOAT_RATE_CREATURE_ELITE_ELITE_HP);
         case CREATURE_ELITE_RAREELITE:
-            return sWorld.getConfig(CONFIG_FLOAT_RATE_CREATURE_ELITE_RAREELITE_HP);
+            return mod * sWorld.getConfig(CONFIG_FLOAT_RATE_CREATURE_ELITE_RAREELITE_HP);
         case CREATURE_ELITE_WORLDBOSS:
-            return sWorld.getConfig(CONFIG_FLOAT_RATE_CREATURE_ELITE_WORLDBOSS_HP);
+            return mod * sWorld.getConfig(CONFIG_FLOAT_RATE_CREATURE_ELITE_WORLDBOSS_HP);
         case CREATURE_ELITE_RARE:
-            return sWorld.getConfig(CONFIG_FLOAT_RATE_CREATURE_ELITE_RARE_HP);
+            return mod * sWorld.getConfig(CONFIG_FLOAT_RATE_CREATURE_ELITE_RARE_HP);
         default:
-            return sWorld.getConfig(CONFIG_FLOAT_RATE_CREATURE_ELITE_ELITE_HP);
+            return mod * sWorld.getConfig(CONFIG_FLOAT_RATE_CREATURE_ELITE_ELITE_HP);
     }
 }
 
-float Creature::_GetDamageMod(int32 Rank)
+float Creature::GetDamageMod() const
 {
-    switch (Rank)                                           // define rates for each elite rank
+    float mod = 1.f;
+
+    if (GetMap()->IsRaid())
+        mod *= sWorld.getConfig(CONFIG_FLOAT_RATE_CREATURE_RAID_DAMAGE);
+
+    int rank = IsPet() ? 0 : GetCreatureInfo()->rank;
+    switch (rank)                                           // define rates for each elite rank
     {
         case CREATURE_ELITE_NORMAL:
-            return sWorld.getConfig(CONFIG_FLOAT_RATE_CREATURE_NORMAL_DAMAGE);
+            return mod * sWorld.getConfig(CONFIG_FLOAT_RATE_CREATURE_NORMAL_DAMAGE);
         case CREATURE_ELITE_ELITE:
-            return sWorld.getConfig(CONFIG_FLOAT_RATE_CREATURE_ELITE_ELITE_DAMAGE);
+            return mod * sWorld.getConfig(CONFIG_FLOAT_RATE_CREATURE_ELITE_ELITE_DAMAGE);
         case CREATURE_ELITE_RAREELITE:
-            return sWorld.getConfig(CONFIG_FLOAT_RATE_CREATURE_ELITE_RAREELITE_DAMAGE);
+            return mod * sWorld.getConfig(CONFIG_FLOAT_RATE_CREATURE_ELITE_RAREELITE_DAMAGE);
         case CREATURE_ELITE_WORLDBOSS:
-            return sWorld.getConfig(CONFIG_FLOAT_RATE_CREATURE_ELITE_WORLDBOSS_DAMAGE);
+            return mod * sWorld.getConfig(CONFIG_FLOAT_RATE_CREATURE_ELITE_WORLDBOSS_DAMAGE);
         case CREATURE_ELITE_RARE:
-            return sWorld.getConfig(CONFIG_FLOAT_RATE_CREATURE_ELITE_RARE_DAMAGE);
+            return mod * sWorld.getConfig(CONFIG_FLOAT_RATE_CREATURE_ELITE_RARE_DAMAGE);
         default:
-            return sWorld.getConfig(CONFIG_FLOAT_RATE_CREATURE_ELITE_ELITE_DAMAGE);
+            return mod * sWorld.getConfig(CONFIG_FLOAT_RATE_CREATURE_ELITE_ELITE_DAMAGE);
     }
 }
 
-float Creature::GetSpellDamageMod(int32 Rank)
+float Creature::GetSpellDamageMod() const
 {
-    switch (Rank)                                           // define rates for each elite rank
+    float mod = 1.f;
+
+    if (GetMap()->IsRaid())
+        mod *= sWorld.getConfig(CONFIG_FLOAT_RATE_CREATURE_RAID_SPELLDAMAGE);
+
+    int rank = IsPet() ? 0 : GetCreatureInfo()->rank;
+    switch (rank)                                           // define rates for each elite rank
     {
         case CREATURE_ELITE_NORMAL:
-            return sWorld.getConfig(CONFIG_FLOAT_RATE_CREATURE_NORMAL_SPELLDAMAGE);
+            return mod * sWorld.getConfig(CONFIG_FLOAT_RATE_CREATURE_NORMAL_SPELLDAMAGE);
         case CREATURE_ELITE_ELITE:
-            return sWorld.getConfig(CONFIG_FLOAT_RATE_CREATURE_ELITE_ELITE_SPELLDAMAGE);
+            return mod * sWorld.getConfig(CONFIG_FLOAT_RATE_CREATURE_ELITE_ELITE_SPELLDAMAGE);
         case CREATURE_ELITE_RAREELITE:
-            return sWorld.getConfig(CONFIG_FLOAT_RATE_CREATURE_ELITE_RAREELITE_SPELLDAMAGE);
+            return mod * sWorld.getConfig(CONFIG_FLOAT_RATE_CREATURE_ELITE_RAREELITE_SPELLDAMAGE);
         case CREATURE_ELITE_WORLDBOSS:
-            return sWorld.getConfig(CONFIG_FLOAT_RATE_CREATURE_ELITE_WORLDBOSS_SPELLDAMAGE);
+            return mod * sWorld.getConfig(CONFIG_FLOAT_RATE_CREATURE_ELITE_WORLDBOSS_SPELLDAMAGE);
         case CREATURE_ELITE_RARE:
-            return sWorld.getConfig(CONFIG_FLOAT_RATE_CREATURE_ELITE_RARE_SPELLDAMAGE);
+            return mod * sWorld.getConfig(CONFIG_FLOAT_RATE_CREATURE_ELITE_RARE_SPELLDAMAGE);
         default:
-            return sWorld.getConfig(CONFIG_FLOAT_RATE_CREATURE_ELITE_ELITE_SPELLDAMAGE);
+            return mod * sWorld.getConfig(CONFIG_FLOAT_RATE_CREATURE_ELITE_ELITE_SPELLDAMAGE);
     }
 }
 
@@ -1578,7 +1594,7 @@ bool Creature::LoadFromDB(uint32 guidlow, Map *map)
     uint32 curhealth = data->curhealth;
     if (curhealth)
     {
-        curhealth = uint32(curhealth * _GetHealthMod(GetCreatureInfo()->rank));
+        curhealth = uint32(curhealth * GetHealthMod());
         if (curhealth < 1)
             curhealth = 1;
     }
@@ -1944,12 +1960,12 @@ bool Creature::IsImmuneToSpell(SpellEntry const *spellInfo, bool castOnSelf)
     return Unit::IsImmuneToSpell(spellInfo, castOnSelf);
 }
 
-bool Creature::IsImmuneToDamage(SpellSchoolMask meleeSchoolMask, SpellEntry const* spellInfo)
+bool Creature::IsImmuneToDamage(SpellSchoolMask meleeSchoolMask)
 {
     if (GetCreatureInfo()->SchoolImmuneMask & meleeSchoolMask)
         return true;
 
-    return Unit::IsImmuneToDamage(meleeSchoolMask, spellInfo);
+    return Unit::IsImmuneToDamage(meleeSchoolMask);
 }
 
 // hacky - seems to be the only way of doing this without wasting more time
