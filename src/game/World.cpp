@@ -2747,6 +2747,8 @@ void World::LogChat(WorldSession* sess, const char* type, std::string const& msg
 
     if (target)
         sLog.out(LOG_CHAT, "[%s] %s:%u -> %s:%u : %s", type, plr->GetName(), plr->GetObjectGuid().GetCounter(), target->GetName(), target->GetObjectGuid().GetCounter(), msg.c_str());
+    else if (chanId && chanStr)
+        sLog.out(LOG_CHAT, "[%s:%u:%s] %s:%u : %s", type, chanId, chanStr, plr->GetName(), plr->GetObjectGuid().GetCounter(), msg.c_str());
     else if (chanId)
         sLog.out(LOG_CHAT, "[%s:%u] %s:%u : %s", type, chanId, plr->GetName(), plr->GetObjectGuid().GetCounter(), msg.c_str());
     else if (chanStr)
