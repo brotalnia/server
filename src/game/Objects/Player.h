@@ -309,11 +309,8 @@ typedef std::list<Item*> ItemDurationList;
 
 enum RaidGroupError
 {
-    ERR_RAID_GROUP_NONE                 = 0,
-    ERR_RAID_GROUP_LOWLEVEL             = 1,
-    ERR_RAID_GROUP_ONLY                 = 2,
-    ERR_RAID_GROUP_FULL                 = 3,
-    ERR_RAID_GROUP_REQUIREMENTS_UNMATCH = 4
+    ERR_RAID_GROUP_REQUIRED = 1,
+    ERR_RAID_GROUP_FULL     = 2
 };
 
 enum DrunkenState
@@ -546,13 +543,12 @@ enum TradeSlots
     TRADE_SLOT_INVALID          = -1
 };
 
-// [-ZERO] Need fix, or maybe not exists
 enum TransferAbortReason
 {
-    TRANSFER_ABORT_NONE                         = 0x00,
     TRANSFER_ABORT_MAX_PLAYERS                  = 0x01,     // Transfer Aborted: instance is full
     TRANSFER_ABORT_NOT_FOUND                    = 0x02,     // Transfer Aborted: instance not found
     TRANSFER_ABORT_TOO_MANY_INSTANCES           = 0x03,     // You have entered too many instances recently.
+    TRANSFER_ABORT_SILENTLY                     = 0x04,     // no message shown; the same effect give values above 5
     TRANSFER_ABORT_ZONE_IN_COMBAT               = 0x05,     // Unable to zone in while an encounter is in progress.
 };
 
@@ -632,6 +628,29 @@ enum PlayerDelayedOperations
     DELAYED_SPELL_CAST_DESERTER   = 0x04,
     DELAYED_CAST_HONORLESS_TARGET = 0x08,
     DELAYED_END
+};
+
+enum PlayerMountResult
+{
+    MOUNTRESULT_INVALIDMOUNTEE  = 0,    // You can't mount that unit!
+    MOUNTRESULT_TOOFARAWAY      = 1,    // That mount is too far away!
+    MOUNTRESULT_ALREADYMOUNTED  = 2,    // You're already mounted!
+    MOUNTRESULT_NOTMOUNTABLE    = 3,    // That unit can't be mounted!
+    MOUNTRESULT_NOTYOURPET      = 4,    // That mount isn't your pet!
+    MOUNTRESULT_OTHER           = 5,    // internal
+    MOUNTRESULT_LOOTING         = 6,    // You can't mount while looting!
+    MOUNTRESULT_RACECANTMOUNT   = 7,    // You can't mount because of your race!
+    MOUNTRESULT_SHAPESHIFTED    = 8,    // You can't mount while shapeshifted!
+    MOUNTRESULT_FORCEDDISMOUNT  = 9,    // You dismount before continuing.
+    MOUNTRESULT_OK              = 10    // no error
+};
+
+enum PlayerDismountResult
+{
+    DISMOUNTRESULT_NOPET        = 0,    // internal
+    DISMOUNTRESULT_NOTMOUNTED   = 1,    // You're not mounted!
+    DISMOUNTRESULT_NOTYOURPET   = 2,    // internal
+    DISMOUNTRESULT_OK           = 3     // no error
 };
 
 enum ReputationSource
@@ -763,7 +782,7 @@ class TradeData
 
         time_t GetLastModificationTime() const { return m_lastModificationTime; }
         void SetLastModificationTime(time_t t) { m_lastModificationTime = t; }
-		
+
 		time_t GetScamPreventionDelay() const { return m_scamPreventionDelay; }
 		void SetScamPreventionDelay(time_t t) { m_scamPreventionDelay = t; }
     public:                                                 // access functions
@@ -832,6 +851,27 @@ struct AuraSaveStruct
     uint32 effIndexMask;
 };
 
+struct ScheduledTeleportData
+{
+    ScheduledTeleportData() : targetMapId(0), x(0.0f), y(0.0f), z(0.0f),
+        orientation(0.0f), options(0), recover(std::function<void()>()) {};
+
+    ScheduledTeleportData(uint32 mapid, float x, float y, float z, float o,
+        uint32 options, std::function<void()> recover)
+        : targetMapId(mapid), x(x), y(y), z(z),
+          orientation(o), options(options), recover(recover) {};
+
+    uint32 targetMapId;
+    float x;
+    float y;
+    float z;
+    float orientation;
+
+    uint32 options;
+
+    std::function<void()> recover;
+};
+
 class MANGOS_DLL_SPEC Player final: public Unit
 {
     friend class WorldSession;
@@ -860,6 +900,10 @@ class MANGOS_DLL_SPEC Player final: public Unit
         {
             return TeleportTo(loc.mapid, loc.coord_x, loc.coord_y, loc.coord_z, loc.orientation, options, recover);
         }
+
+        // _NOT_ thread-safe. Must be executed by the map manager after map updates, since we
+        // remove objects from the map
+        bool ExecuteTeleportFar(ScheduledTeleportData *data);
 
         bool TeleportToBGEntryPoint();
 
@@ -901,7 +945,7 @@ class MANGOS_DLL_SPEC Player final: public Unit
 
         void SendInitialPacketsBeforeAddToMap();
         void SendInitialPacketsAfterAddToMap(bool login = true);
-        void SendTransferAborted(uint32 mapid, uint8 reason, uint8 arg = 0);
+        void SendTransferAborted(uint8 reason);
         void SendInstanceResetWarning(uint32 mapid, uint32 time);
 
         Creature* GetNPCIfCanInteractWith(ObjectGuid guid, uint32 npcflagmask);
@@ -933,6 +977,10 @@ class MANGOS_DLL_SPEC Player final: public Unit
                                                             // mount_id can be used in scripting calls
         void TaxiStepFinished();
         void ContinueTaxiFlight();
+        void Mount(uint32 mount, uint32 spellId = 0) override;
+        void Unmount(bool from_aura = false) override;
+        void SendMountResult(PlayerMountResult result);
+        void SendDismountResult(PlayerDismountResult result);
         bool isAcceptTickets() const { return GetSession()->GetSecurity() >= SEC_GAMEMASTER && (m_ExtraFlags & PLAYER_EXTRA_GM_ACCEPT_TICKETS); }
         void SetAcceptTicket(bool on) { if(on) m_ExtraFlags |= PLAYER_EXTRA_GM_ACCEPT_TICKETS; else m_ExtraFlags &= ~PLAYER_EXTRA_GM_ACCEPT_TICKETS; }
 
@@ -1121,7 +1169,7 @@ class MANGOS_DLL_SPEC Player final: public Unit
                                                             // in trade, guild bank, mail....
         void RemoveItemDependentAurasAndCasts( Item * pItem );
         void DestroyItem( uint8 bag, uint8 slot, bool update );
-        void DestroyItemCount( uint32 item, uint32 count, bool update, bool unequip_check = false);
+        void DestroyItemCount( uint32 item, uint32 count, bool update, bool unequip_check = false, bool check_bank = false);
         void DestroyItemCount( Item* item, uint32& count, bool update );
         /**
          * @brief Destroys equipped item $itemId and updates the Player
@@ -1141,6 +1189,7 @@ class MANGOS_DLL_SPEC Player final: public Unit
         void SendEquipError( InventoryResult msg, Item* pItem, Item *pItem2 = NULL, uint32 itemid = 0 ) const;
         void SendBuyError( BuyResult msg, Creature* pCreature, uint32 item, uint32 param );
         void SendSellError( SellResult msg, Creature* pCreature, ObjectGuid itemGuid, uint32 param );
+        void SendOpenContainer();
         void AddWeaponProficiency(uint32 newflag) { m_WeaponProficiency |= newflag; }
         void AddArmorProficiency(uint32 newflag) { m_ArmorProficiency |= newflag; }
         uint32 GetWeaponProficiency() const { return m_WeaponProficiency; }
@@ -1150,7 +1199,7 @@ class MANGOS_DLL_SPEC Player final: public Unit
             Item* mainItem = GetItemByPos(INVENTORY_SLOT_BAG_0, EQUIPMENT_SLOT_MAINHAND);
             return mainItem && mainItem->GetProto()->InventoryType == INVTYPE_2HWEAPON;
         }
-        void SendNewItem( Item *item, uint32 count, bool received, bool created, bool broadcast = false );
+        void SendNewItem( Item *item, uint32 count, bool received, bool created, bool broadcast = false, bool showInChat = true );
         bool BuyItemFromVendor(ObjectGuid vendorGuid, uint32 item, uint8 count, uint8 bag, uint8 slot);
         void OnReceivedItem(Item* item);
 
@@ -1229,8 +1278,9 @@ class MANGOS_DLL_SPEC Player final: public Unit
         bool SatisfyQuestPrevChain( Quest const* qInfo, bool msg ) const;
         bool CanGiveQuestSourceItemIfNeed( Quest const *pQuest, ItemPosCountVec* dest = NULL) const;
         void GiveQuestSourceItemIfNeed(Quest const *pQuest);
-        bool TakeQuestSourceItem( uint32 quest_id, bool msg );
+        bool TakeOrReplaceQuestStartItems( uint32 quest_id, bool msg, bool giveQuestStartItem );
         bool GetQuestRewardStatus( uint32 quest_id ) const;
+        const QuestStatusData* GetQuestStatusData(uint32 quest_id) const;
         QuestStatus GetQuestStatus( uint32 quest_id ) const;
         void SetQuestStatus( uint32 quest_id, QuestStatus status );
 
@@ -1271,6 +1321,7 @@ class MANGOS_DLL_SPEC Player final: public Unit
         uint32 GetReqKillOrCastCurrentCount(uint32 quest_id, int32 entry);
         void AreaExploredOrEventHappens( uint32 questId );
         void GroupEventHappens( uint32 questId, WorldObject const* pEventObject );
+        void GroupEventFailHappens( uint32 questId );
         void ItemAddedQuestCheck( uint32 entry, uint32 count );
         void ItemRemovedQuestCheck( uint32 entry, uint32 count );
         void KilledMonster( CreatureInfo const* cInfo, ObjectGuid guid );
@@ -1287,10 +1338,11 @@ class MANGOS_DLL_SPEC Player final: public Unit
         void SendQuestCompleteEvent(uint32 quest_id);
         void SendQuestReward( Quest const *pQuest, uint32 XP, Object* questGiver );
         void SendQuestFailed( uint32 quest_id);
+        void SendQuestFailedAtTaker(uint32 quest_id, uint32 reason = INVALIDREASON_DONT_HAVE_REQ) const;
         void SendQuestTimerFailed( uint32 quest_id );
         void SendCanTakeQuestResponse( uint32 msg ) const;
         void SendQuestConfirmAccept(Quest const* pQuest, Player* pReceiver);
-        void SendPushToPartyResponse( Player *pPlayer, uint32 msg );
+        void SendPushToPartyResponse( Player *pPlayer, uint8 msg );
         void SendQuestUpdateAddItem( Quest const* pQuest, uint32 item_idx, uint32 count );
         void SendQuestUpdateAddCreatureOrGo(Quest const* pQuest, ObjectGuid guid, uint32 creatureOrGO_idx, uint32 count);
 
@@ -1412,7 +1464,8 @@ class MANGOS_DLL_SPEC Player final: public Unit
         void SetFreeTalentPoints(uint32 points) { SetUInt32Value(PLAYER_CHARACTER_POINTS1,points); }
         void UpdateFreeTalentPoints(bool resetIfNeed = true);
         bool resetTalents(bool no_cost = false);
-        uint32 resetTalentsCost() const;
+        uint32 resetTalentsCost();
+        void updateResetTalentsMultiplier();
         void InitTalentForLevel();
         void LearnTalent(uint32 talentId, uint32 talentRank);
         uint32 CalculateTalentsPoints() const;
@@ -1534,6 +1587,7 @@ class MANGOS_DLL_SPEC Player final: public Unit
         void UpdateArmor();
         void UpdateMaxHealth();
         void UpdateMaxPower(Powers power);
+        void UpdateManaRegen() override;
         void UpdateAttackPowerAndDamage(bool ranged = false);
         void UpdateDamagePhysical(WeaponAttackType attType);
         void UpdateSpellDamageAndHealingBonus();
@@ -1555,12 +1609,11 @@ class MANGOS_DLL_SPEC Player final: public Unit
 
         void UpdateAllSpellCritChances();
         void UpdateSpellCritChance(uint32 school);
-        void UpdateManaRegen();
 
         ObjectGuid const& GetLootGuid() const { return m_lootGuid; }
         void SetLootGuid(ObjectGuid const& guid) { m_lootGuid = guid; }
 
-        void RemovedInsignia(Player* looterPlr);
+        void RemovedInsignia(Player* looterPlr, Corpse *corpse);
 
         WorldSession* GetSession() const { return m_session; }
         void SetSession(WorldSession *s);
@@ -1645,11 +1698,12 @@ class MANGOS_DLL_SPEC Player final: public Unit
         void learnSkillRewardedSpells(uint32 id, uint32 value);
 
         WorldLocation& GetTeleportDest() { return m_teleport_dest; }
-        bool IsBeingTeleported() const { return mSemaphoreTeleport_Near || mSemaphoreTeleport_Far; }
+        bool IsBeingTeleported() const { return mSemaphoreTeleport_Near || mSemaphoreTeleport_Far || mPendingFarTeleport; }
         bool IsBeingTeleportedNear() const { return mSemaphoreTeleport_Near; }
         bool IsBeingTeleportedFar() const { return mSemaphoreTeleport_Far; }
         void SetSemaphoreTeleportNear(bool semphsetting);
         void SetSemaphoreTeleportFar(bool semphsetting);
+        void SetPendingFarTeleport(bool pending) { mPendingFarTeleport = pending; }
         void ProcessDelayedOperations();
 
         void CheckAreaExploreAndOutdoor(void);
@@ -1935,7 +1989,7 @@ class MANGOS_DLL_SPEC Player final: public Unit
         void SetClientControl(Unit* target, uint8 allowMove);
         void SetMover(Unit* target) { m_mover = target ? target : this; }
         Unit* GetMover() const { return m_mover; }
-        bool IsSelfMover() const { return m_mover == this; }// normal case for player not controlling other unit        
+        bool IsSelfMover() const { return m_mover == this; }// normal case for player not controlling other unit
         bool IsNextRelocationIgnored() const { return m_bNextRelocationsIgnored ? true : false; }
         void SetNextRelocationsIgnoredCount(uint32 count) { m_bNextRelocationsIgnored = count; }
         void DoIgnoreRelocation() { if (m_bNextRelocationsIgnored) --m_bNextRelocationsIgnored; }
@@ -1955,7 +2009,7 @@ class MANGOS_DLL_SPEC Player final: public Unit
 
         void SetHomebindToLocation(WorldLocation const& loc, uint32 area_id);
         void RelocateToHomebind() { SetLocationMapId(m_homebindMapId); Relocate(m_homebindX, m_homebindY, m_homebindZ); }
-        bool TeleportToHomebind(uint32 options = 0) { return TeleportTo(m_homebindMapId, m_homebindX, m_homebindY, m_homebindZ, GetOrientation(), options); }
+        bool TeleportToHomebind(uint32 options = 0, bool hearthCooldown = true);
 
         Object* GetObjectByTypeMask(ObjectGuid guid, TypeMask typemask);
 
@@ -2301,7 +2355,7 @@ class MANGOS_DLL_SPEC Player final: public Unit
         RestType rest_type;
         ////////////////////Rest System/////////////////////
 
-        uint32 m_resetTalentsCost;
+        uint32 m_resetTalentsMultiplier;
         time_t m_resetTalentsTime;
         uint32 m_usedTalentCount;
 
@@ -2325,6 +2379,12 @@ class MANGOS_DLL_SPEC Player final: public Unit
         uint32 m_gmInvisibilityLevel;
         uint32 m_currentTicketCounter;
         bool m_smartInstanceRebind;
+
+        // to fix an 1.12 client problem with transports
+        // sometimes they need a refresh before being usable
+        bool m_justBoarded;
+        void SetJustBoarded(bool hasBoarded) { m_justBoarded = hasBoarded; }
+        bool HasJustBoarded() { return m_justBoarded; }
 
     private:
         // internal common parts for CanStore/StoreItem functions
@@ -2375,6 +2435,7 @@ class MANGOS_DLL_SPEC Player final: public Unit
         uint32 m_lastFallTime;
         float  m_lastFallZ;
 
+        LiquidTypeEntry const* m_lastLiquid;
         uint8 m_isunderwater;
         bool m_isInWater;
 
@@ -2385,6 +2446,7 @@ class MANGOS_DLL_SPEC Player final: public Unit
         std::function<void()> m_teleportRecoverDelayed;
         bool mSemaphoreTeleport_Near;
         bool mSemaphoreTeleport_Far;
+        bool mPendingFarTeleport;
 
         uint32 m_DelayedOperations;
         bool m_bCanDelayTeleport;

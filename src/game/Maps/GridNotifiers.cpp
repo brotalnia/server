@@ -77,6 +77,11 @@ VisibleNotifier::Notify()
         }
     }
 
+    // Update current map active objects, modifies i_clientGUIDs so we are not sending
+    // out of range updates for an active obj
+    if (player.GetMap())
+        player.GetMap()->UpdateActiveObjectVisibility(&player, i_clientGUIDs, i_data, i_visibleNow);
+
     // generate outOfRange for not iterate objects
     i_data.AddOutOfRangeGUID(i_clientGUIDs);
     player.m_visibleGUIDs_lock.acquire_write();
@@ -109,6 +114,18 @@ VisibleNotifier::Notify()
                 plr->UpdateVisibilityOf(plr->GetCamera().GetBody(), &player);
         }
     }
+
+    // for every new visible unit send attack stance if needed
+    for (Object const* obj : i_visibleNow)
+        if (Unit const* unit = obj->ToUnit())
+            if (unit->hasUnitState(UNIT_STAT_MELEE_ATTACKING))
+                if (Unit const* victim = unit->getVictim())
+                {
+                    WorldPacket data(SMSG_ATTACKSTART, 8 + 8);
+                    data << unit->GetObjectGuid();
+                    data << victim->GetObjectGuid();
+                    player.SendDirectMessage(&data);
+                }
 }
 
 void

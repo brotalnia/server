@@ -35,8 +35,9 @@
 #include "WorldPacket.h"
 #include "Language.h"
 #include "GameEventMgr.h"
-
 #include "Policies/SingletonImp.h"
+#include <chrono>
+#include <random>
 
 INSTANTIATE_SINGLETON_1(BattleGroundMgr);
 
@@ -140,7 +141,7 @@ bool BattleGroundQueue::SelectionPool::AddGroup(GroupQueueInfo *ginfo, uint32 de
 /*********************************************************/
 
 // add group or player (grp == NULL) to bg queue with the given leader and bg specifications
-GroupQueueInfo * BattleGroundQueue::AddGroup(Player *leader, Group* grp, BattleGroundTypeId BgTypeId, BattleGroundBracketId bracketId, bool isPremade)
+GroupQueueInfo * BattleGroundQueue::AddGroup(Player *leader, Group* grp, BattleGroundTypeId BgTypeId, BattleGroundBracketId bracketId, bool isPremade, std::vector<uint32>* excludedMembers)
 {
     // create new ginfo
     GroupQueueInfo* ginfo = new GroupQueueInfo;
@@ -167,28 +168,39 @@ GroupQueueInfo * BattleGroundQueue::AddGroup(Player *leader, Group* grp, BattleG
         //ACE_Guard<ACE_Recursive_Thread_Mutex> guard(m_Lock);
         if (grp)
         {
+            const uint32 group_limit = sWorld.getConfig(CONFIG_UINT32_BATTLEGROUND_GROUP_LIMIT);
             for (GroupReference *itr = grp->GetFirstMember(); itr != NULL; itr = itr->next())
             {
                 Player *member = itr->getSource();
                 if (!member)
                     continue;   // this should never happen
-                PlayerQueueInfo& pl_info = m_QueuedPlayers[member->GetObjectGuid()];
-                pl_info.online           = true;
-                pl_info.LastOnlineTime   = 0;
-                pl_info.GroupInfo        = ginfo;
-                // add the pinfo to ginfo's list
-                ginfo->Players[member->GetObjectGuid()]  = &pl_info;
-                sLog.out(LOG_BG, "%s:%u [%u:%s] tag BG=%u (groupLeader '%s')",
+                
+                if (excludedMembers && (std::find(excludedMembers->begin(), excludedMembers->end(), member->GetGUIDLow()) != excludedMembers->end()))
+                    continue;
 
-                         member->GetName(),
-                         member->GetGUIDLow(), member->GetSession()->GetAccountId(), member->GetSession()->GetRemoteAddress().c_str(),
-                         BgTypeId, leader->GetName());
+                if (grp->GetMembersCount() > group_limit) // queue players solo if group size is above limit set in config
+                {
+                    AddGroup(member, nullptr, BgTypeId, bracketId, false);
+                    ChatHandler(member).PSendSysMessage("Group queue limit is set to %u. You have been queued solo.", group_limit);
+                }
+                else
+                {
+                    PlayerQueueInfo& pl_info = m_QueuedPlayers[member->GetObjectGuid()];
+                    pl_info.online = true;
+                    pl_info.LastOnlineTime = 0;
+                    pl_info.GroupInfo = ginfo;
+                    // add the pinfo to ginfo's list
+                    ginfo->Players[member->GetObjectGuid()] = &pl_info;
+                    sLog.out(LOG_BG, "%s:%u [%u:%s] tag BG=%u (groupLeader '%s')",
+
+                        member->GetName(),
+                        member->GetGUIDLow(), member->GetSession()->GetAccountId(), member->GetSession()->GetRemoteAddress().c_str(),
+                        BgTypeId, leader->GetName());
+                }
             }
         }
         else
         {
-
-
             PlayerQueueInfo& pl_info = m_QueuedPlayers[leader->GetObjectGuid()];
             pl_info.online           = true;
             pl_info.LastOnlineTime   = 0;
@@ -201,7 +213,10 @@ GroupQueueInfo * BattleGroundQueue::AddGroup(Player *leader, Group* grp, BattleG
         }
 
         //add GroupInfo to m_QueuedGroups
-        m_QueuedGroups[bracketId][index].push_back(ginfo);
+        if (ginfo->Players.size())
+            m_QueuedGroups[bracketId][index].push_back(ginfo);
+        else
+            return ginfo; // group size was above limit
 
         //announce to world, this code needs mutex
         if (!isPremade && sWorld.getConfig(CONFIG_UINT32_BATTLEGROUND_QUEUE_ANNOUNCER_JOIN))
@@ -664,6 +679,17 @@ void BattleGroundQueue::Update(BattleGroundTypeId bgTypeId, BattleGroundBracketI
             m_QueuedGroups[bracket_id][BG_QUEUE_NORMAL_HORDE].empty())
         return;
 
+    if (sWorld.getConfig(CONFIG_BOOL_BATTLEGROUND_RANDOMIZE))
+    {
+        auto seed = std::chrono::system_clock::now().time_since_epoch().count();
+        std::shuffle(m_QueuedGroups[bracket_id][BG_QUEUE_NORMAL_ALLIANCE].begin(),
+            m_QueuedGroups[bracket_id][BG_QUEUE_NORMAL_ALLIANCE].end(),
+            std::default_random_engine(seed));
+        std::shuffle(m_QueuedGroups[bracket_id][BG_QUEUE_NORMAL_HORDE].begin(),
+            m_QueuedGroups[bracket_id][BG_QUEUE_NORMAL_HORDE].end(),
+            std::default_random_engine(seed));
+    }
+
     //battleground with free slot for player should be always in the beginning of the queue
     // maybe it would be better to create bgfreeslotqueue for each bracket_id
     BGFreeSlotQueueType::iterator itr, next;
@@ -730,9 +756,16 @@ void BattleGroundQueue::Update(BattleGroundTypeId bgTypeId, BattleGroundBracketI
         else
         {
             // Now randomize
-            std::random_shuffle(m_QueuedGroups[bracket_id][BG_QUEUE_NORMAL_ALLIANCE].begin(), m_QueuedGroups[bracket_id][BG_QUEUE_NORMAL_ALLIANCE].begin() + minPlayersInQueue);
-            std::random_shuffle(m_QueuedGroups[bracket_id][BG_QUEUE_NORMAL_HORDE].begin(), m_QueuedGroups[bracket_id][BG_QUEUE_NORMAL_HORDE].begin() + minPlayersInQueue);
-            sLog.out(LOG_BG, "Alterac queue randomized (%u alliance vs %u horde)", m_QueuedGroups[bracket_id][BG_QUEUE_NORMAL_ALLIANCE].size(), m_QueuedGroups[bracket_id][BG_QUEUE_NORMAL_HORDE].size());
+            auto seed = std::chrono::system_clock::now().time_since_epoch().count();
+            std::shuffle(m_QueuedGroups[bracket_id][BG_QUEUE_NORMAL_ALLIANCE].begin(),
+                m_QueuedGroups[bracket_id][BG_QUEUE_NORMAL_ALLIANCE].begin() + minPlayersInQueue,
+                std::default_random_engine(seed));
+            std::shuffle(m_QueuedGroups[bracket_id][BG_QUEUE_NORMAL_HORDE].begin(),
+                m_QueuedGroups[bracket_id][BG_QUEUE_NORMAL_HORDE].begin() + minPlayersInQueue,
+                std::default_random_engine(seed));
+            sLog.out(LOG_BG, "Alterac queue randomized (%u alliance vs %u horde)",
+                m_QueuedGroups[bracket_id][BG_QUEUE_NORMAL_ALLIANCE].size(),
+                m_QueuedGroups[bracket_id][BG_QUEUE_NORMAL_HORDE].size());
         }
     }
     if (bgTypeId == BATTLEGROUND_AV && sWorld.getConfig(CONFIG_UINT32_AV_INITIAL_MAX_PLAYERS) && !sBattleGroundMgr.isTesting() && normalMatchesCreationAttempts)
@@ -1044,15 +1077,11 @@ void BattleGroundMgr::BuildPvpLogDataPacket(WorldPacket *data, BattleGround *bg)
     }
 }
 
-void BattleGroundMgr::BuildGroupJoinedBattlegroundPacket(WorldPacket *data, BattleGroundTypeId bgTypeId)
+void BattleGroundMgr::BuildGroupJoinedBattlegroundPacket(WorldPacket *data, int32 status)
 {
-    /*bgTypeId is:
-    0 - Your group has joined a battleground queue, but you are not eligible
-    1 - Your group has joined the queue for AV
-    2 - Your group has joined the queue for WS
-    3 - Your group has joined the queue for AB*/
     data->Initialize(SMSG_GROUP_JOINED_BATTLEGROUND, 4);
-    *data << uint32(bgTypeId);
+    // for status, see enum BattleGroundGroupJoinStatus
+    *data << int32(status);
 }
 
 void BattleGroundMgr::BuildUpdateWorldStatePacket(WorldPacket *data, uint32 field, uint32 value)
@@ -1182,7 +1211,7 @@ BattleGround * BattleGroundMgr::CreateNewBattleGround(BattleGroundTypeId bgTypeI
 }
 
 // used to create the BG templates
-uint32 BattleGroundMgr::CreateBattleGround(BattleGroundTypeId bgTypeId, uint32 MinPlayersPerTeam, uint32 MaxPlayersPerTeam, uint32 LevelMin, uint32 LevelMax, char const* BattleGroundName, uint32 MapID, float Team1StartLocX, float Team1StartLocY, float Team1StartLocZ, float Team1StartLocO, float Team2StartLocX, float Team2StartLocY, float Team2StartLocZ, float Team2StartLocO)
+uint32 BattleGroundMgr::CreateBattleGround(BattleGroundTypeId bgTypeId, uint32 MinPlayersPerTeam, uint32 MaxPlayersPerTeam, uint32 LevelMin, uint32 LevelMax, uint32 AllianceWinSpell, uint32 AllianceLoseSpell, uint32 HordeWinSpell, uint32 HordeLoseSpell, char const* BattleGroundName, uint32 MapID, float Team1StartLocX, float Team1StartLocY, float Team1StartLocZ, float Team1StartLocO, float Team2StartLocX, float Team2StartLocY, float Team2StartLocZ, float Team2StartLocO)
 {
     // Create the BG
     BattleGround *bg = NULL;
@@ -1208,6 +1237,10 @@ uint32 BattleGroundMgr::CreateBattleGround(BattleGroundTypeId bgTypeId, uint32 M
     bg->SetMaxPlayersPerTeam(MaxPlayersPerTeam);
     bg->SetMinPlayers(MinPlayersPerTeam * 2);
     bg->SetMaxPlayers(MaxPlayersPerTeam * 2);
+    bg->SetAllianceWinSpell(AllianceWinSpell);
+    bg->SetAllianceLoseSpell(AllianceLoseSpell);
+    bg->SetHordeWinSpell(HordeWinSpell);
+    bg->SetHordeLoseSpell(HordeLoseSpell);
     bg->SetName(BattleGroundName);
     bg->SetTeamStartLoc(ALLIANCE, Team1StartLocX, Team1StartLocY, Team1StartLocZ, Team1StartLocO);
     bg->SetTeamStartLoc(HORDE,    Team2StartLocX, Team2StartLocY, Team2StartLocZ, Team2StartLocO);
@@ -1224,8 +1257,8 @@ void BattleGroundMgr::CreateInitialBattleGrounds()
 {
     uint32 count = 0;
 
-    //                                                0   1                 2                 3      4      5                6              7             8
-    QueryResult *result = WorldDatabase.Query("SELECT id, MinPlayersPerTeam,MaxPlayersPerTeam,MinLvl,MaxLvl,AllianceStartLoc,AllianceStartO,HordeStartLoc,HordeStartO FROM battleground_template");
+    //                                                 0           1                 2           3      4           5                 6              7              8               9              10            11           12    
+    QueryResult *result = WorldDatabase.PQuery("SELECT id, MinPlayersPerTeam,MaxPlayersPerTeam,MinLvl,MaxLvl,AllianceWinSpell,AllianceLoseSpell,HordeWinSpell,HordeLoseSpell,AllianceStartLoc,AllianceStartO,HordeStartLoc,HordeStartO FROM battleground_template t1 WHERE patch=(SELECT max(patch) FROM battleground_template t2 WHERE t1.id=t2.id && patch <= %u)", sWorld.GetWowPatch());
 
     if (!result)
     {
@@ -1253,11 +1286,15 @@ void BattleGroundMgr::CreateInitialBattleGrounds()
         uint32 MaxPlayersPerTeam = fields[2].GetUInt32();
         uint32 MinLvl = fields[3].GetUInt32();
         uint32 MaxLvl = fields[4].GetUInt32();
+        uint32 AllianceWinSpell  = fields[5].GetUInt32();
+        uint32 AllianceLoseSpell = fields[6].GetUInt32();
+        uint32 HordeWinSpell  = fields[7].GetUInt32();
+        uint32 HordeLoseSpell = fields[8].GetUInt32();
 
         float AStartLoc[4];
         float HStartLoc[4];
 
-        uint32 start1 = fields[5].GetUInt32();
+        uint32 start1 = fields[9].GetUInt32();
 
         WorldSafeLocsEntry const* start = sWorldSafeLocsStore.LookupEntry(start1);
         if (start)
@@ -1265,7 +1302,7 @@ void BattleGroundMgr::CreateInitialBattleGrounds()
             AStartLoc[0] = start->x;
             AStartLoc[1] = start->y;
             AStartLoc[2] = start->z;
-            AStartLoc[3] = fields[6].GetFloat();
+            AStartLoc[3] = fields[10].GetFloat();
         }
         else
         {
@@ -1273,7 +1310,7 @@ void BattleGroundMgr::CreateInitialBattleGrounds()
             continue;
         }
 
-        uint32 start2 = fields[7].GetUInt32();
+        uint32 start2 = fields[11].GetUInt32();
 
         start = sWorldSafeLocsStore.LookupEntry(start2);
         if (start)
@@ -1281,7 +1318,7 @@ void BattleGroundMgr::CreateInitialBattleGrounds()
             HStartLoc[0] = start->x;
             HStartLoc[1] = start->y;
             HStartLoc[2] = start->z;
-            HStartLoc[3] = fields[8].GetFloat();
+            HStartLoc[3] = fields[12].GetFloat();
         }
         else
         {
@@ -1301,7 +1338,7 @@ void BattleGroundMgr::CreateInitialBattleGrounds()
         }
 
         //DETAIL_LOG("Creating battleground %s, %u-%u", bl->name[sWorld.GetDBClang()], MinLvl, MaxLvl);
-        if (!CreateBattleGround(bgTypeID, MinPlayersPerTeam, MaxPlayersPerTeam, MinLvl, MaxLvl, name, mapId, AStartLoc[0], AStartLoc[1], AStartLoc[2], AStartLoc[3], HStartLoc[0], HStartLoc[1], HStartLoc[2], HStartLoc[3]))
+        if (!CreateBattleGround(bgTypeID, MinPlayersPerTeam, MaxPlayersPerTeam, MinLvl, MaxLvl, AllianceWinSpell, AllianceLoseSpell, HordeWinSpell, HordeLoseSpell, name, mapId, AStartLoc[0], AStartLoc[1], AStartLoc[2], AStartLoc[3], HStartLoc[0], HStartLoc[1], HStartLoc[2], HStartLoc[3]))
             continue;
 
         ++count;

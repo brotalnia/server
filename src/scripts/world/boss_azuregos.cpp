@@ -14,7 +14,7 @@ enum
     SPELL_FROSTBREATH           = 21099,
     SPELL_ARCANEVACUUM          = 21147,
     SPELL_REFLECT               = 22067,
-    SPELL_CLEAVE                = 19983,
+    SPELL_CLEAVE                = 15613,
 
     SAY_TELEPORT                = -1000100,
     SAY_GOOD_DAY                = -1000006,
@@ -28,8 +28,8 @@ enum
     ITEM_MAGICAL_LEDGER         = 20949,
 
     TEXT_HARM                   = 7880,
-    TEXT_SAVING_WORLD           = 1548114,
-    TEXT_SCEPTER_0              = 1548101,
+    TEXT_SAVING_WORLD           = 7901,
+    TEXT_SCEPTER_0              = 7885,
     PLAYER_SAY_0                = -3100013,
     MAX_SCEPTER_DIALOGUE        = 13,
 
@@ -43,6 +43,7 @@ struct boss_azuregosAI : ScriptedAI
 {
     explicit boss_azuregosAI(Creature* pCreature) : ScriptedAI(pCreature)
     {
+        pCreature->SetLootAndXPModDist(150.0f);
         boss_azuregosAI::Reset();
     }
 

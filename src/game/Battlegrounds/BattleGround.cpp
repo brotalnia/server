@@ -110,7 +110,7 @@ public:
 private:
     void do_helper(WorldPacket& data, char const* text)
     {
-        //copyied from BuildMonsterChat
+        //copyied from BuildWorldObjectChat
         data << uint8(CHAT_MSG_MONSTER_YELL);
         data << uint32(i_language);
         data << ObjectGuid(i_source->GetObjectGuid());
@@ -174,7 +174,7 @@ public:
 
         char str [2048];
         snprintf(str, 2048, text, arg1str, arg2str);
-        //copyied from BuildMonsterChat
+        //copyied from BuildWorldObjectChat
         data << uint8(CHAT_MSG_MONSTER_YELL);
         data << uint32(i_language);
         data << ObjectGuid(i_source->GetObjectGuid());
@@ -321,7 +321,7 @@ void BattleGround::Update(uint32 diff)
     /*********************************************************/
 
     // if less then minimum players are in on one side, then start premature finish timer
-    if (GetStatus() == STATUS_IN_PROGRESS && sBattleGroundMgr.GetPrematureFinishTime() && (GetPlayersCountByTeam(ALLIANCE) < GetMinPlayersPerTeam() || GetPlayersCountByTeam(HORDE) < GetMinPlayersPerTeam()))
+    if (GetTypeID() != BATTLEGROUND_AV && GetStatus() == STATUS_IN_PROGRESS && sBattleGroundMgr.GetPrematureFinishTime() && (GetPlayersCountByTeam(ALLIANCE) < GetMinPlayersPerTeam() || GetPlayersCountByTeam(HORDE) < GetMinPlayersPerTeam()))
     {
         if (!m_PrematureCountDown)
         {
@@ -755,33 +755,17 @@ uint32 BattleGround::GetBattlemasterEntry() const
 
 void BattleGround::RewardMark(Player *plr, uint32 count)
 {
-    switch (GetTypeID())
-    {
-        case BATTLEGROUND_AV:
-            if (count == ITEM_WINNER_COUNT)
-                RewardSpellCast(plr, SPELL_AV_MARK_WINNER);
-            else
-                RewardSpellCast(plr, SPELL_AV_MARK_LOSER);
-            break;
-        case BATTLEGROUND_WS:
-            if (count == ITEM_WINNER_COUNT)
-                RewardSpellCast(plr, SPELL_WS_MARK_WINNER);
-            else
-                RewardSpellCast(plr, SPELL_WS_MARK_LOSER);
-            break;
-        case BATTLEGROUND_AB:
-            if (count == ITEM_WINNER_COUNT)
-                RewardSpellCast(plr, SPELL_AB_MARK_WINNER);
-            else
-                RewardSpellCast(plr, SPELL_AB_MARK_LOSER);
-            break;
-        default:
-            break;
-    }
+    if (count == ITEM_WINNER_COUNT)
+        RewardSpellCast(plr, plr->GetTeamId() ? GetHordeWinSpell() : GetAllianceWinSpell());
+    else
+        RewardSpellCast(plr, plr->GetTeamId() ? GetHordeLoseSpell() : GetAllianceLoseSpell());
 }
 
 void BattleGround::RewardSpellCast(Player *plr, uint32 spell_id)
 {
+    if (!spell_id)
+        return;
+
     SpellEntry const *spellInfo = sSpellMgr.GetSpellEntry(spell_id);
     if (!spellInfo)
     {
@@ -1377,7 +1361,7 @@ void BattleGround::ReturnPlayersToHomeGY()
     }
 }
 
-void BattleGround::SpawnEvent(uint8 event1, uint8 event2, bool spawn, bool forced_despawn)
+void BattleGround::SpawnEvent(uint8 event1, uint8 event2, bool spawn, bool forced_despawn, uint32 delay)
 {
     // stop if we want to spawn something which was already spawned
     // or despawn something which was already despawned
@@ -1413,7 +1397,7 @@ void BattleGround::SpawnEvent(uint8 event1, uint8 event2, bool spawn, bool force
 
     BGObjects::const_iterator itr2 = m_EventObjects[MAKE_PAIR32(event1, event2)].gameobjects.begin();
     for (; itr2 != m_EventObjects[MAKE_PAIR32(event1, event2)].gameobjects.end(); ++itr2)
-        SpawnBGObject(*itr2, (spawn) ? RESPAWN_IMMEDIATELY : RESPAWN_ONE_DAY);
+        SpawnBGObject(*itr2, (spawn) ? delay : RESPAWN_ONE_DAY);
 
     OnEventStateChanged(event1, event2, spawn);
 }
@@ -1450,21 +1434,27 @@ void BattleGround::SpawnBGObject(ObjectGuid guid, uint32 respawntime)
     GameObject *obj = map->GetGameObject(guid);
     if (!obj)
         return;
-    if (respawntime == 0)
+    if (respawntime != RESPAWN_ONE_DAY)
     {
         //we need to change state from GO_JUST_DEACTIVATED to GO_READY in case battleground is starting again
         if (obj->getLootState() == GO_JUST_DEACTIVATED)
             obj->SetLootState(GO_READY);
 
-        obj->SetRespawnTime(obj->GetGOInfo()->type == GAMEOBJECT_TYPE_FLAGSTAND ? 0 : 3);
+        if (obj->GetGOInfo()->type != GAMEOBJECT_TYPE_FLAGSTAND)
+            obj->SetGoState(GO_STATE_READY);
+
+        obj->SetRespawnTime(respawntime);
         if (obj->GetEntry() == 178786 || obj->GetEntry() == 178787 || obj->GetEntry() == 178788 || obj->GetEntry() == 178789)
             obj->SetRespawnDelay(60);
 
-        map->Add(obj);
+        if (!obj->GetRespawnTime())
+            map->Add(obj);
     }
     else
     {
-        map->Add(obj);
+        if (obj->GetGOInfo()->type != GAMEOBJECT_TYPE_FLAGSTAND)
+            obj->SetGoState(GO_STATE_ACTIVE_ALTERNATIVE);
+
         obj->SetRespawnTime(respawntime);
         obj->SetLootState(GO_JUST_DEACTIVATED);
     }

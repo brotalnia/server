@@ -258,7 +258,7 @@ void WorldSession::HandleGameObjectUseOpcode(WorldPacket & recv_data)
         return;
 
     GameObject *obj = GetPlayer()->GetMap()->GetGameObject(guid);
-    if (!obj)
+    if (!obj || obj->IsDeleted())
         return;
 
     // Additional check preventing exploits (ie loot despawned chests)
@@ -281,42 +281,10 @@ void WorldSession::HandleGameObjectUseOpcode(WorldPacket & recv_data)
     }
 }
 
-void WorldSession::HandleMeetingStoneJoinOpcode(WorldPacket & recv_data)
-{
-    ObjectGuid guid;
-
-    recv_data >> guid;
-
-    DEBUG_LOG("WORLD: Recvd CMSG_MEETINGSTONE_JOIN Message guid: %s", guid.GetString().c_str());
-
-    // ignore for remote control state
-    if (!_player->IsSelfMover())
-        return;
-
-    GameObject *obj = GetPlayer()->GetMap()->GetGameObject(guid);
-    if (!obj)
-        return;
-
-    // Never expect this opcode for some type GO's
-    if (obj->GetGoType() != GAMEOBJECT_TYPE_MEETINGSTONE)
-        return;
-
-    _player->RemoveAurasWithInterruptFlags(AURA_INTERRUPT_FLAG_USE);
-    obj->Use(_player);
-}
-
 void WorldSession::HandleCastSpellOpcode(WorldPacket& recvPacket)
 {
     uint32 spellId;
     recvPacket >> spellId;
-
-    // ignore for remote control state (for player case)
-    Unit* mover = _player->GetMover();
-    if (mover != _player && mover->GetTypeId() == TYPEID_PLAYER)
-    {
-        recvPacket.rpos(recvPacket.wpos());                 // prevent spam at ignore packet
-        return;
-    }
 
     DEBUG_LOG("WORLD: got cast spell packet, spellId - %u, data length = %i",
               spellId, (uint32)recvPacket.size());
@@ -329,21 +297,21 @@ void WorldSession::HandleCastSpellOpcode(WorldPacket& recvPacket)
         return;
     }
 
-    if (mover->GetTypeId() == TYPEID_PLAYER)
+    if (_player->GetTypeId() == TYPEID_PLAYER)
     {
         // not have spell in spellbook or spell passive and not casted by client
-        if (!((Player*)mover)->HasActiveSpell(spellId) || IsPassiveSpell(spellInfo))
+        if (!_player->HasActiveSpell(spellId) || IsPassiveSpell(spellInfo))
         {
-            sLog.outError("World: Player %u casts spell %u which he shouldn't have", mover->GetGUIDLow(), spellId);
+            sLog.outError("World: Player %u casts spell %u which he shouldn't have", _player->GetGUIDLow(), spellId);
             //cheater? kick? ban?
             recvPacket.rpos(recvPacket.wpos());                 // prevent spam at ignore packet
             return;
         }
     }
-    else
+    else if (_player->GetTypeId() == TYPEID_UNIT)
     {
         // not have spell in spellbook or spell passive and not casted by client
-        if (!((Creature*)mover)->HasSpell(spellId) || IsPassiveSpell(spellInfo))
+        if (!_player->HasSpell(spellId) || IsPassiveSpell(spellInfo))
         {
             //cheater? kick? ban?
             recvPacket.rpos(recvPacket.wpos());                 // prevent spam at ignore packet
@@ -392,6 +360,9 @@ void WorldSession::HandleCancelCastOpcode(WorldPacket& recvPacket)
 
     if (_player->IsNonMeleeSpellCasted(false))
         _player->InterruptNonMeleeSpells(false, spellId);
+
+    if (_player->IsNextSwingSpellCasted())
+        _player->InterruptSpell(CURRENT_MELEE_SPELL);
 }
 
 void WorldSession::HandleCancelAuraOpcode(WorldPacket& recvPacket)
@@ -446,13 +417,6 @@ void WorldSession::HandleCancelAuraOpcode(WorldPacket& recvPacket)
         if (spellInfo->Effect[i] == SPELL_EFFECT_SUMMON_POSSESSED)
         {
             _player->SetNextRelocationsIgnoredCount(1);
-            break;
-        }
-
-        // Eyes of the Beast case
-        if (spellInfo->EffectApplyAuraName[i] == SPELL_AURA_MOD_POSSESS_PET)
-        {
-            _player->SetNextRelocationsIgnoredCount(3);
             break;
         }
     }
@@ -536,23 +500,6 @@ void WorldSession::HandleCancelChanneling(WorldPacket & recv_data)
             return;
         _player->InterruptSpell(CURRENT_CHANNELED_SPELL);
     }
-}
-
-void WorldSession::HandleTotemDestroyed(WorldPacket& recvPacket)
-{
-    uint8 slotId;
-
-    recvPacket >> slotId;
-
-    // ignore for remote control state
-    if (!_player->IsSelfMover())
-        return;
-
-    if (int(slotId) >= MAX_TOTEM_SLOT)
-        return;
-
-    if (Totem* totem = GetPlayer()->GetTotem(TotemSlot(slotId)))
-        totem->UnSummon();
 }
 
 void WorldSession::HandleSelfResOpcode(WorldPacket & /*recv_data*/)

@@ -162,6 +162,15 @@ struct boss_jeklikAI : public ScriptedAI
         //ScriptedAI::JustDied(Killer);
     }
 
+    void EnterEvadeMode() override
+    {
+        ScriptedAI::EnterEvadeMode();
+        m_creature->Respawn();
+        float x, y, z, o;
+        m_creature->GetHomePosition(x, y, z, o);
+        m_creature->NearTeleportTo(x, y, z, o);
+    }
+
     void UpdateAI(const uint32 lastDiff)
     {
         if (!m_pInstance || !m_creature->SelectHostileTarget() || !m_creature->getVictim())
@@ -359,7 +368,6 @@ struct boss_jeklikAI : public ScriptedAI
                     m_creature->InterruptNonMeleeSpells(false);
                     if (DoCastSpellIfCan(m_creature, SPELL_GREATER_HEAL) == CAST_OK)
                     {
-                        //m_creature->MonsterTextEmote(NOST_TEXT(TEXTE_GRAND_SORT_SOIN), NULL, true);
                         DoScriptText(TEXTE_GRAND_SORT_SOIN, m_creature);
                         skillStarted = true;
                         GreaterHeal_Timer = urand(20000, 25000);

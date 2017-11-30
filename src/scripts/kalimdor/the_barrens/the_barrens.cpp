@@ -24,7 +24,6 @@ EndScriptData */
 /* ContentData
 npc_beaten_corpse
 npc_gilthares
-npc_sputtervalve
 npc_taskmaster_fizzule
 npc_twiggy_flathead
 at_twiggy_flathead
@@ -249,32 +248,6 @@ bool QuestAccept_npc_gilthares(Player* pPlayer, Creature* pCreature, const Quest
 
         if (npc_giltharesAI* pEscortAI = dynamic_cast<npc_giltharesAI*>(pCreature->AI()))
             pEscortAI->Start(false, pPlayer->GetGUID(), pQuest);
-    }
-    return true;
-}
-
-/*######
-## npc_sputtervalve
-######*/
-
-bool GossipHello_npc_sputtervalve(Player* pPlayer, Creature* pCreature)
-{
-    if (pCreature->isQuestGiver())
-        pPlayer->PrepareQuestMenu(pCreature->GetGUID());
-
-    if (pPlayer->GetQuestStatus(6981) == QUEST_STATUS_INCOMPLETE)
-        pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, "Can you tell me about this shard?", GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF);
-
-    pPlayer->SEND_GOSSIP_MENU(pPlayer->GetGossipTextId(pCreature), pCreature->GetGUID());;
-    return true;
-}
-
-bool GossipSelect_npc_sputtervalve(Player* pPlayer, Creature* pCreature, uint32 uiSender, uint32 uiAction)
-{
-    if (uiAction == GOSSIP_ACTION_INFO_DEF)
-    {
-        pPlayer->SEND_GOSSIP_MENU(2013, pCreature->GetGUID());
-        pPlayer->AreaExploredOrEventHappens(6981);
     }
     return true;
 }
@@ -950,19 +923,19 @@ struct npc_regthar_deathgateAI : public ScriptedAI
         {
             pDefender = NULL;
             if (pDefender = m_creature->GetMap()->GetCreature(GuidPhaseOneGuards[i]))
-                pDefender->AddObjectToRemoveList();
+                static_cast<TemporarySummon*>(pDefender)->UnSummon();
         }
         for (int i = 0; i < 8; i++)
         {
             pDefender = NULL;
             if (pDefender = m_creature->GetMap()->GetCreature(GuidPhaseTwoGuards[i]))
-                pDefender->AddObjectToRemoveList();
+                static_cast<TemporarySummon*>(pDefender)->UnSummon();
         }
         while (!AllKolkars.empty())
         {
             pDefender = NULL;
             if (pDefender = m_creature->GetMap()->GetCreature(AllKolkars.front()))
-                pDefender->AddObjectToRemoveList();
+                static_cast<TemporarySummon*>(pDefender)->UnSummon();
             AllKolkars.pop_front();
         }
     }
@@ -1006,22 +979,22 @@ struct npc_regthar_deathgateAI : public ScriptedAI
                 }
                 SecondPhaseGuards();
 
+                if (phaseTimer < 200000)
+                    phaseTimer = 200000;
                 //summon  NPC_KROMZAR + 2 adds en deaddespawn.
-                if (Creature* kromzar = m_creature->SummonCreature(NPC_KROMZAR, -288.344f, -1852.846f, 92.497f, 4.64f, TEMPSUMMON_TIMED_OR_DEAD_DESPAWN, 60000))
+                if (Creature* kromzar = m_creature->SummonCreature(NPC_KROMZAR, -288.344f, -1852.846f, 92.497f, 4.64f, TEMPSUMMON_TIMED_OR_DEAD_DESPAWN, phaseTimer))
                 {
                     kromzar->JoinCreatureGroup(kromzar, 3, 0, (OPTION_FORMATION_MOVE | OPTION_AGGRO_TOGETHER));
                     kromzar->SetRespawnDelay(120000);
                     for (int i = 0; i < 2; i++)
                     {
-                        if (Creature* c = m_creature->SummonCreature(NPC_KOLKAR_INVADER, -288.344f + i, -1852.846f + i, 92.497f, 4.64f, TEMPSUMMON_TIMED_OR_DEAD_DESPAWN, 60000))
+                        if (Creature* c = m_creature->SummonCreature(NPC_KOLKAR_INVADER, -288.344f + i, -1852.846f + i, 92.497f, 4.64f, TEMPSUMMON_TIMED_OR_DEAD_DESPAWN, phaseTimer))
                         {
                             c->JoinCreatureGroup(kromzar, 3.0f, (3.0f + i) - kromzar->GetOrientation(), (OPTION_FORMATION_MOVE | OPTION_AGGRO_TOGETHER | OPTION_EVADE_TOGETHER));
                             c->SetRespawnDelay(120000);
                         }
                     }
                     DoScriptText(YELL_KOLKAR_STRONGEST, kromzar);
-                    if (phaseTimer < 200000)
-                        phaseTimer = 200000;
                 }
             }
         }
@@ -1589,12 +1562,6 @@ void AddSC_the_barrens()
     newscript->Name = "npc_gilthares";
     newscript->GetAI = &GetAI_npc_gilthares;
     newscript->pQuestAcceptNPC = &QuestAccept_npc_gilthares;
-    newscript->RegisterSelf();
-
-    newscript = new Script;
-    newscript->Name = "npc_sputtervalve";
-    newscript->pGossipHello = &GossipHello_npc_sputtervalve;
-    newscript->pGossipSelect = &GossipSelect_npc_sputtervalve;
     newscript->RegisterSelf();
 
     newscript = new Script;

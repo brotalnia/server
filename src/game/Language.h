@@ -93,7 +93,10 @@ enum MangosStrings
     LANG_GM_NO_WHISPER                  = 64,
     LANG_USING_SCRIPT_LIB_UNKNOWN       = 65,
     LANG_USING_SCRIPT_LIB_NONE          = 66,
-    // Room for more level 0              67-99 not used
+    LANG_UNSTUCK_UNAVAILABLE            = 67,
+    LANG_UNSTUCK_ALIVE                  = 68,
+    LANG_UNSTUCK_DEAD                   = 69,
+    // Room for more level 0              70-99 not used
 
     // level 1 chat
     LANG_GLOBAL_NOTIFY                  = 100,
@@ -557,6 +560,11 @@ enum MangosStrings
     LANG_NPCINFO_VENDOR                 = 545,
     LANG_NPCINFO_TRAINER                = 546,
     LANG_NPCINFO_DUNGEON_ID             = 547,
+    LANG_NPCINFO_ACTIVE_VISIBILITY      = 1030,
+    LANG_NPCINFO_EQUIPMENT              = 1031,
+    LANG_NPCINFO_INHABIT_TYPE           = 1032,
+    LANG_NPCINFO_ARMOR                  = 1033,
+    LANG_NPCINFO_AIINFO                 = 1034,
 
     LANG_PINFO_ACCOUNT                  = 616,
     LANG_PINFO_LEVEL                    = 549,
@@ -694,6 +702,7 @@ enum MangosStrings
     //LANG_BG_EY_DROPPED_FLAG           = 686,
     //LANG_BG_EY_RESETED_FLAG           = 687,
 
+    LANG_RESTORED_ITEM                  = 699,
     //LANG_ARENA_ONE_TOOLOW             = 700,
     //LANG_ARENA_ONE_MINUTE             = 701,
     //LANG_ARENA_THIRTY_SECONDS         = 702,
@@ -895,7 +904,7 @@ enum MangosStrings
     LANG_LOG_FILTERS_STATE_HEADER       = 1027,
     LANG_ALL_LOG_FILTERS_SET_TO_S       = 1028,
     LANG_RA_ONLY_COMMAND                = 1029,
-    // Room for more level 4              1030-1099 not used
+    // Room for more level 4              1035-1099 not used
 
     // Level 3 (continue)
     LANG_ACCOUNT_SETADDON               = 1100,
@@ -968,7 +977,13 @@ enum MangosStrings
     LANG_SCRIPTS_WRONG_API              = 1167,
     LANG_SCRIPTS_RELOADED_OK            = 1168,
     LANG_SCRIPTS_OUTDATED               = 1169,
-    // Room for more level 3              1170-1199 not used
+    LANG_SET_LOCK_SUCCESS               = 1170,
+    LANG_SET_LOCK_USAGE                 = 1171,
+    LANG_REMOVE_RIDING_WRONG_TYPE       = 1172,
+    LANG_REMOVE_RIDING_NOT_HAVE         = 1173,
+    LANG_REMOVE_RIDING_ERROR            = 1174,
+    LANG_REMOVE_RIDING_SUCCESS          = 1175,
+    // Room for more level 3              1176-1199 not used
 
     // Debug commands
     LANG_CINEMATIC_NOT_EXIST            = 1200,

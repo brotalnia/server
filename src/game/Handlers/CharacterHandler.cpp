@@ -61,7 +61,7 @@ private:
     ObjectGuid m_guid;
 public:
     LoginQueryHolder(uint32 accountId, ObjectGuid guid)
-        : m_accountId(accountId), m_guid(guid) { }
+        : SqlQueryHolder(guid.GetCounter()), m_accountId(accountId), m_guid(guid) { }
     ~LoginQueryHolder()
     {
         // Queries should NOT be deleted by user
@@ -87,7 +87,7 @@ bool LoginQueryHolder::Initialize()
     // NOTE: all fields in `characters` must be read to prevent lost character data at next save in case wrong DB structure.
     // !!! NOTE: including unused `zone`,`online`
     res &= SetPQuery(PLAYER_LOGIN_QUERY_LOADFROM,            "SELECT guid, account, name, race, class, gender, level, xp, money, playerBytes, playerBytes2, playerFlags, "
-                     "position_x, position_y, position_z, map, orientation, taximask, cinematic, totaltime, leveltime, rest_bonus, logout_time, is_logout_resting, resettalents_cost, "
+                     "position_x, position_y, position_z, map, orientation, taximask, cinematic, totaltime, leveltime, rest_bonus, logout_time, is_logout_resting, resettalents_multiplier, "
                      "resettalents_time, trans_x, trans_y, trans_z, trans_o, transguid, extra_flags, stable_slots, at_login, zone, online, death_expire_time, taxi_path, "
                      "honorRankPoints, honorHighestRank, honorStanding, honorLastWeekHK, honorLastWeekCP, honorStoredHK, honorStoredDK, "
                      "watchedFaction, drunk, health, power1, power2, power3, power4, power5, exploredZones, equipmentCache, ammoId, actionBars, "
@@ -96,7 +96,7 @@ bool LoginQueryHolder::Initialize()
     res &= SetPQuery(PLAYER_LOGIN_QUERY_LOADBOUNDINSTANCES,  "SELECT id, permanent, map, resettime FROM character_instance LEFT JOIN instance ON instance = id WHERE guid = '%u'", m_guid.GetCounter());
     res &= SetPQuery(PLAYER_LOGIN_QUERY_LOADAURAS,           "SELECT caster_guid,item_guid,spell,stackcount,remaincharges,basepoints0,basepoints1,basepoints2,periodictime0,periodictime1,periodictime2,maxduration,remaintime,effIndexMask FROM character_aura WHERE guid = '%u'", m_guid.GetCounter());
     res &= SetPQuery(PLAYER_LOGIN_QUERY_LOADSPELLS,          "SELECT spell,active,disabled FROM character_spell WHERE guid = '%u'", m_guid.GetCounter());
-    res &= SetPQuery(PLAYER_LOGIN_QUERY_LOADQUESTSTATUS,     "SELECT quest,status,rewarded,explored,timer,mobcount1,mobcount2,mobcount3,mobcount4,itemcount1,itemcount2,itemcount3,itemcount4 FROM character_queststatus WHERE guid = '%u'", m_guid.GetCounter());
+    res &= SetPQuery(PLAYER_LOGIN_QUERY_LOADQUESTSTATUS,     "SELECT quest,status,rewarded,explored,timer,mobcount1,mobcount2,mobcount3,mobcount4,itemcount1,itemcount2,itemcount3,itemcount4,reward_choice FROM character_queststatus WHERE guid = '%u'", m_guid.GetCounter());
     res &= SetPQuery(PLAYER_LOGIN_QUERY_LOADHONORCP,         "SELECT victimType,victim,cp,date,type FROM character_honor_cp WHERE guid = '%u'", m_guid.GetCounter());
     res &= SetPQuery(PLAYER_LOGIN_QUERY_LOADREPUTATION,      "SELECT faction,standing,flags FROM character_reputation WHERE guid = '%u'", m_guid.GetCounter());
     res &= SetPQuery(PLAYER_LOGIN_QUERY_LOADINVENTORY,       "SELECT * FROM (SELECT creatorGuid, giftCreatorGuid, count, duration, charges, flags, enchantments, randomPropertyId, durability, text, bag, slot, item, itemEntry, generated_loot FROM character_inventory JOIN item_instance ON character_inventory.item = item_instance.guid WHERE character_inventory.guid = '%u') as t ORDER BY bag,slot", m_guid.GetCounter());
@@ -384,7 +384,7 @@ void WorldSession::HandleCharDeleteOpcode(WorldPacket & recv_data)
     if (sGuildMgr.GetGuildByLeader(guid))
     {
         WorldPacket data(SMSG_CHAR_DELETE, 1);
-        data << (uint8)CHAR_DELETE_FAILED_GUILD_LEADER;
+        data << (uint8)CHAR_DELETE_FAILED;
         SendPacket(&data);
         return;
     }
@@ -474,10 +474,10 @@ void WorldSession::HandlePlayerLogin(LoginQueryHolder *holder)
     ASSERT(playerGuid.IsPlayer());
 
     // If the character is online (ALT-F4 logout for example)
-    Player *pCurrChar = sObjectAccessor.FindPlayerNotInWorld(playerGuid);
+    Player *pCurrChar = sObjectAccessor.FindPlayer(playerGuid);
     MasterPlayer* pCurrMasterPlayer = sObjectAccessor.FindMasterPlayer(playerGuid);
     bool alreadyOnline = false;
-    if (pCurrChar && (pCurrChar->IsInWorld() || pCurrChar->IsBeingTeleportedFar()))
+    if (pCurrChar)
     {
         // Hacking attempt
         if (pCurrChar->GetSession()->GetAccountId() != GetAccountId())
@@ -651,11 +651,13 @@ void WorldSession::HandlePlayerLogin(LoginQueryHolder *holder)
             pCurrChar->TeleportTo(at->target_mapId, at->target_X, at->target_Y, at->target_Z, pCurrChar->GetOrientation());
         else
             pCurrChar->TeleportToHomebind();
+
+        sMapMgr.ExecuteSingleDelayedTeleport(pCurrChar);
     }
 
-    if (alreadyOnline && pCurrChar->FindMap())
+    if (alreadyOnline)
         pCurrChar->GetMap()->ExistingPlayerLogin(pCurrChar); // SendInitSelf ...
-    else if (!alreadyOnline)
+    else
         sObjectAccessor.AddObject(pCurrChar);
 
     //DEBUG_LOG("Player %s added to Map.",pCurrChar->GetName());
@@ -787,15 +789,6 @@ void WorldSession::HandleSetFactionAtWarOpcode(WorldPacket & recv_data)
     recv_data >> flag;
 
     GetPlayer()->GetReputationMgr().SetAtWar(repListID, flag);
-}
-
-void WorldSession::HandleMeetingStoneInfoOpcode(WorldPacket & /*recv_data*/)
-{
-    DEBUG_LOG("WORLD: Received CMSG_MEETING_STONE_INFO");
-
-    WorldPacket data(SMSG_MEETINGSTONE_SETQUEUE, 5);
-    data << uint32(0) << uint8(6);
-    SendPacket(&data);
 }
 
 void WorldSession::HandleTutorialFlagOpcode(WorldPacket & recv_data)
@@ -943,4 +936,5 @@ void WorldSession::HandleChangePlayerNameOpcodeCallBack(QueryResult *result, uin
     session->SendPacket(&data);
 
     sObjectMgr.ChangePlayerNameInCache(guidLow, oldname, newname);
+    sWorld.InvalidatePlayerDataToAllClient(guid);
 }

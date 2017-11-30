@@ -65,6 +65,8 @@ void WorldSession::HandleGMTicketUpdateTextOpcode(WorldPacket & recv_data)
             ticket->SetTicketType(TicketType(type));
             ticket->SaveToDB();
             response = GMTICKET_RESPONSE_UPDATE_SUCCESS;
+
+            sWorld.SendGMTicketText(LANG_COMMAND_TICKETUPDATED, GetPlayer()->GetName(), ticket->GetId());
         }
     }
 
@@ -81,7 +83,7 @@ void WorldSession::HandleGMTicketDeleteTicketOpcode(WorldPacket & /*recv_data*/)
         data << uint32(GMTICKET_RESPONSE_TICKET_DELETED);
         SendPacket(&data);
 
-        //sWorld.SendGMTicketText(LANG_COMMAND_TICKETPLAYERABANDON, GetPlayer()->GetName(), ticket->GetId());
+        sWorld.SendGMTicketText(LANG_COMMAND_TICKETPLAYERABANDON, GetPlayer()->GetName(), ticket->GetId());
 
         sTicketMgr->CloseTicket(ticket->GetId(), GetPlayer()->GetGUID());
         sTicketMgr->SendTicket(this, NULL);
@@ -127,9 +129,9 @@ void WorldSession::HandleGMTicketCreateOpcode(WorldPacket& recvData)
 
         ChatHandler(this).SendSysMessage("NOTE: Game Masters DO NOT handle bug reports!");
         ChatHandler(this).SendSysMessage("Please use our bugtracker and provide sources if possible:");
-        ChatHandler(this).SendSysMessage("https://github.com/elysium-project/server/issues");
+        ChatHandler(this).SendSysMessage("https://github.com/LightsHope/server");
         ChatHandler(this).SendSysMessage("For quicker & casual support, visit our forums:");
-        ChatHandler(this).SendSysMessage("https://forum.elysium-project.org/forum/303-help-support/");
+        ChatHandler(this).SendSysMessage("https://forum.lightshope.org/viewforum.php?f=9");
 
         ticket = new GmTicket(GetPlayer());
         ticket->SetPosition(mapId, x, y, z);
@@ -139,7 +141,7 @@ void WorldSession::HandleGMTicketCreateOpcode(WorldPacket& recvData)
         sTicketMgr->AddTicket(ticket);
         sTicketMgr->UpdateLastChange();
 
-        sWorld.SendGMTicketText(LANG_COMMAND_TICKETNEW, GetPlayer()->GetName(), ticket->GetId());
+        sWorld.SendGMTicketText(LANG_COMMAND_TICKETNEW, GetPlayer()->GetName(), ticket->GetTicketCategoryName(TicketType(ticketType)), ticket->GetId());
 
         response = GMTICKET_RESPONSE_CREATE_SUCCESS;
     }

@@ -623,6 +623,7 @@ void AuctionHouseObject::Update()
                 data.parts[0].itemsEntries[0] = itr->second->itemTemplate;
                 Item* item = sAuctionMgr.GetAItem(itr->second->itemGuidLow);
                 data.parts[0].itemsCount[0] = item ? item->GetCount() : 0;
+                data.parts[0].itemsGuid[0] = itr->second->itemGuidLow;
                 data.parts[1].lowGuid = itr->second->bidder;
                 data.parts[1].money = itr->second->bid;
                 sWorld.LogTransaction(data);
@@ -678,6 +679,7 @@ void AuctionHouseObject::BuildListAuctionItems(WorldPacket& data, Player* player
         AuctionHouseClientQuery const& query,
         uint32& count, uint32& totalcount)
 {
+    std::string const& clientIp = player->GetSession()->GetRemoteAddress();
     // Happening often, and easy to deal with
     if (query.auctionMainCategory == 0xffffffff && query.auctionSubCategory == 0xffffffff && query.auctionSlotID == 0xffffffff &&
         query.quality == 0xffffffff && query.levelmin == 0x00 && query.levelmax == 0x00 && query.usable == 0x00 && query.wsearchedname.empty())
@@ -689,6 +691,9 @@ void AuctionHouseObject::BuildListAuctionItems(WorldPacket& data, Player* player
             std::advance(itr, query.listfrom);
             for (; itr != AuctionsMap.end(); ++itr)
             {
+                if (!itr->second->IsAvailableFor(clientIp))
+                    continue;
+
                 itr->second->BuildAuctionInfo(data);
                 if ((++count) >= 50)
                     break;
@@ -698,7 +703,6 @@ void AuctionHouseObject::BuildListAuctionItems(WorldPacket& data, Player* player
     }
 
     time_t currTime = sWorld.GetGameTime();
-    std::string const& clientIp = player->GetSession()->GetRemoteAddress();
     int loc_idx = player->GetSession()->GetSessionDbLocaleIndex();
 
     for (AuctionEntryMap::const_iterator itr = AuctionsMap.begin(); itr != AuctionsMap.end(); ++itr)
@@ -736,7 +740,7 @@ void AuctionHouseObject::BuildListAuctionItems(WorldPacket& data, Player* player
                         continue;
 
             // IP locked auction
-            if (!Aentry->lockedIpAddress.empty() && Aentry->lockedIpAddress != clientIp)
+            if (!Aentry->IsAvailableFor(clientIp))
                 continue;
 
             if (!query.wsearchedname.empty())
@@ -831,4 +835,12 @@ void AuctionEntry::SaveToDB() const
     CharacterDatabase.PExecute("INSERT INTO auction (id,houseid,itemguid,item_template,itemowner,buyoutprice,time,buyguid,lastbid,startbid,deposit) "
                                "VALUES ('%u', '%u', '%u', '%u', '%u', '%u', '" UI64FMTD "', '%u', '%u', '%u', '%u')",
                                Id, auctionHouseEntry->houseId, itemGuidLow, itemTemplate, owner, buyout, (uint64)expireTime, bidder, bid, startbid, deposit);
+}
+
+bool AuctionEntry::IsAvailableFor(std::string const& ip)
+{
+    if (!lockedIpAddress.empty())
+        return lockedIpAddress == ip;
+
+    return true;
 }

@@ -30,6 +30,8 @@
 #include "LootMgr.h"
 #include "DBCEnums.h"
 #include "SharedDefines.h"
+#include "LFGHandler.h"
+#include "LFGMgr.h"
 
 #include <map>
 #include <vector>
@@ -53,6 +55,18 @@ enum LootMethod
     MASTER_LOOT       = 2,
     GROUP_LOOT        = 3,
     NEED_BEFORE_GREED = 4
+};
+
+enum RemoveMethod
+{
+    GROUP_LEAVE = 0,
+    GROUP_KICK = 1
+};
+
+enum InviteMethod
+{
+    GROUP_JOIN = 0,
+    GROUP_LFG = 1
 };
 
 enum RollVote
@@ -188,8 +202,8 @@ class MANGOS_DLL_SPEC Group
         uint32 RemoveInvite(Player *player);
         void   RemoveAllInvites();
         bool   AddLeaderInvite(Player *player);
-        bool   AddMember(ObjectGuid guid, const char* name);
-        uint32 RemoveMember(ObjectGuid guid, uint8 method); // method: 0=just remove, 1=kick
+        bool   AddMember(ObjectGuid guid, const char* name, uint8 joinMethod = GROUP_JOIN);
+        uint32 RemoveMember(ObjectGuid guid, uint8 removeMethod); // method: 0=just remove, 1=kick
         void   ChangeLeader(ObjectGuid guid);
         void   SetLootMethod(LootMethod method) { m_lootMethod = method; }
         void   SetLooterGuid(ObjectGuid guid) { m_looterGuid = guid; }
@@ -256,10 +270,13 @@ class MANGOS_DLL_SPEC Group
         void ConvertToRaid();
 
         void SetBattlegroundGroup(BattleGround *bg) { m_bgGroup = bg; }
-        uint32 CanJoinBattleGroundQueue(BattleGroundTypeId bgTypeId, BattleGroundQueueTypeId bgQueueTypeId, uint32 MinPlayerCount, uint32 MaxPlayerCount);
+        uint32 CanJoinBattleGroundQueue(BattleGroundTypeId bgTypeId, BattleGroundQueueTypeId bgQueueTypeId, uint32 MinPlayerCount, uint32 MaxPlayerCount, Player* Leader, std::vector<uint32>* excludedMembers = nullptr);
 
         void ChangeMembersGroup(ObjectGuid guid, uint8 group);
         void ChangeMembersGroup(Player *player, uint8 group);
+        
+        void SwapMembersGroup(ObjectGuid guid, ObjectGuid swapGuid);
+        void SwapMembersGroup(Player *player, Player *swapPlayer);
 
         ObjectGuid GetMainTankGuid() const { return m_mainTankGuid; }
         ObjectGuid GetMainAssistantGuid() const { return m_mainAssistantGuid; }
@@ -308,6 +325,30 @@ class MANGOS_DLL_SPEC Group
         void RewardGroupAtKill(Unit* pVictim, Player* player_tap);
 
         /*********************************************************/
+        /***                   LFG SYSTEM                      ***/
+        /*********************************************************/
+
+        void SetLFGAreaId(uint32 areaId) { m_LFGAreaId = areaId; }
+        uint32 GetLFGAreaId()            { return m_LFGAreaId;   }
+        bool isInLFG()                   { return (m_LFGAreaId > 0) ? true : false; }
+
+        void CalculateLFGRoles(LFGGroupQueueInfo& data);
+        void FillPremadeLFG(ObjectGuid plrGuid, ClassRoles requiredRole, uint32& InitRoles, uint32& DpsCount, std::vector<ObjectGuid>& playersProcessed);
+
+        bool inLFGGroup(std::vector<ObjectGuid> processed, ObjectGuid plr)
+        {
+            for (uint32 i = 0; i < processed.size(); ++i)
+            {
+                if (processed[i] == plr)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /*********************************************************/
         /***                   LOOT SYSTEM                     ***/
         /*********************************************************/
 
@@ -343,6 +384,7 @@ class MANGOS_DLL_SPEC Group
         void _removeRolls(ObjectGuid guid);
 
         bool _setMembersGroup(ObjectGuid guid, uint8 group);
+        bool _swapMembersGroup(ObjectGuid guid, ObjectGuid swapGuid);
         bool _setAssistantFlag(ObjectGuid guid, const bool &state);
         bool _setMainTank(ObjectGuid guid);
         bool _setMainAssistant(ObjectGuid guid);
@@ -413,5 +455,6 @@ class MANGOS_DLL_SPEC Group
         BoundInstancesMap   m_boundInstances;
         uint8*              m_subGroupsCounts;
         Team                m_groupTeam; // ALLIANCE / HORDE / TEAM_NONE / TEAM_CROSSFACTION
+        uint32              m_LFGAreaId;
 };
 #endif

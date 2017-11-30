@@ -695,6 +695,7 @@ bool HonorMgr::Add(float cp, uint8 type, Unit* source)
         return false;
 
     // If not source, then give yourself
+    Unit* realSource = source;
     if (!source)
         source = m_owner;
 
@@ -732,7 +733,7 @@ bool HonorMgr::Add(float cp, uint8 type, Unit* source)
 
     m_honorCP.push_back(honorCP);
 
-    SendPVPCredit(source, honor);
+    SendPVPCredit(realSource, honor);
 
     Update();
     return true;
@@ -895,14 +896,7 @@ HonorRankInfo HonorMgr::CalculateRank(float rankPoints, uint32 totalHK)
 
     // rank none
     if (rankPoints == 0)
-    {
-        if (totalHK >= sWorld.getConfig(CONFIG_UINT32_MIN_HONOR_KILLS))
-        {
-            prk.rank = NEGATIVE_HONOR_RANK_COUNT + 1;
-            CalculateRankInfo(prk);
-        }
         return prk;
-    }
 
     prk.positive = rankPoints > 0;
     if (!prk.positive)

@@ -489,6 +489,7 @@ void LoadSpellCacheData(GenericAISpell* spellToModify, SpellEntry const* spellIn
             switch (spellInfos->Effect[i])
             {
                 case SPELL_EFFECT_APPLY_AURA:
+                case SPELL_EFFECT_APPLY_AREA_AURA_PARTY:
                 {
                     switch (spellInfos->EffectApplyAuraName[i])
                     {
@@ -499,6 +500,15 @@ void LoadSpellCacheData(GenericAISpell* spellToModify, SpellEntry const* spellIn
                     }
                     spellToModify->spellFlags |= SPELL_FLAG_APPLY_AURA;
                     break;
+                }
+                case SPELL_EFFECT_SUMMON_GUARDIAN:
+                {
+                    int32 duration = GetSpellDuration(spellInfos);
+                    if (duration > 0) 
+                    {
+                        spellToModify->minCD = duration;
+                        spellToModify->maxCD = duration;
+                    }
                 }
             }
         }

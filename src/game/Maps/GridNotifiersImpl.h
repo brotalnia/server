@@ -31,6 +31,7 @@
 #include "SpellAuras.h"
 #include "DBCStores.h"
 #include "DBCEnums.h"
+#include "Spell.h"
 #include "SpellMgr.h"
 
 template<class T>
@@ -129,7 +130,7 @@ inline void MaNGOS::DynamicObjectUpdater::VisitHelper(Unit* target)
     if (!target->isAlive() || target->IsTaxiFlying() )
         return;
 
-    if (target->GetTypeId() == TYPEID_UNIT && ((Creature*)target)->IsTotem())
+    if (target->GetTypeId() == TYPEID_UNIT && ((Creature*)target)->IsImmuneToAoe())
         return;
 
     if (!i_dynobject.IsWithinDistInMap(target, i_dynobject.GetRadius()))
@@ -143,6 +144,11 @@ inline void MaNGOS::DynamicObjectUpdater::VisitHelper(Unit* target)
     if (target->GetTypeId()==TYPEID_UNIT && ((Creature*)target)->IsInEvadeMode())
         return;
 
+    // Must check LoS with the target to prevent casting through objects by targeting
+    // the floor
+    if (!i_dynobject.IsWithinLOSInMap(target))
+        return;
+
     //Check player targets and remove if in GM mode or GM invisibility (for not self casting case)
     if (target->GetTypeId() == TYPEID_PLAYER && target != i_check && (((Player*)target)->isGameMaster() || ((Player*)target)->GetVisibility() == VISIBILITY_OFF))
         return;
@@ -154,6 +160,11 @@ inline void MaNGOS::DynamicObjectUpdater::VisitHelper(Unit* target)
 
     if (!i_dynobject.NeedsRefresh(target))
         return;
+
+    // Negative AoE from non flagged players cannot target other players
+    if (Player *attackedPlayer = target->GetCharmerOrOwnerPlayerOrPlayerItself())
+        if (!i_positive && i_check->IsPlayer() && !i_check->IsPvP() && !((Player*)i_check)->IsInDuelWith(attackedPlayer))
+            return;
 
     SpellEntry const *spellInfo = sSpellMgr.GetSpellEntry(i_dynobject.GetSpellId());
     SpellEffectIndex eff_index  = i_dynobject.GetEffIndex();
@@ -176,6 +187,7 @@ inline void MaNGOS::DynamicObjectUpdater::VisitHelper(Unit* target)
     // Apply PersistentAreaAura on target
     // in case 2 dynobject overlap areas for same spell, same holder is selected, so dynobjects share holder
     SpellAuraHolder *holder = target->GetSpellAuraHolder(spellInfo->Id, i_dynobject.GetCasterGuid());
+    bool existing = false;
 
     if (holder)
     {
@@ -188,20 +200,48 @@ inline void MaNGOS::DynamicObjectUpdater::VisitHelper(Unit* target)
             target->AddAuraToModList(Aur);
             Aur->ApplyModifier(true,true);
         }
-        else if (holder->GetAuraDuration() >= 0 && uint32(holder->GetAuraDuration()) < i_dynobject.GetDuration())
+        // Don't update aura time for active channeled spells, otherwise it can become out of sync with the cast
+        else if (!i_dynobject.IsChanneled() && holder->GetAuraDuration() >= 0 && uint32(holder->GetAuraDuration()) < i_dynobject.GetDuration())
         {
             holder->SetAuraDuration(i_dynobject.GetDuration());
             holder->UpdateAuraDuration();
         }
         holder->SetInUse(false);
+
+        existing = true;
     }
     else
     {
         holder = CreateSpellAuraHolder(spellInfo, target, i_dynobject.GetCaster());
         PersistentAreaAura* Aur = new PersistentAreaAura(spellInfo, eff_index, NULL, holder, target, i_dynobject.GetCaster());
         holder->AddAura(Aur, eff_index);
-            
-        target->AddSpellAuraHolder(holder);
+
+        // Debuff slots may be full, in which case holder is deleted or holder is not able to
+        // be added for some reason
+        if (!target->AddSpellAuraHolder(holder))
+            holder = nullptr;
+    }
+
+    if (holder && holder->IsChanneled())
+    {
+        if (Unit *caster = i_dynobject.GetCaster())
+        {
+            // Caster is channeling this spell, update current channel spell holders with
+            // the new holder. Don't check channel object, as it might be a spell with
+            // multiple dyn objs
+            if (Spell *spell = caster->GetCurrentSpell(CURRENT_CHANNELED_SPELL))
+            {
+                if (spell->m_spellInfo->Id == spellInfo->Id)
+                {
+                    if (!existing)
+                        spell->AddChanneledAuraHolder(holder);
+
+                    holder->SetAuraDuration(spell->GetCastedTime());
+                    holder->RefreshAuraPeriodicTimers(); // make sure we are ticking in sync with the spell cast time
+                    holder->UpdateAuraDuration();
+                }
+            }
+        }
     }
 
     i_dynobject.AddAffected(target);

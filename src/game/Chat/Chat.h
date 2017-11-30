@@ -190,8 +190,12 @@ class MANGOS_DLL_SPEC ChatHandler
         bool HandleSpamerUnmute(char* args);
         bool HandleSpamerList(char* args);
         bool HandleWhisperRestrictionCommand(char* args);
-
+        bool HandleUnstuckCommand(char* args);
         bool HandleGoldRemoval(char* args);
+        bool HandleAntiSpamAdd(char* args);
+        bool HandleAntiSpamRemove(char* args);
+        bool HandleAntiSpamReplace(char* args);
+        bool HandleAntiSpamRemoveReplace(char* args);
 
         // Packet dump
         bool HandleReplayPlayCommand(char *);
@@ -285,7 +289,10 @@ class MANGOS_DLL_SPEC ChatHandler
         bool HandleDebugUpdateCommand(char *args) { return true; }
         // Formations
         bool HandleNpcGroupAddCommand(char *args);
+        bool HandleNpcGroupAddRelCommand(char *args);
         bool HandleNpcGroupDelCommand(char *args);
+        bool HandleNpcGroupLinkCommand(char* args);
+
         bool HandleReloadCreatureGroupsCommand(char *args);
         // Characters
         bool HandleCharacterChangeRaceCommand(char *args);
@@ -328,6 +335,7 @@ class MANGOS_DLL_SPEC ChatHandler
         bool HandleReloadAccountBanList(char* args);
         bool HandleReloadCreatureCommand(char* args);
         bool HandleReloadGameObjectCommand(char* args);
+        bool HandleReloadInstanceBuffRemoval(char* args);
         // Channel
         bool HandleChannelJoinCommand(char* );
         bool HandleChannelLeaveCommand(char* );
@@ -342,6 +350,7 @@ class MANGOS_DLL_SPEC ChatHandler
         bool HandleAccountSetAddonCommand(char* args);
         bool HandleAccountSetGmLevelCommand(char* args);
         bool HandleAccountSetPasswordCommand(char* args);
+        bool HandleAccountSetLockedCommand(char* args);
 
         bool HandleAuctionAllianceCommand(char* args);
         bool HandleAuctionGoblinCommand(char* args);
@@ -368,7 +377,9 @@ class MANGOS_DLL_SPEC ChatHandler
         bool HandleCastTargetCommand(char* args);
 
         bool HandleCharacterDeletedDeleteCommand(char* args);
-        bool HandleCharacterDeletedListCommand(char* args);
+        bool HandleCharacterDeletedListCommand(char* args, bool useName);
+        bool HandleCharacterDeletedListAccountCommand(char* args);
+        bool HandleCharacterDeletedListNameCommand(char* args);
         bool HandleCharacterDeletedRestoreCommand(char* args);
         bool HandleCharacterDeletedOldCommand(char* args);
         bool HandleCharacterEraseCommand(char* args);
@@ -395,7 +406,9 @@ class MANGOS_DLL_SPEC ChatHandler
 
         bool HandleDebugPlayCinematicCommand(char* args);
         bool HandleDebugPlaySoundCommand(char* args);
-
+        bool HandleDebugPlayScriptText(char* args);
+        bool HandleDebugPlayMusicCommand(char* args);
+        
         bool HandleDebugSendBuyErrorCommand(char* args);
         bool HandleDebugSendChannelNotifyCommand(char* args);
         bool HandleDebugSendChatMsgCommand(char* args);
@@ -406,6 +419,14 @@ class MANGOS_DLL_SPEC ChatHandler
         bool HandleDebugSendQuestInvalidMsgCommand(char* args);
         bool HandleDebugSendSellErrorCommand(char* args);
         bool HandleDebugSendSpellFailCommand(char* args);
+        bool HandleDebugSendOpenBagCommand(char* args);
+
+        /*
+        Send the visual of the next channeled spell after args, suggested macro :
+        /run if not f then f=ChatFrame_OnEvent ChatFrame_OnEvent=function(e)f(e)if p==0 and e=='CHAT_MSG_SYSTEM'then n=gsub(arg1,'%D*(%d*)%s.*','%1')end end end n=n or 0 SendChatMessage('.debug send chanvisualnext '..(p==1 and n or -1))p=p==1 and 0 or 1
+        */
+        bool HandleDebugSendNextChannelSpellVisualCommand(char* args);
+        bool HandleSendSpellChannelVisualCommand(char* args);
 
         bool HandleEventListCommand(char* args);
         bool HandleEventStartCommand(char* args);
@@ -503,6 +524,7 @@ class MANGOS_DLL_SPEC ChatHandler
         bool HandleLookupPlayerAccountCommand(char* args);
         bool HandleLookupPlayerEmailCommand(char* args);
         bool HandleLookupPlayerNameCommand(char* args);
+        bool HandleLookupPlayerCharacterCommand(char* args);
         bool HandleLookupPoolCommand(char* args);
         bool HandleLookupQuestCommand(char* args);
         bool HandleLookupSkillCommand(char* args);
@@ -650,7 +672,6 @@ class MANGOS_DLL_SPEC ChatHandler
         bool HandleReloadLocalesGameobjectCommand(char* args);
         bool HandleReloadLocalesGossipMenuOptionCommand(char* args);
         bool HandleReloadLocalesItemCommand(char* args);
-        bool HandleReloadLocalesNpcTextCommand(char* args);
         bool HandleReloadLocalesPageTextCommand(char* args);
         bool HandleReloadLocalesPointsOfInterestCommand(char* args);
         bool HandleReloadLocalesQuestCommand(char* args);
@@ -674,6 +695,7 @@ class MANGOS_DLL_SPEC ChatHandler
         bool HandleReloadQuestEndScriptsCommand(char* args);
         bool HandleReloadQuestStartScriptsCommand(char* args);
         bool HandleReloadQuestTemplateCommand(char* args);
+        bool HandleReloadQuestGreetingCommand(char* args);
         bool HandleReloadReservedNameCommand(char* args);
         bool HandleReloadReputationRewardRateCommand(char* args);
         bool HandleReloadReputationSpilloverTemplateCommand(char* args);
@@ -775,9 +797,11 @@ class MANGOS_DLL_SPEC ChatHandler
 
         bool HandleCooldownCommand(char* args);
         bool HandleUnLearnCommand(char* args);
+        bool HandleRemoveRidingCommand(char* args);
         bool HandleGetDistanceCommand(char* args);
         bool HandleModifyStandStateCommand(char* args);
         bool HandleDieCommand(char* args);
+        bool HandleFearCommand(char* args);
         bool HandleDamageCommand(char* args);
         bool HandleReviveCommand(char* args);
         bool HandleModifyMorphCommand(char* args);
@@ -791,6 +815,7 @@ class MANGOS_DLL_SPEC ChatHandler
         bool HandleShowAreaCommand(char* args);
         bool HandleHideAreaCommand(char* args);
         bool HandleAddItemCommand(char* args);
+        bool HandleDeleteItemCommand(char* args);
         bool HandleAddItemSetCommand(char* args);
 
         bool HandleBankCommand(char* args);
@@ -928,7 +953,7 @@ class MANGOS_DLL_SPEC ChatHandler
         };
 
         typedef std::list<DeletedInfo> DeletedInfoList;
-        bool GetDeletedCharacterInfoList(DeletedInfoList& foundList, std::string searchString = "");
+        bool GetDeletedCharacterInfoList(DeletedInfoList& foundList, bool useName, std::string searchString = "");
         std::string GenerateDeletedCharacterGUIDsWhereStr(DeletedInfoList::const_iterator& itr, DeletedInfoList::const_iterator const& itr_end);
         void HandleCharacterDeletedListHelper(DeletedInfoList const& foundList);
         void HandleCharacterDeletedRestoreHelper(DeletedInfo const& delInfo);

@@ -99,7 +99,7 @@ void LootStore::LoadLootTable()
     sLog.outString("%s :", GetName());
 
     //                                                 0      1     2                    3        4              5         6
-    QueryResult* result = WorldDatabase.PQuery("SELECT entry, item, ChanceOrQuestChance, groupid, mincountOrRef, maxcount, condition_id FROM %s", GetName());
+    QueryResult* result = WorldDatabase.PQuery("SELECT entry, item, ChanceOrQuestChance, groupid, mincountOrRef, maxcount, condition_id FROM %s WHERE (mincountOrRef < 0) || (item NOT IN (SELECT entry FROM forbidden_items WHERE (AfterOrBefore = 0 && patch <= %u) || (AfterOrBefore = 1 && patch >= %u)))", GetName(), sWorld.GetWowPatch(), sWorld.GetWowPatch());
 
     if (result)
     {
@@ -393,7 +393,7 @@ bool LootItem::AllowedForPlayer(Player const* player, WorldObject const* lootTar
     else
     {
         // Not quest only drop (check quest starting items for already accepted non-repeatable quests)
-        if (pProto->StartQuest && player->GetQuestStatus(pProto->StartQuest) != QUEST_STATUS_NONE && !player->HasQuestForItem(itemid))
+        if (pProto->StartQuest && player->GetQuestStatus(pProto->StartQuest) != QUEST_STATUS_NONE && !player->HasQuestForItem(itemid) && !(pProto->ExtraFlags & ITEM_EXTRA_IGNORE_QUEST_STATUS))
             return false;
     }
     if (!lootOwner.IsEmpty())
@@ -1055,6 +1055,8 @@ LootStoreItem const * LootTemplate::LootGroup::Roll(Loot const& loot) const
                     continue;
                 Team conditionTeam = condition->GetTeam();
                 if ((conditionTeam == ALLIANCE || conditionTeam == HORDE) && conditionTeam != loot.GetTeam())
+                    continue;
+                if (!condition->CheckPatch())
                     continue;
             }
             indexesOk.push_back(i);

@@ -183,7 +183,6 @@ protected:
     uint32 cooldown;
     std::function<uint32()> resetCD;
     bool triggered;
-    bool onlyOnce;
     bool retryOnFail;
     uint32 timeSinceLast;
     SpellTarSelectFunction targetSelectFunc;
@@ -1687,7 +1686,7 @@ struct cthunAI : public ScriptedAI
         }
         //Spawn 2 flesh tentacles in C'thun stomach
         for (uint32 i = 0; i < 2; i++) {
-            Creature* pSpawned = m_creature->SummonCreature(MOB_FLESH_TENTACLE,
+            m_creature->SummonCreature(MOB_FLESH_TENTACLE,
                 fleshTentaclePositions[i][0],
                 fleshTentaclePositions[i][1],
                 fleshTentaclePositions[i][2],

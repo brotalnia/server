@@ -82,6 +82,7 @@ struct boss_baroness_anastariAI : public ScriptedAI
 
         m_creature->SetVisibility(VISIBILITY_ON);
         m_creature->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
+        m_creature->ApplySpellImmune(0, IMMUNITY_DAMAGE, SPELL_SCHOOL_MASK_ALL, false);
 
         /** Memorize old position of the Banshee */
         old_Position.x = m_creature->GetPositionX();
@@ -126,8 +127,9 @@ struct boss_baroness_anastariAI : public ScriptedAI
                         /** Teleport the banshee to his old position */
                         m_creature->NearTeleportTo(old_Position.x, old_Position.y, old_Position.z, 0.0f);
 
-                        /** Set back the player health to its old state */
-                        pTarget->SetHealthPercent(PlayerHealth);
+                        /** Set the player health back to its old state unless their party members killed them, whoops! */
+                        if (pTarget->isAlive())
+                            pTarget->SetHealthPercent(PlayerHealth);
 
                         m_creature->SetVisibility(VISIBILITY_ON);
                         m_creature->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);

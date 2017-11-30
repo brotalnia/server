@@ -17,51 +17,16 @@
 /* ScriptData
 SDName: Orgrimmar
 SD%Complete: 100
-SDComment: Quest support: 2460, 5727, 6566
+SDComment: Quest support: 2460, 6566
 SDCategory: Orgrimmar
 EndScriptData */
 
 /* ContentData
-npc_neeru_fireblade     npc_text + gossip options text missing
 npc_shenthul
 npc_thrall_warchief
 EndContentData */
 
 #include "scriptPCH.h"
-
-/*######
-## npc_neeru_fireblade
-######*/
-
-#define QUEST_5727  5727
-
-bool GossipHello_npc_neeru_fireblade(Player* pPlayer, Creature* pCreature)
-{
-    if (pCreature->isQuestGiver())
-        pPlayer->PrepareQuestMenu(pCreature->GetGUID());
-
-    if (pPlayer->GetQuestStatus(QUEST_5727) == QUEST_STATUS_INCOMPLETE)
-        pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, "You may speak frankly, Neeru...", GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 1);
-
-    pPlayer->SEND_GOSSIP_MENU(4513, pCreature->GetGUID());
-    return true;
-}
-
-bool GossipSelect_npc_neeru_fireblade(Player* pPlayer, Creature* pCreature, uint32 uiSender, uint32 uiAction)
-{
-    switch (uiAction)
-    {
-        case GOSSIP_ACTION_INFO_DEF+1:
-            pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, "[PH] ...", GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 2);
-            pPlayer->SEND_GOSSIP_MENU(4513, pCreature->GetGUID());
-            break;
-        case GOSSIP_ACTION_INFO_DEF+2:
-            pPlayer->CLOSE_GOSSIP_MENU();
-            pPlayer->AreaExploredOrEventHappens(QUEST_5727);
-            break;
-    }
-    return true;
-}
 
 /*######
 ## npc_shenthul
@@ -187,8 +152,8 @@ enum
 {
     QUEST_FOR_ALL_TO_SEE                = 7491,
 
-    YELL_ONY_REWARD_1_HORDE             = -143921,
-    YELL_ONY_REWARD_2_HORDE             = -143922,
+    YELL_ONY_REWARD_1_HORDE             = -1900113,
+    YELL_ONY_REWARD_2_HORDE             = -1900112,
 
     GO_ONYXIAS_HEAD_HORDE               = 179556
 };
@@ -339,10 +304,8 @@ enum
 
     QUEST_LORD_OF_BLACKROCK_HORDE       = 7784,
 
-    YELL_NEF_REWARD_1_MALE_HORDE       = -147201,
-    YELL_NEF_REWARD_2_MALE_HORDE       = -147202,
-    YELL_NEF_REWARD_1_FEMALE_HORDE     = -147203,
-    YELL_NEF_REWARD_2_FEMALE_HORDE     = -147204,
+    YELL_NEF_REWARD_1_HORDE     = -1900106,
+    YELL_NEF_REWARD_2_HORDE     = -1900105,
 
     GO_NEFARIANS_HEAD_HORDE            = 179881,
 };
@@ -420,7 +383,7 @@ struct npc_overlord_saurfangAI : public ScriptedAI
                         if (Player* pPlayer = m_creature->GetMap()->GetPlayer(m_playerGuid))
                         {
                             m_creature->HandleEmote(EMOTE_ONESHOT_SHOUT);
-                            m_creature->MonsterYellToZone(pPlayer->getGender() ? YELL_NEF_REWARD_1_FEMALE_HORDE : YELL_NEF_REWARD_1_MALE_HORDE, 0, pPlayer);
+                            m_creature->MonsterYellToZone(YELL_NEF_REWARD_1_HORDE, 0, pPlayer);
                         }
                         m_uiDialogueTimer = 10000;
                         break;
@@ -428,7 +391,7 @@ struct npc_overlord_saurfangAI : public ScriptedAI
                         if (Player* pPlayer = m_creature->GetMap()->GetPlayer(m_playerGuid))
                         {
                             m_creature->HandleEmote(EMOTE_ONESHOT_SHOUT);
-                            m_creature->MonsterYellToZone(pPlayer->getGender() ? YELL_NEF_REWARD_2_FEMALE_HORDE : YELL_NEF_REWARD_2_MALE_HORDE, 0, pPlayer);
+                            m_creature->MonsterYellToZone(YELL_NEF_REWARD_2_HORDE, 0, pPlayer);
                         }
                         if (GameObject* pGo = m_creature->FindNearestGameObject(GO_NEFARIANS_HEAD_HORDE, 150.0f))
                         {
@@ -559,10 +522,10 @@ enum
     NPC_HERALD_THRALL               = 10719,
     MAX_BLESSING_GENERATORS         = 8,
     QUEST_FOR_THE_HORDE             = 4974,
-    YELL_WARCHIEF_BLESSING_1        = -143961,
-    YELL_WARCHIEF_BLESSING_2        = -143962,
-    YELL_WARCHIEF_BLESSING_3        = -143963,
-    WARCHIEF_BLESSING_COOLDOWN      = 21600000
+    YELL_WARCHIEF_BLESSING_1        = -1900109,
+    YELL_WARCHIEF_BLESSING_2        = -1900108,
+    YELL_WARCHIEF_BLESSING_3        = -1900107,
+    WARCHIEF_BLESSING_COOLDOWN      = 30000
 };
 
 //TODO: verify abilities/timers
@@ -579,7 +542,7 @@ struct npc_thrall_warchiefAI : public ScriptedAI
     uint32 m_uiTick;
     uint32 ChainLightning_Timer;
     uint32 Shock_Timer;
-    int32 m_uiBlessingEventTimer;
+    uint32 m_uiBlessingEventTimer;
     bool m_bBlessingEvent;
     Creature* m_pHerald;
 
@@ -611,7 +574,9 @@ struct npc_thrall_warchiefAI : public ScriptedAI
                     case 0:
                         // Spawn Herald of Thrall in the Crossroads
                         m_pHerald = m_creature->SummonCreature(NPC_HERALD_THRALL, -462.404f, -2637.68f, 96.0656f, 5.8606f, TEMPSUMMON_TIMED_DESPAWN, WARCHIEF_BLESSING_COOLDOWN);
-                        m_pHerald->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_PASSIVE);
+                        if (m_pHerald)
+                            m_pHerald->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_PASSIVE);
+
                         m_uiBlessingEventTimer = 3000;
                         m_uiTick++;
                         break;
@@ -868,12 +833,6 @@ CreatureAI* GetAI_boss_vol_jin(Creature* pCreature)
 void AddSC_orgrimmar()
 {
     Script *newscript;
-
-    newscript = new Script;
-    newscript->Name = "npc_neeru_fireblade";
-    newscript->pGossipHello =  &GossipHello_npc_neeru_fireblade;
-    newscript->pGossipSelect = &GossipSelect_npc_neeru_fireblade;
-    newscript->RegisterSelf();
 
     newscript = new Script;
     newscript->Name = "npc_shenthul";

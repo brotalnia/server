@@ -36,6 +36,8 @@
 #include "Util.h"
 #include "LootMgr.h"
 #include "SpellMgr.h"
+#include "LFGMgr.h"
+#include "LFGHandler.h"
 
 GroupMemberStatus GetGroupMemberStatus(const Player *member = nullptr)
 {
@@ -77,7 +79,7 @@ void Roll::targetObjectBuildLink()
 
 Group::Group() : m_Id(0), m_groupType(GROUPTYPE_NORMAL),
     m_bgGroup(NULL), m_lootMethod(FREE_FOR_ALL), m_lootThreshold(ITEM_QUALITY_UNCOMMON),
-    m_subGroupsCounts(NULL), m_groupTeam(TEAM_NONE), m_leaderLastOnline(0)
+    m_subGroupsCounts(NULL), m_groupTeam(TEAM_NONE), m_leaderLastOnline(0), m_LFGAreaId(0)
 {
 }
 
@@ -307,7 +309,7 @@ Player* Group::GetInvited(const std::string& name) const
     return NULL;
 }
 
-bool Group::AddMember(ObjectGuid guid, const char* name)
+bool Group::AddMember(ObjectGuid guid, const char* name, uint8 joinMethod)
 {
     if (!_addMember(guid, name))
         return false;
@@ -336,6 +338,21 @@ bool Group::AddMember(ObjectGuid guid, const char* name)
         // quest related GO state dependent from raid membership
         if (isRaidGroup())
             player->UpdateForQuestWorldObjects();
+
+        if (isInLFG())
+        {
+            if (joinMethod == GROUP_LFG)
+            {
+
+            }
+            else
+            {
+                player->GetSession()->SendMeetingstoneSetqueue(m_LFGAreaId, MEETINGSTONE_STATUS_JOINED_QUEUE);
+
+                sLFGMgr.UpdateGroup(m_Id);
+            }
+        }
+
         // Cancel instance reset
         Map* map = player->GetMap();
         if (map->IsDungeon())
@@ -351,7 +368,7 @@ bool Group::AddMember(ObjectGuid guid, const char* name)
     return true;
 }
 
-uint32 Group::RemoveMember(ObjectGuid guid, uint8 method)
+uint32 Group::RemoveMember(ObjectGuid guid, uint8 removeMethod)
 {
     // remove member and change leader (if need) only if strong more 2 members _before_ member remove
     if (GetMembersCount() > GetMembersMinCount())
@@ -366,10 +383,31 @@ uint32 Group::RemoveMember(ObjectGuid guid, uint8 method)
 
             WorldPacket data;
 
-            if (method == 1)
+            if (removeMethod == GROUP_KICK)
             {
                 data.Initialize(SMSG_GROUP_UNINVITE, 0);
                 player->GetSession()->SendPacket(&data);
+
+                if (isInLFG())
+                {
+                    data.Initialize(SMSG_MEETINGSTONE_SETQUEUE, 5);
+                    data << 0 << uint8(MEETINGSTONE_STATUS_PARTY_MEMBER_REMOVED_PARTY_REMOVED);
+
+                    BroadcastPacket(&data, true);
+                    sLFGMgr.RemoveGroupFromQueue(m_Id);
+
+                    player->GetSession()->SendMeetingstoneSetqueue(m_LFGAreaId, MEETINGSTONE_STATUS_LOOKING_FOR_NEW_PARTY_IN_QUEUE);
+                    sLFGMgr.AddToQueue(player, m_LFGAreaId);
+                }
+            }
+
+            if (removeMethod == GROUP_LEAVE && isInLFG())
+            {
+                player->GetSession()->SendMeetingstoneSetqueue(0, MEETINGSTONE_STATUS_NONE);
+
+                data.Initialize(SMSG_MEETINGSTONE_SETQUEUE, 5);
+                data << m_LFGAreaId << uint8(MEETINGSTONE_STATUS_PARTY_MEMBER_LEFT_LFG);
+                BroadcastPacket(&data, true);
             }
 
             //we already removed player from group and in player->GetGroup() is his original group!
@@ -390,7 +428,12 @@ uint32 Group::RemoveMember(ObjectGuid guid, uint8 method)
             WorldPacket data(SMSG_GROUP_SET_LEADER, (m_leaderName.size() + 1));
             data << m_leaderName;
             BroadcastPacket(&data, true);
+
+            sLFGMgr.RemoveGroupFromQueue(m_Id);
         }
+
+        if (isInLFG())
+            sLFGMgr.UpdateGroup(m_Id);
 
         SendUpdate();
     }
@@ -460,6 +503,16 @@ void Group::Disband(bool hideDestroy)
             data.Initialize(SMSG_GROUP_LIST, 24);
             data << uint64(0) << uint64(0) << uint64(0);
             player->GetSession()->SendPacket(&data);
+
+            if (isInLFG())
+            {
+                sLFGMgr.RemoveGroupFromQueue(m_Id);
+
+                data.Initialize(SMSG_MEETINGSTONE_SETQUEUE, 5);
+                data << 0 << MEETINGSTONE_STATUS_NONE;
+
+                player->GetSession()->SendPacket(&data);
+            }
         }
 
         _homebindIfInstance(player);
@@ -481,6 +534,132 @@ void Group::Disband(bool hideDestroy)
     _updateLeaderFlag(true);
     m_leaderGuid.Clear();
     m_leaderName = "";
+}
+
+/*********************************************************/
+/***                   LFG SYSTEM                      ***/
+/*********************************************************/
+
+void Group::CalculateLFGRoles(LFGGroupQueueInfo& data)
+{
+    uint32 m_initRoles = (LFG_ROLE_TANK | LFG_ROLE_DPS | LFG_ROLE_HEALER);
+    std::vector<ObjectGuid> m_processed;
+    uint32 dpsCount = 0;
+
+    for (member_citerator citr = GetMemberSlots().begin(); citr != GetMemberSlots().end(); ++citr)
+    {
+        ClassRoles lfgRole;
+
+        lfgRole = sLFGMgr.CalculateRoles((Classes)sObjectMgr.GetPlayerClassByGUID(citr->guid));
+
+        if ((sLFGMgr.canPerformRole(lfgRole, LFG_ROLE_TANK) & m_initRoles) == LFG_ROLE_TANK && !inLFGGroup(m_processed, citr->guid))
+        {
+            FillPremadeLFG(citr->guid, LFG_ROLE_TANK, m_initRoles, dpsCount, m_processed);
+        }
+
+        if ((sLFGMgr.canPerformRole(lfgRole, LFG_ROLE_HEALER) & m_initRoles) == LFG_ROLE_HEALER && !inLFGGroup(m_processed, citr->guid))
+        {
+            FillPremadeLFG(citr->guid, LFG_ROLE_HEALER, m_initRoles, dpsCount, m_processed);
+        }
+
+        if ((sLFGMgr.canPerformRole(lfgRole, LFG_ROLE_DPS) & m_initRoles) == LFG_ROLE_DPS && !inLFGGroup(m_processed, citr->guid))
+        {
+            FillPremadeLFG(citr->guid, LFG_ROLE_DPS, m_initRoles, dpsCount, m_processed);
+        }
+    }
+
+    data.availableRoles = (ClassRoles)m_initRoles;
+    data.dpsCount = dpsCount;
+}
+
+void Group::FillPremadeLFG(ObjectGuid plrGuid, ClassRoles requiredRole, uint32& InitRoles, uint32& DpsCount, std::vector<ObjectGuid>& playersProcessed)
+{
+    Classes plrClass = (Classes)sObjectMgr.GetPlayerClassByGUID(plrGuid);
+
+    if (sLFGMgr.getPriority(plrClass, requiredRole) >= LFG_PRIORITY_HIGH && !inLFGGroup(playersProcessed, plrGuid))
+    {
+        switch (requiredRole)
+        {
+        case LFG_ROLE_TANK:
+        {
+            InitRoles &= ~LFG_ROLE_TANK;
+            break;
+        }
+
+        case LFG_ROLE_HEALER:
+        {
+            InitRoles &= ~LFG_ROLE_HEALER;
+            break;
+        }
+
+        case LFG_ROLE_DPS:
+        {
+            if (DpsCount < 3)
+            {
+                ++DpsCount;
+
+                if (DpsCount >= 3)
+                    InitRoles &= ~LFG_ROLE_DPS;
+            }
+            break;
+        }
+        default:
+            break;
+        }
+        playersProcessed.push_back(plrGuid);
+    }
+    else if (sLFGMgr.getPriority(plrClass, requiredRole) < LFG_PRIORITY_HIGH && !inLFGGroup(playersProcessed, plrGuid))
+    {
+        bool hasFoundPriority = false;
+
+        for (member_citerator citr = GetMemberSlots().begin(); citr != GetMemberSlots().end(); ++citr)
+        {
+            if (plrGuid == citr->guid)
+                continue;
+
+            Classes memberClass = (Classes)sObjectMgr.GetPlayerClassByGUID(plrGuid);
+
+            if (sLFGMgr.getPriority(plrClass, requiredRole) < sLFGMgr.getPriority(memberClass, requiredRole) && !inLFGGroup(playersProcessed, plrGuid))
+            {
+                hasFoundPriority = true;
+            }
+        }
+
+        if (!hasFoundPriority)
+        {
+            switch (requiredRole)
+            {
+            case LFG_ROLE_TANK:
+            {
+                InitRoles &= ~LFG_ROLE_TANK;
+                break;
+            }
+
+            case LFG_ROLE_HEALER:
+            {
+                InitRoles &= ~LFG_ROLE_HEALER;
+                break;
+
+            }
+
+            case LFG_ROLE_DPS:
+            {
+                if (DpsCount < 3)
+                {
+                    ++DpsCount;
+
+                    if (DpsCount >= 3)
+                        InitRoles &= ~LFG_ROLE_DPS;
+                }
+                break;
+            }
+            default:
+                break;
+            }
+
+            playersProcessed.push_back(plrGuid);
+        }
+    }
 }
 
 /*********************************************************/
@@ -1393,6 +1572,31 @@ void Group::_removeRolls(ObjectGuid guid)
     }
 }
 
+bool Group::_swapMembersGroup(ObjectGuid guid, ObjectGuid swapGuid)
+{
+    // If we can't get a member slot for both members then the swap is impossible
+    member_witerator slot = _getMemberWSlot(guid);
+    if (slot == m_memberSlots.end())
+        return false;
+
+    member_witerator swapSlot = _getMemberWSlot(swapGuid);
+    if (swapSlot == m_memberSlots.end())
+        return false;
+
+    uint8 swapGroup = swapSlot->group;
+    swapSlot->group = slot->group;
+    slot->group = swapGroup;
+
+    // Don't need to change group counters since we are swapping
+    if (!isBGGroup())
+    {
+        CharacterDatabase.PExecute("UPDATE group_member SET subgroup='%u' WHERE memberGuid='%u'", slot->group, guid.GetCounter());
+        CharacterDatabase.PExecute("UPDATE group_member SET subgroup='%u' WHERE memberGuid='%u'", swapSlot->group, swapGuid.GetCounter());
+    }
+
+    return true;
+}
+
 bool Group::_setMembersGroup(ObjectGuid guid, uint8 group)
 {
     member_witerator slot = _getMemberWSlot(guid);
@@ -1481,7 +1685,11 @@ bool Group::SameSubGroup(Player const* member1, Player const* member2) const
 // allows setting subgroup for offline members
 void Group::ChangeMembersGroup(ObjectGuid guid, uint8 group)
 {
-    if (!isRaidGroup())
+    if (!isRaidGroup() || group >= MAX_RAID_SUBGROUPS)
+        return;
+
+    // Cannot put player in group if it would cause the group to overflow
+    if (m_subGroupsCounts && m_subGroupsCounts[group] >= MAX_GROUP_SIZE)
         return;
 
     Player *player = sObjectMgr.GetPlayer(guid);
@@ -1506,11 +1714,17 @@ void Group::ChangeMembersGroup(ObjectGuid guid, uint8 group)
 // only for online members
 void Group::ChangeMembersGroup(Player *player, uint8 group)
 {
-    if (!player || !isRaidGroup())
+    if (!player || !isRaidGroup() || group >= MAX_RAID_SUBGROUPS)
         return;
 
-    uint8 prevSubGroup = player->GetSubGroup();
-    if (prevSubGroup == group)
+    // Player's current subgroup may be from a battleground, so check
+    // subgroup in this Group
+    uint8 prevSubGroup = GetMemberGroup(player->GetObjectGuid());
+    if (prevSubGroup == group || prevSubGroup >= MAX_RAID_SUBGROUPS)
+        return;
+
+    // Cannot put player in group if it would cause the group to overflow
+    if (m_subGroupsCounts && m_subGroupsCounts[group] >= MAX_GROUP_SIZE)
         return;
 
     if (_setMembersGroup(player->GetObjectGuid(), group))
@@ -1529,8 +1743,87 @@ void Group::ChangeMembersGroup(Player *player, uint8 group)
     }
 }
 
+// One or both members are offline
+void Group::SwapMembersGroup(ObjectGuid guid, ObjectGuid swapGuid)
+{
+    if (!isRaidGroup())
+        return;
 
-uint32 Group::CanJoinBattleGroundQueue(BattleGroundTypeId bgTypeId, BattleGroundQueueTypeId bgQueueTypeId, uint32 MinPlayerCount, uint32 MaxPlayerCount)
+    Player *player = sObjectMgr.GetPlayer(guid);
+    Player *swapPlayer = sObjectMgr.GetPlayer(swapGuid);
+
+    if (player && swapPlayer)
+        SwapMembersGroup(player, swapPlayer);
+    else
+    {
+        uint8 group = GetMemberGroup(guid);
+        uint8 swapGroup = GetMemberGroup(swapGuid);
+
+        // Same group, can't swap
+        if (group == swapGroup || group >= MAX_RAID_SUBGROUPS || swapGroup >= MAX_RAID_SUBGROUPS)
+            return;
+
+        if (_swapMembersGroup(guid, swapGuid))
+        {
+            // Player is online, update group refs
+            if (player)
+            {
+                if (player->GetGroup() == this)
+                    player->GetGroupRef().setSubGroup(swapGroup);
+                // BG group
+                else
+                    player->GetOriginalGroupRef().setSubGroup(swapGroup);
+            }
+
+            // Swap player is online, update group refs
+            if (swapPlayer)
+            {
+                if (swapPlayer->GetGroup() == this)
+                    swapPlayer->GetGroupRef().setSubGroup(group);
+                else
+                    swapPlayer->GetOriginalGroupRef().setSubGroup(group);
+            }
+
+            // Don't change group counters, we're swapping. Just update
+            SendUpdate();
+        }
+    }
+}
+
+// Both members online
+void Group::SwapMembersGroup(Player *player, Player *swapPlayer)
+{
+    if (!isRaidGroup() || !player || !swapPlayer)
+        return;
+
+    // Cannot swap players in the same sub group! Get groups from GetMemberGroup,
+    // as either player may be in a battleground and not have their current group
+    // set to this Group
+    uint8 group = GetMemberGroup(player->GetObjectGuid());
+    uint8 swapGroup = GetMemberGroup(swapPlayer->GetObjectGuid());
+
+    if (group == swapGroup || group >= MAX_RAID_SUBGROUPS || swapGroup >= MAX_RAID_SUBGROUPS)
+        return;
+
+    if (_swapMembersGroup(player->GetObjectGuid(), swapPlayer->GetObjectGuid()))
+    {
+        // One player may be in a BG group, the other not
+        if (player->GetGroup() == this)
+            player->GetGroupRef().setSubGroup(swapGroup);
+        // BG group
+        else
+            player->GetOriginalGroupRef().setSubGroup(swapGroup);
+
+        if (swapPlayer->GetGroup() == this)
+            swapPlayer->GetGroupRef().setSubGroup(group);
+        else
+            swapPlayer->GetOriginalGroupRef().setSubGroup(group);
+
+        SendUpdate();
+    }
+}
+
+uint32 Group::CanJoinBattleGroundQueue(BattleGroundTypeId bgTypeId, BattleGroundQueueTypeId bgQueueTypeId, uint32 MinPlayerCount, uint32 MaxPlayerCount, Player* Leader, std::vector<uint32>* excludedMembers)
 {
     // check for min / max count
     uint32 memberscount = GetMembersCount();
@@ -1539,14 +1832,12 @@ uint32 Group::CanJoinBattleGroundQueue(BattleGroundTypeId bgTypeId, BattleGround
     if (memberscount > MaxPlayerCount)
         return BG_JOIN_ERR_GROUP_TOO_MANY;
 
-    // get a player as reference, to compare other players' stats to (queue id based on level, etc.)
-    Player * reference = GetFirstMember()->getSource();
     // no reference found, can't join this way
-    if (!reference)
+    if (!Leader)
         return BG_JOIN_ERR_OFFLINE_MEMBER;
 
-    BattleGroundBracketId bracket_id = reference->GetBattleGroundBracketIdFromLevel(bgTypeId);
-    Team team = reference->GetTeam();
+    BattleGroundBracketId bracket_id = Leader->GetBattleGroundBracketIdFromLevel(bgTypeId);
+    Team team = Leader->GetTeam();
 
     // check every member of the group to be able to join
     for (GroupReference *itr = GetFirstMember(); itr != NULL; itr = itr->next())
@@ -1560,7 +1851,10 @@ uint32 Group::CanJoinBattleGroundQueue(BattleGroundTypeId bgTypeId, BattleGround
             return BG_JOIN_ERR_MIXED_FACTION;
         // not in the same battleground level bracket, don't let join
         if (member->GetBattleGroundBracketIdFromLevel(bgTypeId) != bracket_id)
-            return BG_JOIN_ERR_MIXED_LEVELS;
+        {
+            if (excludedMembers && (std::find(excludedMembers->begin(), excludedMembers->end(), member->GetGUIDLow()) == excludedMembers->end()))
+                excludedMembers->push_back(member->GetGUIDLow());
+        }
         // don't let join if someone from the group is already in that bg queue
         if (member->InBattleGroundQueueForBattleGroundQueueType(bgQueueTypeId))
             return BG_JOIN_ERR_GROUP_MEMBER_ALREADY_IN_QUEUE;
@@ -1612,6 +1906,27 @@ void Group::ResetInstances(InstanceResetMethod method, Player* SendMsgTo)
                 ++itr;
                 continue;
             }
+
+            if (SendMsgTo)
+            {
+                bool offline_players = false;
+                for (member_citerator citr = m_memberSlots.begin(); citr != m_memberSlots.end(); ++citr)
+                {
+                    Player *pl = sObjectMgr.GetPlayer(citr->guid);
+                    if (!pl || !pl->GetSession())
+                    {
+                        offline_players = true;
+                        break;
+                    }
+                }
+
+                if (offline_players)
+                {
+                    SendMsgTo->SendResetInstanceFailed(INSTANCERESET_FAIL_OFFLINE, state->GetMapId());
+                    ++itr;
+                    continue;
+                }
+            }
         }
 
         bool isEmpty = true;
@@ -1625,7 +1940,7 @@ void Group::ResetInstances(InstanceResetMethod method, Player* SendMsgTo)
             if (isEmpty)
                 SendMsgTo->SendResetInstanceSuccess(state->GetMapId());
             else
-                SendMsgTo->SendResetInstanceFailed(0, state->GetMapId());
+                SendMsgTo->SendResetInstanceFailed(INSTANCERESET_FAIL_GENERAL, state->GetMapId());
         }
 
         if (isEmpty || method == INSTANCE_RESET_GROUP_DISBAND)

@@ -43,19 +43,19 @@ class ObjectMgr;
 #define QUEST_REPUTATIONS_COUNT 5
 #define QUEST_EMOTE_COUNT 4
 
-// [-ZERO] need update
 enum QuestFailedReasons
 {
-    INVALIDREASON_DONT_HAVE_REQ                 = 0,
-    INVALIDREASON_QUEST_FAILED_LOW_LEVEL        = 1,        //You are not high enough level for that quest.
-    INVALIDREASON_QUEST_FAILED_WRONG_RACE       = 6,        //That quest is not available to your race.
-    INVALIDREASON_QUEST_ONLY_ONE_TIMED          = 12,       //You can only be on one timed quest at a time.
-    INVALIDREASON_QUEST_ALREADY_ON              = 13,       //You are already on that quest
-    INVALIDREASON_QUEST_FAILED_MISSING_ITEMS    = 21,       //You don't have the required items with you. Check storage.
-    INVALIDREASON_QUEST_FAILED_NOT_ENOUGH_MONEY = 23,       //You don't have enough money for that quest.
-    //[-ZERO] tbc enumerations [?]
-    INVALIDREASON_QUEST_ALREADY_ON2             = 18,       //You are already on that quest
-    INVALIDREASON_QUEST_ALREADY_DONE            = 7,        //You have completed that quest.
+    INVALIDREASON_DONT_HAVE_REQ                 = 0,        // this is default case
+    INVALIDREASON_QUEST_FAILED_LOW_LEVEL        = 1,        // You are not high enough level for that quest.
+    INVALIDREASON_QUEST_FAILED_REQS             = 2,        // You don't meet the requirements for that quest.
+    INVALIDREASON_QUEST_FAILED_INVENTORY_FULL   = 4,        // Inventory is full. (Also 50. From SMSG_QUESTGIVER_QUEST_FAILED)
+    INVALIDREASON_QUEST_FAILED_WRONG_RACE       = 6,        // That quest is not available to your race.
+    INVALIDREASON_QUEST_ONLY_ONE_TIMED          = 12,       // You can only be on one timed quest at a time.
+    INVALIDREASON_QUEST_ALREADY_ON              = 13,       // You are already on that quest
+    INVALIDREASON_QUEST_FAILED_DUPLICATE_ITEM   = 17,       // Duplicate item found. (From SMSG_QUESTGIVER_QUEST_FAILED)
+    INVALIDREASON_QUEST_FAILED_MISSING_ITEMS    = 20,       // You don't have the required items with you. Check storage.
+    INVALIDREASON_QUEST_FAILED_NOT_ENOUGH_MONEY = 22        // You don't have enough money for that quest.
+    // INVALIDREASON_QUEST_FAILED_REQS                   = 3,4,5,7-11,14-19,21
 };
 
 enum QuestShareMessages
@@ -175,6 +175,15 @@ enum QuestSpecialFlags
     QUEST_SPECIAL_FLAG_TIMED                = 0x040,        // Internal flag computed only
 };
 
+enum QuestMethod
+{
+    QUEST_METHOD_AUTOCOMPLETE               = 0x0,
+    QUEST_METHOD_DISABLED                   = 0x1,
+    QUEST_METHOD_DELIVER                    = 0x2,
+
+    QUEST_METHOD_LIMIT                      = 0x3,          // Highest Method entry DB should have
+};
+
 #define QUEST_SPECIAL_FLAG_DB_ALLOWED (QUEST_SPECIAL_FLAG_REPEATABLE | QUEST_SPECIAL_FLAG_EXPLORATION_OR_EVENT)
 
 struct QuestLocale
@@ -210,6 +219,7 @@ class Quest
         uint32 GetQuestMethod() const { return QuestMethod; }
         int32  GetZoneOrSort() const { return ZoneOrSort; }
         uint32 GetMinLevel() const { return MinLevel; }
+        uint32 GetMaxLevel() const { return MaxLevel; }
         uint32 GetQuestLevel() const { return QuestLevel; }
         uint32 GetType() const { return Type; }
         uint32 GetRequiredClasses() const { return RequiredClasses; }
@@ -307,6 +317,7 @@ class Quest
         uint32 QuestMethod;
         int32  ZoneOrSort;
         uint32 MinLevel;
+        uint32 MaxLevel;
         uint32 QuestLevel;
         uint32 Type;
         uint32 RequiredClasses;
@@ -364,7 +375,7 @@ struct QuestStatusData
 {
     QuestStatusData()
         : m_status(QUEST_STATUS_NONE),m_rewarded(false),
-        m_explored(false), m_timer(0), uState(QUEST_NEW)
+        m_explored(false), m_timer(0), uState(QUEST_NEW), m_reward_choice(0)
     {
         memset(m_itemcount, 0, QUEST_OBJECTIVES_COUNT * sizeof(uint32));
         memset(m_creatureOrGOcount, 0, QUEST_OBJECTIVES_COUNT * sizeof(uint32));
@@ -375,6 +386,7 @@ struct QuestStatusData
     bool m_explored;
     uint32 m_timer;
     QuestUpdateState uState;
+    uint32 m_reward_choice;
 
     uint32 m_itemcount[ QUEST_OBJECTIVES_COUNT ];
     uint32 m_creatureOrGOcount[ QUEST_OBJECTIVES_COUNT ];

@@ -62,8 +62,6 @@ bool GOHello_go_shadowforge_brazier(Player* pPlayer, GameObject* pGo)
 
 enum
 {
-    NPC_GRIMSTONE       = 10096,
-
     //4 or 6 in total? 1+2+1 / 2+2+2 / 3+3. Depending on this, code should be changed.
     MAX_MOB_AMOUNT      = 8
 };
@@ -88,26 +86,10 @@ uint32 RingBoss[] =
     9032,                                                   // Hedrum
 };
 
-bool AreaTrigger_at_ring_of_law(Player* pPlayer, const AreaTriggerEntry *at)
-{
-    if (ScriptedInstance* pInstance = (ScriptedInstance*)pPlayer->GetInstanceData())
-    {
-        if (pInstance->GetData(TYPE_RING_OF_LAW) == IN_PROGRESS || pInstance->GetData(TYPE_RING_OF_LAW) == DONE)
-            return false;
-
-        pInstance->SetData(TYPE_RING_OF_LAW, IN_PROGRESS);
-        pPlayer->SummonCreature(NPC_GRIMSTONE, 625.559f, -205.618f, -52.735f, 2.609f, TEMPSUMMON_DEAD_DESPAWN, 0);
-
-        return false;
-    }
-    return false;
-}
-
 /*######
 ## npc_grimstone
 ######*/
 
-//TODO: implement quest part of event (different end boss)
 struct npc_grimstoneAI : public npc_escortAI
 {
     npc_grimstoneAI(Creature* pCreature) : npc_escortAI(pCreature)
@@ -129,7 +111,13 @@ struct npc_grimstoneAI : public npc_escortAI
     uint64 RingMobGUID[MAX_MOB_AMOUNT];
     uint64 RingBossGUID;
 
+    uint64 ChallengeMobGUID[4];
+
+    bool ArenaChallenge;
+
     bool CanWalk;
+
+    bool GroupIsWiped;
 
     void Reset()
     {
@@ -144,9 +132,14 @@ struct npc_grimstoneAI : public npc_escortAI
         for (uint8 i = 0; i < MAX_MOB_AMOUNT; ++i)
             RingMobGUID[i] = 0;
 
+        for (uint8 i = 0; i < 4; ++i)
+            ChallengeMobGUID[i] = 0;
+
         RingBossGUID = 0;
 
         CanWalk = false;
+        ArenaChallenge = false;
+        GroupIsWiped = false;
     }
 
     void DoGate(uint32 id, uint32 state)
@@ -168,22 +161,105 @@ struct npc_grimstoneAI : public npc_escortAI
             RingMobGUID[MobCount] = tmp->GetGUID();
             tmp->GetMotionMaster()->MovePoint(1, 596.285156f, -188.698944f, -54.132176f);
             tmp->SetHomePosition(596.285156f, -188.698944f, -54.132176f, 0);
-        }
+            tmp->SetInCombatWithZone();
 
-        ++MobCount;
+            ++MobCount;
+        }
 
         if (MobCount == MAX_MOB_AMOUNT)
             MobDeath_Timer = 2500;
     }
 
-    //TODO: move them to center
     void SummonRingBoss()
     {
-        if (Creature* tmp = m_creature->SummonCreature(RingBoss[rand() % 6], 644.300f, -175.989f, -53.739f, 3.418f, TEMPSUMMON_DEAD_DESPAWN, 0))
+        float spawnX, spawnY, spawnZ, spawnO;
+        float homeX, homeY, homeZ, homeO;
+        spawnX = 644.300f;
+        spawnY = -175.989f;
+        spawnZ = -53.739f;
+        spawnO = 3.418f;
+
+        homeX = 596.285156f;
+        homeY = -188.698944f;
+        homeZ = -54.132176f;
+        homeO = 0;
+
+        // T0.5 Challenge has been put down, summon Theldren and his random adds
+        if (m_pInstance->GetData(DATA_THELDREN) == IN_PROGRESS)
         {
-            RingBossGUID = tmp->GetGUID();
-            tmp->GetMotionMaster()->MovePoint(1, 596.285156f, -188.698944f, -54.132176f);
-            tmp->SetHomePosition(596.285156f, -188.698944f, -54.132176f, 0);
+            Player *challenger = m_creature->GetMap()->GetPlayer(m_pInstance->GetData64(DATA_ARENA_CHALLENGER));
+            if (!challenger)
+            {
+                sLog.outError("[Blackrock Depths] Ring of Law challenger player not found!");
+                return;
+            }
+
+            ArenaChallenge = true;
+
+            // Can spawn up to 5 creatures. One is guaranteed to be Theldren, a DPS warrior
+            // Always have at least one 'healer', priest or shaman
+            // The last three are DPS. Can both be ranged, both melee or one from each.
+            // https://web.archive.org/web/20060523124717/http://wow.allakhazam.com:80/db/quest.html?wquest=9015&mid=114423967727961
+
+            uint32 HealerEntries[2];
+            uint32 DPSEntries[6];
+
+            HealerEntries[0] = 16053;
+            HealerEntries[1] = 16055;
+
+            DPSEntries[0] = 16058;
+            DPSEntries[1] = 16051;
+            DPSEntries[2] = 16052;
+            DPSEntries[3] = 16049;
+            DPSEntries[4] = 16050;
+            DPSEntries[5] = 16054;
+            // Offset spawns slightly so the NPCs aren't stacked
+            if (Creature *healer = m_creature->SummonCreature(HealerEntries[rand() % 2], spawnX+3, spawnY-1, spawnZ-1, spawnO, TEMPSUMMON_DEAD_DESPAWN, 0))
+            {
+                healer->GetMotionMaster()->MovePoint(1, spawnX, spawnY, spawnZ);
+                healer->SetHomePosition(homeX, homeY, homeZ, homeO);
+                healer->SetInCombatWithZone();
+                ChallengeMobGUID[0] = healer->GetGUID();
+                ++MobCount;
+            }
+
+            // Spawn 3 more random DPS!
+            for (uint8 i = 0; i < 3; ++i)
+            {
+                float x, y, z;
+                x = spawnX + 1.5f;
+                y = spawnY - 3 + 3 * i;
+                z = spawnZ;
+
+                if (Creature *dps = m_creature->SummonCreature(DPSEntries[rand() % 6], x, y, z, spawnO, TEMPSUMMON_DEAD_DESPAWN, 0))
+                {
+                    dps->GetMotionMaster()->MovePoint(1, spawnX, spawnY, spawnZ);
+                    dps->SetHomePosition(homeX, homeY, homeZ, homeO);
+                    dps->SetInCombatWithZone();
+                    ChallengeMobGUID[i + 1] = dps->GetGUID();
+                    ++MobCount;
+                }
+            }
+
+            // Lastly, spawn Theldren
+            if (Creature *theldren = m_creature->SummonCreature(NPC_THELDREN, spawnX, spawnY, spawnZ, spawnO, TEMPSUMMON_DEAD_DESPAWN, 0))
+            {
+                RingBossGUID = theldren->GetGUID();
+                theldren->GetMotionMaster()->MovePoint(1, spawnX, spawnY, spawnZ);
+                theldren->SetHomePosition(homeX, homeY, homeZ, homeO);
+                theldren->SetInCombatWithZone();
+                ++MobCount;
+            }
+        }
+        else {
+            if (Creature* tmp = m_creature->SummonCreature(RingBoss[rand() % 6], spawnX, spawnY, spawnZ, spawnO, TEMPSUMMON_DEAD_DESPAWN, 0))
+            {
+                RingBossGUID = tmp->GetGUID();
+                tmp->GetMotionMaster()->MovePoint(1, 596.285156f, -188.698944f, -54.132176f);
+                tmp->SetHomePosition(homeX, homeY, homeZ, homeO);
+                tmp->SetInCombatWithZone();
+                ++MobCount;
+            }
         }
 
         MobDeath_Timer = 2500;
@@ -218,6 +294,9 @@ struct npc_grimstoneAI : public npc_escortAI
                 if (m_pInstance)
                 {
                     m_pInstance->SetData(TYPE_RING_OF_LAW, DONE);
+
+                    if (m_pInstance->GetData(DATA_THELDREN) == IN_PROGRESS)
+                        m_pInstance->SetData(DATA_THELDREN, DONE);
                     sLog.outDebug("npc_grimstone: event reached end and set complete.");
                 }
                 break;
@@ -243,26 +322,50 @@ struct npc_grimstoneAI : public npc_escortAI
                         RingBossGUID = 0;
                         Event_Timer = 5000;
                         MobDeath_Timer = 0;
+                        
+                        --MobCount;
+                        // End of the event if boss dies, even if some adds are left alive
                         return;
                     }
-                    return;
-                }
 
-                for (uint8 i = 0; i < MAX_MOB_AMOUNT; ++i)
-                {
-                    Creature *mob = m_creature->GetMap()->GetCreature(RingMobGUID[i]);
-                    if (mob && !mob->isAlive() && mob->isDead())
+                    if (ArenaChallenge)
                     {
-                        RingMobGUID[i] = 0;
-                        --MobCount;
-
-                        //seems all are gone, so set timer to continue and discontinue this
-                        if (!MobCount)
+                        for (uint8 i = 0; i < 4; ++i)
                         {
-                            Event_Timer = 5000;
-                            MobDeath_Timer = 0;
+                            Creature *mob = m_creature->GetMap()->GetCreature(ChallengeMobGUID[i]);
+                            if (mob && !mob->isAlive() && mob->isDead())
+                            {
+                                ChallengeMobGUID[i] = 0;
+                                --MobCount;
+                            }
                         }
                     }
+                }
+                else 
+                {
+                    for (uint8 i = 0; i < MAX_MOB_AMOUNT; ++i)
+                    {
+                        Creature *mob = m_creature->GetMap()->GetCreature(RingMobGUID[i]);
+                        if (mob && !mob->isAlive() && mob->isDead())
+                        {
+                            RingMobGUID[i] = 0;
+                            --MobCount;
+
+                            //seems all are gone, so set timer to continue and discontinue this
+                            if (!MobCount)
+                            {
+                                Event_Timer = 10000;
+                                MobDeath_Timer = 0;
+                            }
+                        }
+                    }
+                }
+
+                // Group wiped?
+                if (CheckForWipe())
+                {
+                    GroupIsWiped = true;
+                    return;
                 }
             }
             else MobDeath_Timer -= diff;
@@ -276,7 +379,7 @@ struct npc_grimstoneAI : public npc_escortAI
                 {
                     case 0:
                         DoScriptText(-1000010, m_creature);
-                        DoGate(DATA_ARENA4, 1);
+                        DoGate(DATA_ARENA4, GO_STATE_READY);
                         Start(false);
                         CanWalk = true;
                         Event_Timer = 0;
@@ -357,6 +460,64 @@ struct npc_grimstoneAI : public npc_escortAI
         if (CanWalk)
             npc_escortAI::UpdateAI(diff);
     }
+
+    bool CheckForWipe() {
+        if (GroupIsWiped)
+            return true;
+        // If there are no players within the vicinity of Grimstone in combat
+        // and there are mobs alive, it's a wipe
+        bool wiped = MobCount > 0;
+        if (!wiped)
+            return wiped;
+
+        Map::PlayerList const &PlayerList = m_creature->GetMap()->GetPlayers();
+
+        for (Map::PlayerList::const_iterator itr = PlayerList.begin(); itr != PlayerList.end(); ++itr)
+        {
+            Player *player = itr->getSource();
+
+            if (player && player->IsWithinDistInMap(m_creature, 80.0f) && player->isInCombat()) {
+                wiped = false;
+                break;
+            }
+        }
+
+        if (wiped)
+        {
+            // Players wiped, open the gates. 
+            DoGate(DATA_ARENA1, GO_STATE_READY);
+            DoGate(DATA_ARENA2, GO_STATE_READY);
+            DoGate(DATA_ARENA4, GO_STATE_ACTIVE); // jail entrance
+
+            // If the phase is before the boss has spawned, reset the event
+            if (!RingBossGUID)
+            {
+                m_pInstance->SetData(TYPE_RING_OF_LAW, NOT_STARTED);
+
+                Reset();
+                m_creature->ForcedDespawn();
+            }
+        }
+        
+        return wiped;
+    }
+
+    void PlayerEnteredArena(Player *player)
+    {
+        // Re-enter zone after wipe, have boss. Close gates
+        if (GroupIsWiped)
+        {
+            if (Creature *boss = m_pInstance->GetCreature(RingBossGUID))
+            {
+                DoGate(DATA_ARENA4, GO_STATE_READY); // jail entrance
+
+                // Charge!
+                boss->SetInCombatWith(player);
+            }
+
+            GroupIsWiped = false;
+        }
+    }
 };
 
 CreatureAI* GetAI_npc_grimstone(Creature* pCreature)
@@ -364,6 +525,30 @@ CreatureAI* GetAI_npc_grimstone(Creature* pCreature)
     if (!pCreature->GetInstanceData())
         return NULL;
     return new npc_grimstoneAI(pCreature);
+}
+
+bool AreaTrigger_at_ring_of_law(Player* pPlayer, const AreaTriggerEntry *at)
+{
+    if (ScriptedInstance* pInstance = (ScriptedInstance*)pPlayer->GetInstanceData())
+    {
+        if (pInstance->GetData(TYPE_RING_OF_LAW) == IN_PROGRESS || pInstance->GetData(TYPE_RING_OF_LAW) == DONE)
+        {
+            // Player triggered ring of law while it's in progress. Might have been after a wipe
+            if (Creature *creature = pInstance->GetCreature(pInstance->GetData64(NPC_GRIMSTONE)))
+            {
+                if (npc_grimstoneAI *grimstoneAI = dynamic_cast<npc_grimstoneAI *>(creature->AI()))
+                    grimstoneAI->PlayerEnteredArena(pPlayer);
+            }
+            return false;
+        }
+
+
+        pInstance->SetData(TYPE_RING_OF_LAW, IN_PROGRESS);
+        pPlayer->SummonCreature(NPC_GRIMSTONE, 625.559f, -205.618f, -52.735f, 2.609f, TEMPSUMMON_DEAD_DESPAWN, 0);
+
+        return false;
+    }
+    return false;
 }
 
 /*######
@@ -1273,12 +1458,15 @@ bool GOHello_go_relic_coffer_door(Player* pPlayer, GameObject* pGo)
 
     if (pInstance->GetData(TYPE_RELIC_COFFER) == DONE)
     {
-        Creature* pCreature = pPlayer->SummonCreature(RUINEPOIGNE_ENTRY,
-                              819.45f, -348.96f, -50.49f, 0.35f, TEMPSUMMON_TIMED_OR_DEAD_DESPAWN, 300000);
-//        pCreature->MonsterYell("Ne les laissez pas s'emparer du Coeur de la montagne!!", 0, pPlayer);
-        // pCreature->MonsterYell("Don't let them take the moutain hearth!", 0, pPlayer);
-        pCreature->MonsterYell(NOST_TEXT(153), 0, pPlayer);
-        pCreature->AI()->AttackStart(pPlayer);
+        if (Creature* pCreature = pPlayer->SummonCreature(RUINEPOIGNE_ENTRY,
+            819.45f, -348.96f, -50.49f, 0.35f, TEMPSUMMON_TIMED_OR_DEAD_DESPAWN, 300000))
+        {
+            // pCreature->MonsterYell("Ne les laissez pas s'emparer du Coeur de la montagne!!", 0, pPlayer);
+            pCreature->MonsterYell("Don't let them take the moutain hearth!", 0, pPlayer);
+            // pCreature->MonsterYell(NOST_TEXT(153), 0, pPlayer); // seems to be custom
+            pCreature->AI()->AttackStart(pPlayer);
+        }
+
     }
 
     return false;
@@ -1383,7 +1571,7 @@ enum
 };
 
 //#define GOSSIP_ITEM_ATTAQUE  "On pay bien pour votre tête..."
-#define GOSSIP_ITEM_ATTAQUE "We will be paid well for your head..."
+#define GOSSIP_ITEM_ATTAQUE "Your family says hello, Ribbly. And they want your head!"
 
 struct npc_ribbly_fermevanneAI : public ScriptedAI
 {
@@ -1446,7 +1634,7 @@ bool GossipSelect_npc_ribbly_fermevanne(Player* pPlayer, Creature* pCreature, ui
     if (uiAction == GOSSIP_ACTION_INFO_DEF + 1)
     {
         pPlayer->CLOSE_GOSSIP_MENU();
-        pCreature->MonsterYell(NOST_TEXT(154), 0, pPlayer);
+        pCreature->MonsterYell(4973, 0, pPlayer);
         pCreature->setFaction(14);
         pCreature->AI()->AttackStart(pPlayer);
 
@@ -1483,7 +1671,7 @@ struct npc_golem_lord_argelmachAI : public ScriptedAI
     {
         m_creature->GetMotionMaster()->MovePoint(0, 846.801025f, 16.280600f, -53.639500f);
         //m_creature->MonsterYell("Golems, votre Seigneur a besoin de vous!", 0, pWho);
-        m_creature->MonsterYell(NOST_TEXT(155), 0, pWho);
+        //m_creature->MonsterYell(NOST_TEXT(155), 0, pWho); // seems to be custom
 
         if (m_pInstance)
             m_pInstance->SetData(DATA_ARGELMACH_AGGRO, IN_PROGRESS);
@@ -1587,8 +1775,7 @@ struct npc_GorShakAI : public ScriptedAI
         if (bQuestActive)
         {
             if (Player* player = m_creature->GetMap()->GetPlayer(playerGuid))
-                if (player->GetQuestStatus(QUEST_WHATISGOINGON) == QUEST_STATUS_INCOMPLETE)
-                    player->FailQuest(QUEST_WHATISGOINGON);
+                player->GroupEventFailHappens(QUEST_WHATISGOINGON);
             Reset();
         }
     }
@@ -1670,7 +1857,7 @@ struct npc_GorShakAI : public ScriptedAI
                             // DoScriptText(SAY_END, m_creature);
                             // Validate Quest :
                             if (Player* player = m_creature->GetMap()->GetPlayer(playerGuid))
-                                player->AreaExploredOrEventHappens(QUEST_WHATISGOINGON);
+                                player->GroupEventHappens(QUEST_WHATISGOINGON, m_creature);
                             Reset();
                         }
                         break;
@@ -1769,7 +1956,7 @@ bool AreaTrigger_at_shadowforge_bridge(Player* pPlayer, AreaTriggerEntry const* 
         if (pPlayer->isGameMaster() || !pPlayer->isAlive() || pInstance->GetData(TYPE_BRIDGE) == DONE)
             return false;
 
-        if (Creature* pMasterGuard = ((Creature*)pPlayer)->SummonCreature(NPC_ANVILRAGE_GUARDMAN, aGuardSpawnPositions[0][0], aGuardSpawnPositions[0][1], aGuardSpawnPositions[0][2], aGuardSpawnPositions[0][3], TEMPSUMMON_DEAD_DESPAWN, 0))
+        if (Creature* pMasterGuard = pPlayer->SummonCreature(NPC_ANVILRAGE_GUARDMAN, aGuardSpawnPositions[0][0], aGuardSpawnPositions[0][1], aGuardSpawnPositions[0][2], aGuardSpawnPositions[0][3], TEMPSUMMON_DEAD_DESPAWN, 0))
         {
             pMasterGuard->SetWalk(false);
             pMasterGuard->GetMotionMaster()->MoveWaypoint();
@@ -1778,7 +1965,7 @@ bool AreaTrigger_at_shadowforge_bridge(Player* pPlayer, AreaTriggerEntry const* 
             pPlayer->GetContactPoint(pMasterGuard, fX, fY, fZ);
             pMasterGuard->GetMotionMaster()->MovePoint(1,fX, fY, fZ);
 
-            if (Creature* pSlaveGuard = ((Creature*)pPlayer)->SummonCreature(NPC_ANVILRAGE_GUARDMAN, aGuardSpawnPositions[1][0], aGuardSpawnPositions[1][1], aGuardSpawnPositions[1][2], aGuardSpawnPositions[1][3], TEMPSUMMON_DEAD_DESPAWN, 0))
+            if (Creature* pSlaveGuard = pPlayer->SummonCreature(NPC_ANVILRAGE_GUARDMAN, aGuardSpawnPositions[1][0], aGuardSpawnPositions[1][1], aGuardSpawnPositions[1][2], aGuardSpawnPositions[1][3], TEMPSUMMON_DEAD_DESPAWN, 0))
             {
                 pSlaveGuard->GetMotionMaster()->MoveFollow(pMasterGuard, 2.0f, 0);
             }
@@ -2176,14 +2363,8 @@ struct npc_marshal_reginald_windsorAI : npc_escortAI
 
     void DoJailBreakQuestCredit() const
     {
-        Map::PlayerList const &PlayerList = m_creature->GetMap()->GetPlayers();
-
-        for (Map::PlayerList::const_iterator itr = PlayerList.begin(); itr != PlayerList.end(); ++itr)
-        {
-            Player* pPlayer = itr->getSource();
-            if (pPlayer && pPlayer->GetQuestStatus(QUEST_JAIL_BREAK) == QUEST_STATUS_INCOMPLETE)
-                pPlayer->AreaExploredOrEventHappens(QUEST_JAIL_BREAK);
-        }
+        if (Player* pPlayer = GetPlayerForEscort())
+            pPlayer->GroupEventHappens(QUEST_JAIL_BREAK, m_creature);
     }
 
     void WaypointReached(uint32 uiPointId) override
@@ -2261,14 +2442,9 @@ struct npc_marshal_reginald_windsorAI : npc_escortAI
                 break;
             case 32:
                 DoScriptText(SAY_REGINALD_WINDSOR_20_2, m_creature);
-                Map::PlayerList const &PlayerList = m_creature->GetMap()->GetPlayers();
-
-                for (Map::PlayerList::const_iterator itr = PlayerList.begin(); itr != PlayerList.end(); ++itr)
-                {
-                    Player* m_pPlayer = itr->getSource();
-                    if (m_pPlayer && m_pPlayer->GetQuestStatus(QUEST_JAIL_BREAK) == QUEST_STATUS_INCOMPLETE)
-                        m_pPlayer->AreaExploredOrEventHappens(QUEST_JAIL_BREAK);
-                }
+                
+                DoJailBreakQuestCredit();
+                
                 m_pInstance->SetData(TYPE_QUEST_JAIL_BREAK, DONE);
                 break;
         }
@@ -2300,6 +2476,9 @@ struct npc_marshal_reginald_windsorAI : npc_escortAI
 
     void JustDied(Unit* /*pKiller*/) override
     {
+        if (Player* pPlayer = GetPlayerForEscort())
+            pPlayer->GroupEventFailHappens(QUEST_JAIL_BREAK);
+        
         m_pInstance->SetData(TYPE_QUEST_JAIL_BREAK, FAIL);
     }
 
@@ -2483,6 +2662,9 @@ struct npc_marshal_windsorAI : npc_escortAI
 
     void JustDied(Unit* /*pKiller*/) override
     {
+        if (Player* pPlayer = GetPlayerForEscort())
+            pPlayer->GroupEventFailHappens(QUEST_JAIL_BREAK);
+            
         m_pInstance->SetData(TYPE_QUEST_JAIL_BREAK, FAIL);
     }
 

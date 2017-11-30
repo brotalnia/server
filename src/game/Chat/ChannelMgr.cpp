@@ -85,7 +85,7 @@ Channel *ChannelMgr::GetChannel(std::string name, PlayerPointer p, bool pkt)
         if (pkt)
         {
             WorldPacket data;
-            MakeNotOnPacket(&data, name);
+            Channel::MakeNotOnPacket(&data, name);
             p->GetSession()->SendPacket(&data);
         }
 
@@ -119,12 +119,6 @@ void ChannelMgr::LeftChannel(std::string name, PlayerPointer p)
     }
 }
 
-void ChannelMgr::MakeNotOnPacket(WorldPacket *data, std::string name)
-{
-    data->Initialize(SMSG_CHANNEL_NOTIFY, (1 + 10)); // we guess size
-    (*data) << (uint8)CHAT_NOT_MEMBER_NOTICE << name;
-}
-
 std::string ChannelMgr::TranslateChannel(std::string channelName, uint32 zoneId)
 {
     ChatChannelsEntry const* ch = GetChannelEntryFor(channelName);
@@ -152,7 +146,6 @@ std::string ChannelMgr::TranslateChannel(std::string channelName, uint32 zoneId)
     }
     return channelName;
 }
-
 
 void ChannelMgr::CreateDefaultChannels()
 {

@@ -190,6 +190,7 @@ bool GameObject::Create(uint32 guidlow, uint32 name_id, Map *map, float x, float
     SetGoType(GameobjectTypes(goinfo->type));
 
     SetGoAnimProgress(animprogress);
+    SetName(goinfo->name);
 
     //Notify the map's instance data.
     //Only works if you create the object in it, not if it is moves to that map.
@@ -274,7 +275,7 @@ void GameObject::Update(uint32 update_diff, uint32 /*p_time*/)
 
 			    // Play splash sound
 			    PlayDistanceSound(3355);
-                            SendGameObjectCustomAnim(GetObjectGuid());
+                            SendGameObjectCustomAnim();
                         }
 
                         m_lootState = GO_READY;             // can be successfully open with some chance
@@ -326,9 +327,17 @@ void GameObject::Update(uint32 update_diff, uint32 /*p_time*/)
                                 return;
                             }
 
-                            // respawn timer
-                            GetMap()->Add(this);
-                            break;
+                            const LockEntry *lock = sLockStore.LookupEntry(GetGOInfo()->GetLockId());
+                            //workarounds for PvP banners
+                            if (lock && lock->Index[1] == LOCKTYPE_SLOW_OPEN)
+                            {
+                                m_respawnDelayTime = -1; //spawn animation
+                                GetMap()->Add(this);
+                                m_respawnDelayTime = 0;
+                                SendGameObjectReset();
+                            }
+                            else
+                                GetMap()->Add(this);
                     }
                 }
             }
@@ -433,7 +442,8 @@ void GameObject::Update(uint32 update_diff, uint32 /*p_time*/)
                             case 4472:
                             case 4491:
                             case 6785:
-                                SendGameObjectCustomAnim(GetObjectGuid());
+                            case 6747: //sapphiron birth
+                                SendGameObjectCustomAnim();
                                 break;
                         }
                     }
@@ -490,6 +500,7 @@ void GameObject::Update(uint32 update_diff, uint32 /*p_time*/)
 
                 if (spellId)
                 {
+                    // TODO find out why this is here, because m_UniqueUsers is empty for GAMEOBJECT_TYPE_GOOBER
                     for (GuidsSet::const_iterator itr = m_UniqueUsers.begin(); itr != m_UniqueUsers.end(); ++itr)
                     {
                         if (Player* owner = GetMap()->GetPlayer(*itr))
@@ -597,27 +608,125 @@ void GameObject::Refresh()
 
 void GameObject::AddUniqueUse(Player* player)
 {
+    std::unique_lock<std::mutex> guard(m_UniqueUsers_lock);
+
     AddUse();
+
+    if (m_UniqueUsers.find(player->GetObjectGuid()) != m_UniqueUsers.end())
+        return;
 
     if (!m_firstUser)
         m_firstUser = player->GetObjectGuid();
 
     m_UniqueUsers.insert(player->GetObjectGuid());
 
+    guard.unlock();
+
+    if (GameObjectInfo const* info = GetGOInfo())
+        if (info->type == GAMEOBJECT_TYPE_SUMMONING_RITUAL &&
+            info->summoningRitual.animSpell &&
+            GetOwnerGuid() != player->GetObjectGuid())
+        {
+            SpellEntry const *spellInfo = sSpellMgr.GetSpellEntry(info->summoningRitual.animSpell);
+            if (!spellInfo)
+            {
+                sLog.outError("WORLD: unknown spell id %u at play anim for gameobject (Entry: %u GoType: %u )", info->summoningRitual.animSpell, GetEntry(), GetGoType());
+                return;
+            }
+            Spell* spell = new Spell(player, spellInfo, true, GetObjectGuid());
+            spell->SetChannelingVisual(true);
+            SpellCastTargets targets;
+            targets.setGOTarget(this);
+            spell->prepare(std::move(targets));
+        }
+}
+
+void GameObject::RemoveUniqueUse(Player* player)
+{
+    std::lock_guard<std::mutex> guard(m_UniqueUsers_lock);
+
+    auto itr = m_UniqueUsers.find(player->GetObjectGuid());
+    if (itr == m_UniqueUsers.end())
+        return;
+    m_UniqueUsers.erase(itr);
+
+    if (GameObjectInfo const* info = GetGOInfo())
+        // owner cancelled
+        if (player->GetObjectGuid() == GetOwnerGuid() ||
+            // too many helpers cancelled while it's activated
+            (GetGoState() == GO_STATE_ACTIVE &&
+            m_UniqueUsers.size() < info->summoningRitual.reqParticipants))
+        {
+            if (!info->summoningRitual.ritualPersistent)
+            {
+                if (GetGoState() != GO_STATE_ACTIVE)
+                    SetLootState(GO_JUST_DEACTIVATED);
+                else if (GetOwner())
+                    // if active it'll be destroyed in Spell::update
+                    // remove it from owner's list to keep it running
+                    GetOwner()->RemoveGameObject(this, false);
+            }
+            SetGoState(GO_STATE_READY);
+        }
+}
+
+void GameObject::FinishRitual()
+{
+    std::unique_lock<std::mutex> guard(m_UniqueUsers_lock);
+
+    if (GameObjectInfo const* info = GetGOInfo())
+    {
+        // take spell cooldown
+        if (GetOwner() && GetOwner()->IsPlayer())
+            if (SpellEntry const* createBySpell = sSpellMgr.GetSpellEntry(GetSpellId()))
+                GetOwner()->CooldownEvent(createBySpell);
+        if (!info->summoningRitual.ritualPersistent)
+            SetLootState(GO_JUST_DEACTIVATED);
+        // Only ritual of doom deals a second spell
+        if (uint32 spellid = info->summoningRitual.casterTargetSpell)
+        {
+            // On a random user
+            auto it = m_UniqueUsers.begin();
+            if (it != m_UniqueUsers.end())
+            {
+                std::advance(it, urand(0, m_UniqueUsers.size() - 1));
+
+                guard.unlock();
+
+                if (Player* target = GetMap()->GetPlayer(*it))
+                    target->CastSpell(target, spellid, true);
+            }
+        }
+    }
+}
+
+bool GameObject::HasUniqueUser(Player* player)
+{
+    std::lock_guard<std::mutex> guard(m_UniqueUsers_lock);
+    return m_UniqueUsers.find(player->GetObjectGuid()) != m_UniqueUsers.end();
+}
+
+uint32 GameObject::GetUniqueUseCount()
+{
+    std::lock_guard<std::mutex> guard(m_UniqueUsers_lock);
+    return m_UniqueUsers.size();
 }
 
 void GameObject::Delete()
 {
-    SendObjectDeSpawnAnim(GetObjectGuid());
+    if (!IsDeleted())
+        AddObjectToRemoveList();
+
+    // no despawn animation for not activated rituals
+    if (GetGoType() != GAMEOBJECT_TYPE_SUMMONING_RITUAL ||
+        GetGoState() == GO_STATE_ACTIVE)
+        SendObjectDeSpawnAnim(GetObjectGuid());
 
     SetGoState(GO_STATE_READY);
     SetUInt32Value(GAMEOBJECT_FLAGS, GetGOInfo()->flags);
 
     if (uint16 poolid = sPoolMgr.IsPartOfAPool<GameObject>(GetGUIDLow()))
         sPoolMgr.GetPoolGameObjects(poolid).DespawnObject(*GetMap()->GetPersistentState(), GetGUIDLow());
-
-    if (!IsDeleted())
-        AddObjectToRemoveList();
 }
 
 void GameObject::getFishLoot(Loot *fishloot, Player* loot_owner)
@@ -626,6 +735,10 @@ void GameObject::getFishLoot(Loot *fishloot, Player* loot_owner)
 
     uint32 zone, subzone;
     GetZoneAndAreaId(zone, subzone);
+
+    // Don't allow fishing in hidden wetlands lake
+    if (subzone == 11 && loot_owner->IsWithinDist2d(-4074.74f, -1315.79f, 100.0f))
+        return;
 
     // if subzone loot exist use it
     if (!fishloot->FillLoot(subzone, LootTemplates_Fishing, loot_owner, true, (subzone != zone)) && subzone != zone)
@@ -687,10 +800,11 @@ void GameObject::SaveToDB(uint32 mapid)
        << GetFloatValue(GAMEOBJECT_ROTATION + 1) << ", "
        << GetFloatValue(GAMEOBJECT_ROTATION + 2) << ", "
        << GetFloatValue(GAMEOBJECT_ROTATION + 3) << ", "
-       << m_respawnDelayTime << ", "
+       << data.spawntimesecs << ", " // PRESERVE SPAWNED BY DEFAULT
        << uint32(GetGoAnimProgress()) << ", "
        << uint32(GetGoState()) << ","
-       << m_isActiveObject << ")";
+       << m_isActiveObject << ","
+       << m_visibilityModifier << ")";
 
     WorldDatabase.BeginTransaction();
     WorldDatabase.PExecuteLog("DELETE FROM gameobject WHERE guid = '%u'", GetGUIDLow());
@@ -761,6 +875,8 @@ bool GameObject::LoadFromDB(uint32 guid, Map *map)
     }
 
     m_isActiveObject = (data->spawnFlags & SPAWN_FLAG_ACTIVE);
+    m_visibilityModifier = data->visibilityModifier;
+
     return true;
 }
 
@@ -892,7 +1008,7 @@ bool GameObject::isVisibleForInState(Player const* u, WorldObject const* viewPoi
 
     // check distance
     return IsWithinDistInMap(viewPoint, GetMap()->GetVisibilityDistance() +
-                             (inVisibleList ? World::GetVisibleObjectGreyDistance() : 0.0f), false);
+                             (inVisibleList ? World::GetVisibleObjectGreyDistance() : 0.0f) + GetVisibilityModifier(), false);
 }
 
 void GameObject::Respawn()
@@ -1313,7 +1429,7 @@ void GameObject::Use(Unit* user)
 
             // this appear to be ok, however others exist in addition to this that should have custom (ex: 190510, 188692, 187389)
             if (time_to_restore && info->goober.customAnim)
-                SendGameObjectCustomAnim(GetObjectGuid());
+                SendGameObjectCustomAnim();
             else
                 SetGoState(GO_STATE_ACTIVE);
 
@@ -1489,16 +1605,10 @@ void GameObject::Use(Unit* user)
 
             AddUniqueUse(player);
 
-            if (info->summoningRitual.animSpell)
-            {
-                player->CastSpell(player, info->summoningRitual.animSpell, true);
-
-                // for this case, summoningRitual.spellId is always triggered
-                triggered = true;
-            }
-
             // full amount unique participants including original summoner, need more
-            if (GetUniqueUseCount() < info->summoningRitual.reqParticipants)
+            if (GetUniqueUseCount() < info->summoningRitual.reqParticipants ||
+                !info->summoningRitual.spellId ||
+                GetGoState() == GO_STATE_ACTIVE) // spell already sent
                 return;
 
             // owner is first user for non-wild GO objects, if it offline value already set to current user
@@ -1506,34 +1616,14 @@ void GameObject::Use(Unit* user)
                 if (Player* firstUser = GetMap()->GetPlayer(m_firstUser))
                     spellCaster = firstUser;
 
+            // Some have a visual effect
+            SetGoState(GO_STATE_ACTIVE);
+
             spellId = info->summoningRitual.spellId;
 
             // spell have reagent and mana cost but it not expected use its
             // it triggered spell in fact casted at currently channeled GO
             triggered = true;
-
-            // finish owners spell
-            if (owner)
-                owner->FinishSpell(CURRENT_CHANNELED_SPELL);
-
-            // finish clickers spell
-            for (GuidsSet::const_iterator itr = m_UniqueUsers.begin(); itr != m_UniqueUsers.end(); ++itr)
-            {
-                if (Player* user = GetMap()->GetPlayer(*itr))
-                    if (user && user != owner && !info->summoningRitual.ritualPersistent)
-                    {
-                        Spell *channeled = user->GetCurrentSpell(CURRENT_CHANNELED_SPELL);
-                        if (channeled && channeled->m_spellInfo->Id == info->summoningRitual.animSpell)
-                            user->FinishSpell(CURRENT_CHANNELED_SPELL);
-                    }
-            }
-
-            // can be deleted now, if
-            if (!info->summoningRitual.ritualPersistent)
-                SetLootState(GO_JUST_DEACTIVATED);
-            // reset ritual for this GO
-            else
-                ClearAllUsesData();
 
             // go to end function to spell casting
             break;
@@ -1772,16 +1862,21 @@ void GameObject::Use(Unit* user)
 
     Spell *spell = new Spell(spellCaster, spellInfo, triggered, GetObjectGuid());
 
-    // spell target is user of GO 
     SpellCastTargets targets;
 
     // If summoning ritual GO use the summon target instead
-    Player* summonTarget = nullptr;
-    if (GetGoType() == GAMEOBJECT_TYPE_SUMMONING_RITUAL && getSummonTarget())
-        summonTarget = sObjectMgr.GetPlayer(getSummonTarget());
-
-    if (summonTarget)
-        targets.setUnitTarget(summonTarget);
+    if (GetGoType() == GAMEOBJECT_TYPE_SUMMONING_RITUAL)
+    {
+        Player* summonTarget = nullptr;
+        // Only player summoning requires a target
+        if (GetEntry() == 36727 && getSummonTarget())
+        {
+            summonTarget = sObjectMgr.GetPlayer(getSummonTarget());
+            targets.setUnitTarget(summonTarget);
+        }
+        // Object coordinates are needed later
+        targets.setGOTarget(this);
+    }
     else
         targets.setUnitTarget(user);
 
@@ -2065,8 +2160,10 @@ struct SpawnGameObjectInMapsWorker
                 delete pGameobject;
             else
             {
-                if (pGameobject->isSpawnedByDefault())
+                //if (pGameobject->isSpawnedByDefault())
                     map->Add(pGameobject);
+                //else
+                //    delete pGameobject;
             }
         }
     }
@@ -2126,11 +2223,36 @@ GameObjectData const * GameObject::GetGOData() const
     return sObjectMgr.GetGOData(GetGUIDLow());
 }
 
+void GameObject::SendGameObjectCustomAnim(uint32 animId /*= 0*/)
+{
+    WorldPacket data(SMSG_GAMEOBJECT_CUSTOM_ANIM, 8 + 4);
+    data << GetObjectGuid();
+    data << uint32(animId);
+    SendMessageToSet(&data, true);
+}
+
+void GameObject::SendGameObjectReset()
+{
+    WorldPacket data(SMSG_GAMEOBJECT_RESET_STATE, 8);
+    data << GetObjectGuid();
+    SendMessageToSet(&data, true);
+}
+
 void GameObject::Despawn()
 {
     SendObjectDeSpawnAnim(GetObjectGuid());
     if (GameObjectData const* data = GetGOData())
-        SetRespawnTime(data->spawntimesecs);
+    {
+        if (m_spawnedByDefault)
+        {
+            SetRespawnTime(data->spawntimesecs);
+        }
+        else
+        {
+            m_respawnTime = 0;
+            m_respawnDelayTime = data->spawntimesecs < 0 ? -data->spawntimesecs : data->spawntimesecs;
+        }
+    }
     else
         AddObjectToRemoveList();
 }

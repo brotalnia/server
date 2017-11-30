@@ -130,6 +130,7 @@ void SpellEntry::InitCachedValues()
 {
     ComputeBinary();
     ComputeDispel();
+    ComputeNonPeriodicDispel();
 }
 
 void SpellEntry::ComputeBinary()
@@ -184,12 +185,25 @@ void SpellEntry::ComputeBinary()
     }
 }
 
+void SpellEntry::ComputeNonPeriodicDispel()
+{
+    _isNonPeriodicDispel = true;
+    for (int i = 0; i < 3; ++i)
+        if (_isNonPeriodicDispel && Effect[i] != 0 && (Effect[i] != SPELL_EFFECT_DISPEL || EffectRadiusIndex[i] != 0))
+            _isNonPeriodicDispel = false;
+}
+
 void SpellEntry::ComputeDispel()
 {
-    _isDispel = true;
+    _isDispel = false;
     for (int i = 0; i < 3; ++i)
-        if (_isDispel && Effect[i] != 0 && (Effect[i] != SPELL_EFFECT_DISPEL || EffectRadiusIndex[i] != 0))
-            _isDispel = false;
+    {
+        if (Effect[i] == SPELL_EFFECT_DISPEL)
+        {
+            _isDispel = true;
+            break;
+        }
+    }
 }
 DiminishingGroup SpellEntry::GetDiminishingReturnsGroup(bool triggered) const
 {
@@ -240,10 +254,21 @@ DiminishingGroup SpellEntry::GetDiminishingReturnsGroup(bool triggered) const
                 return DIMINISHING_CONTROL_ROOT;
             break;
         }
+        case SPELLFAMILY_MAGE:
+        {
+            // Ice Block
+            if (SpellVisual == 4325)
+                return DIMINISHING_NONE;
+            break;
+        }
         case SPELLFAMILY_GENERIC:
         {
-            if (Id == 12355) // Impact
+            // Impact
+            if (Id == 12355)
                 return DIMINISHING_TRIGGER_STUN; // avant 'DIMINISHING_NONE' (MaNGOSZero)
+            // Pyroclasm
+            if (Id == 18093)
+                return DIMINISHING_NONE; // No diminishing returns (Patch 1.9)
             break;
         }
         default:
@@ -346,6 +371,25 @@ DiminishingReturnsType GetDiminishingReturnsGroupType(DiminishingGroup group)
     }
 
     return DRTYPE_NONE;
+}
+
+float GetDiminishingRate(uint32 type)
+{
+    switch (type)
+    {
+        case DIMINISHING_LEVEL_1:
+            return 1.0f;
+        case DIMINISHING_LEVEL_2:
+            return 0.5f;
+        case DIMINISHING_LEVEL_3:
+            return 0.25f;
+        case DIMINISHING_LEVEL_IMMUNE:
+            return 0.0f;
+        default:
+            break;
+    }
+
+    return 1.0f;
 }
 
 bool SpellEntry::IsPvEHeartBeat() const
