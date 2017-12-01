@@ -1015,7 +1015,7 @@ struct npc_summon_debugAI : ScriptedAI
     npc_summon_debugAI(Creature *pCreature) : ScriptedAI(pCreature)
     {
         m_summonCount = 0;
-        for (int i = 0; i < m_maxSummonCount; ++i)
+        for (uint32 i = 0; i < m_maxSummonCount; ++i)
             m_summons[i] = nullptr;
 
         Reset();
@@ -1024,7 +1024,7 @@ struct npc_summon_debugAI : ScriptedAI
     void Reset() override
     {
         m_summonCount = 0;
-        for (int i = 0; i < m_maxSummonCount; ++i)
+        for (uint32 i = 0; i < m_maxSummonCount; ++i)
         {
             if (m_summons[i])
                 ((TemporarySummon*)m_summons[i])->UnSummon();
@@ -1067,24 +1067,24 @@ void AddSC_custom_creatures()
     newscript->RegisterSelf(false);
     /*
     Commented out to prevent startup error about unused script.
-
+    */
     newscript = new Script;
     newscript->Name = "custom_EnchantNPC";
     newscript->pGossipHello = &GossipHello_EnchantNPC;
     newscript->pGossipSelect = &GossipSelect_EnchantNPC;
-    newscript->RegisterSelf(true);
+    newscript->RegisterSelf(false);
 
     newscript = new Script;
     newscript->Name = "custom_ProfessionsNPC";
     newscript->pGossipHello = &GossipHello_ProfessionNPC;
     newscript->pGossipSelect = &GossipSelect_ProfessionNPC;
-    newscript->RegisterSelf(true);
+    newscript->RegisterSelf(false);
 
     newscript = new Script;
     newscript->Name = "npc_training_dummy";
     newscript->GetAI = &GetAI_npc_training_dummy;
-    newscript->RegisterSelf();
-    */
+    newscript->RegisterSelf(false);
+    
 
     newscript = new Script;
     newscript->Name = "custom_npc_summon_debugAI";
