@@ -25,8 +25,6 @@
 #include "Common.h"
 #include "Platform/Define.h"
 #include "Policies/Singleton.h"
-#include "ace/Recursive_Thread_Mutex.h"
-#include "ace/Thread_Mutex.h"
 #include "Map.h"
 #include "GridStates.h"
 
@@ -72,15 +70,16 @@ struct MANGOS_DLL_DECL MapID
     uint32 nInstanceId;
 };
 
+class ThreadPool;
 struct ScheduledTeleportData;
 
-class MANGOS_DLL_DECL MapManager : public MaNGOS::Singleton<MapManager, MaNGOS::ClassLevelLockable<MapManager, ACE_Recursive_Thread_Mutex> >
+class MANGOS_DLL_DECL MapManager : public MaNGOS::Singleton<MapManager, MaNGOS::ClassLevelLockable<MapManager, std::recursive_mutex> >
 {
     friend class MaNGOS::OperatorNew<MapManager>;
 
-    typedef ACE_Recursive_Thread_Mutex LOCK_TYPE;
-    typedef ACE_Guard<LOCK_TYPE> LOCK_TYPE_GUARD;
-    typedef MaNGOS::ClassLevelLockable<MapManager, ACE_Recursive_Thread_Mutex>::Lock Guard;
+    using  LOCK_TYPE = std::recursive_mutex;
+    using LOCK_TYPE_GUARD = std::unique_lock<LOCK_TYPE>;
+    typedef MaNGOS::ClassLevelLockable<MapManager, std::recursive_mutex>::Lock Guard;
 
     public:
         typedef std::map<MapID, Map* > MapMapType;
@@ -184,24 +183,11 @@ class MANGOS_DLL_DECL MapManager : public MaNGOS::Singleton<MapManager, MaNGOS::
         void ExecuteDelayedPlayerTeleports();
         void ExecuteSingleDelayedTeleport(Player *player);
         void CancelDelayedPlayerTeleport(Player *player);
+        void MarkContinentUpdateFinished();
+        bool IsContinentUpdateFinished() const;
 
-        void MarkContinentUpdateFinished(int idx)
-        {
-            ASSERT(idx < i_maxContinentThread);
-            i_continentUpdateFinished[idx] = true;
-        }
-        bool IsContinentUpdateFinished()
-        {
-            // Check pointer rather than deref. Deleted after
-            // continent and instance updates are finished
-            if (i_continentUpdateFinished == NULL)
-                return true;
-
-            for (int i = 0; i < i_maxContinentThread; ++i)
-                if (!i_continentUpdateFinished[i])
-                    return false;
-            return true;
-        }
+        bool waitContinentUpdateFinishedFor(std::chrono::milliseconds time) const;
+        bool waitContinentUpdateFinishedUntil(std::chrono::high_resolution_clock::time_point time) const;
     private:
 
         // debugging code, should be deleted some day
@@ -229,12 +215,18 @@ class MANGOS_DLL_DECL MapManager : public MaNGOS::Singleton<MapManager, MaNGOS::
 
         uint32 i_MaxInstanceId;
         int             i_maxContinentThread;
-        volatile bool*  i_continentUpdateFinished;
+
+        mutable std::mutex      m_continentMutex;
+        mutable std::condition_variable      m_continentCV;
+        std::atomic<int> i_continentUpdateFinished;
+
+        std::unique_ptr<ThreadPool> m_threads;
+        std::unique_ptr<ThreadPool> m_continentThreads;
         bool asyncMapUpdating;
 
         // Instanced continent zones
         const static int LAST_CONTINENT_ID = 2;
-        ACE_Thread_Mutex    m_scheduledInstanceSwitches_lock[LAST_CONTINENT_ID];
+        std::mutex    m_scheduledInstanceSwitches_lock[LAST_CONTINENT_ID];
         std::map<Player*, uint16 /* new instance */> m_scheduledInstanceSwitches[LAST_CONTINENT_ID]; // 2 continents
 
         ACE_Thread_Mutex m_scheduledFarTeleportsLock;

@@ -30,8 +30,7 @@
 #include "Timer.h"
 #include "Policies/Singleton.h"
 #include "SharedDefines.h"
-#include "ace/Atomic_Op.h"
-#include "Commands/Nostalrius.h"
+#include "Nostalrius.h"
 #include "ObjectGuid.h"
 #include "MapNodes/AbstractPlayer.h"
 
@@ -41,6 +40,7 @@
 #include <chrono>
 #include <memory>
 #include <unordered_map>
+#include <thread>
 
 class Object;
 class WorldPacket;
@@ -574,6 +574,8 @@ struct CliCommandHolder
     ~CliCommandHolder() { delete[] m_command; }
 };
 
+class ThreadPool;
+
 /// The World
 class World
 {
@@ -760,10 +762,8 @@ class World
          * These async tasks should be added from THREADUNSAFE opcode handlers (since AddAsyncTask is *not* threadsafe)
          * The tasks will be executed *while* maps are updated. So don't touch the mobs, pets, etc ...
          */
-        void AddAsyncTask(AsyncTask* task) { _asyncTasks.push_back(task); }
+        void AddAsyncTask(AsyncTask* task);
         void HandleAsyncTasks(int currThreadIdx, int threadsCount);
-        typedef std::vector<AsyncTask*> AsyncTaskVect;
-        AsyncTaskVect _asyncTasks;
         /**
          * Database logs system
          */
@@ -877,24 +877,26 @@ class World
         static uint32 m_creatureSummonCountLimit;
 
         // CLI command holder to be thread safe
-        ACE_Based::LockedQueue<CliCommandHolder*,ACE_Thread_Mutex> cliCmdQueue;
+        LockedQueue<CliCommandHolder*,std::mutex> cliCmdQueue;
 
         //Player Queue
         Queue m_QueuedSessions;
 
         //sessions that are added async
         void AddSession_(WorldSession* s);
-        ACE_Based::LockedQueue<WorldSession*, ACE_Thread_Mutex> addSessQueue;
+        LockedQueue<WorldSession*, std::mutex> addSessQueue;
 
         //used versions
         uint32      m_anticrashRearmTimer;
-        ACE_Based::Thread* m_charDbWorkerThread;
+        std::unique_ptr<std::thread> m_charDbWorkerThread;
 
         typedef std::unordered_map<uint32, ArchivedLogMessage> LogMessagesMap;
         LogMessagesMap m_logMessages;
 
         // Packet broadcaster
         std::unique_ptr<MovementBroadcaster> m_broadcaster;
+
+        std::unique_ptr<ThreadPool> m_updateThreads;
 };
 
 extern uint32 realmID;
