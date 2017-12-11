@@ -591,7 +591,7 @@ class MANGOS_DLL_SPEC Creature : public Unit
         void UpdateAttackPowerAndDamage(bool ranged = false) override;
         void UpdateDamagePhysical(WeaponAttackType attType) override;
         uint32 GetCurrentEquipmentId() const { return m_equipmentId; }
-        float GetSpellDamageMod(int32 Rank);
+        float GetSpellDamageMod() const;
 
         VendorItemData const* GetVendorItems() const;
         VendorItemData const* GetVendorTemplateItems() const;
@@ -843,8 +843,8 @@ class MANGOS_DLL_SPEC Creature : public Unit
 
         void _RealtimeSetCreatureInfo();
 
-        static float _GetHealthMod(int32 Rank);
-        static float _GetDamageMod(int32 Rank);
+        float GetHealthMod() const;
+        float GetDamageMod() const;
 
         uint32 m_lootMoney;
         ObjectGuid m_lootRecipientGuid;                     // player who will have rights for looting if m_lootGroupRecipient==0 or group disbanded

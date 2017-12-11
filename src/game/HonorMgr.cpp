@@ -699,6 +699,20 @@ bool HonorMgr::Add(float cp, uint8 type, Unit* source)
     if (!source)
         source = m_owner;
 
+    bool isBattleGround = m_owner->GetMap()->IsBattleGround();
+
+    if (type == DISHONORABLE)
+    {
+        cp *= sWorld.getConfig(CONFIG_FLOAT_RATE_HONOR_DISHONOR);
+    }
+    else
+    {
+        if (isBattleGround)
+            cp *= sWorld.getConfig(CONFIG_FLOAT_RATE_HONOR_BATTLEGROUND);
+        else
+            cp *= sWorld.getConfig(CONFIG_FLOAT_RATE_HONOR_WORLD);
+    }
+
     HonorCP honorCP;
     honorCP.date = sWorld.GetGameDay();
     honorCP.cp = cp;
@@ -716,7 +730,7 @@ bool HonorMgr::Add(float cp, uint8 type, Unit* source)
 
     bool plr = source->GetTypeId() == TYPEID_PLAYER ? true : false;
 
-    if (m_owner->GetMap()->IsBattleGround())
+    if (isBattleGround)
         sLog.outHonor("[BATTLEGROUND]: Player %s (account: %u) got %f honor for type %u, source %s %s (IP: %s)",
             m_owner->GetSession()->GetPlayerName(), m_owner->GetSession()->GetAccountId(), honor, type, plr ? "player" : "unit", source->GetName(), ip.c_str());
     else
