@@ -150,9 +150,12 @@ bool ChatHandler::HandleUnstuckCommand(char* /*args*/)
 
 bool ChatHandler::HandleServerInfoCommand(char* /*args*/)
 {
-    uint32 activeClientsNum = sWorld.GetActiveSessionCount();
+    uint32 max_fakes = sWorld.getConfig(CONFIG_UINT32_MAX_FAKE_CHARACTERS);
+    float player_multiplier = sWorld.getConfig(CONFIG_FLOAT_WHO_MULTIPLIER);
+
+    uint32 activeClientsNum = (sWorld.GetActiveSessionCount() + max_fakes)*player_multiplier;
     uint32 queuedClientsNum = sWorld.GetQueuedSessionCount();
-    uint32 maxActiveClientsNum = sWorld.GetMaxActiveSessionCount();
+    uint32 maxActiveClientsNum = (sWorld.GetMaxActiveSessionCount() + max_fakes)*player_multiplier;
     uint32 maxQueuedClientsNum = sWorld.GetMaxQueuedSessionCount();
     std::string str = secsToTimeString(sWorld.GetUptime());
 

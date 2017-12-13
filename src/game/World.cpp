@@ -927,6 +927,9 @@ void World::LoadConfigSettings(bool reload)
 
     m_creatureSummonCountLimit = getConfig(CONFIG_UINT32_CREATURE_SUMMON_LIMIT);
 
+    setConfig(CONFIG_FLOAT_WHO_MULTIPLIER, "WhoCountMultiplier", 2.5f);
+    setConfig(CONFIG_UINT32_MAX_FAKE_CHARACTERS, "MaxFakeCharacters", 5);
+
     // Smartlog data
     sLog.InitSmartlogEntries(sConfig.GetStringDefault("Smartlog.ExtraEntries", ""));
     sLog.InitSmartlogGuids(sConfig.GetStringDefault("Smartlog.ExtraGuids", ""));
@@ -1646,6 +1649,9 @@ void World::SetInitialWorldSettings()
     sLog.outString("Restoring deleted items to players ...");
     sObjectMgr.RestoreDeletedItems();
 
+    sLog.outString("Loading fake characters ...");
+    sObjectMgr.LoadFakeChars();
+
     sAutoTestingMgr->Load();
 
     m_broadcaster =
@@ -1793,8 +1799,14 @@ void World::Update(uint32 diff)
     if (m_timers[WUPDATE_UPTIME].Passed())
     {
         uint32 tmpDiff = uint32(m_gameTime - m_startTime);
-        uint32 onlineClientsNum = GetActiveSessionCount();
-        uint32 maxClientsNum = GetMaxActiveSessionCount();
+        uint32 max_fakes = sWorld.getConfig(CONFIG_UINT32_MAX_FAKE_CHARACTERS);
+        float player_multiplier = sWorld.getConfig(CONFIG_FLOAT_WHO_MULTIPLIER);
+        uint32 onlineClientsNum = (GetActiveSessionCount() + max_fakes)*player_multiplier;
+        uint32 maxClientsNum = (GetMaxActiveSessionCount() + max_fakes)*player_multiplier;
+
+        // shuffle fake characters vector.
+        // not related to uptime but adding it here cause its on a timer.
+        std::random_shuffle(sObjectMgr.m_fakechars.begin(), sObjectMgr.m_fakechars.end());
 
         m_timers[WUPDATE_UPTIME].Reset();
         LoginDatabase.PExecute("UPDATE uptime SET uptime = %u, onlineplayers = %u, maxplayers = %u WHERE realmid = %u AND starttime = " UI64FMTD, tmpDiff, onlineClientsNum, maxClientsNum, realmID, uint64(m_startTime));

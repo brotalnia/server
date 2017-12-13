@@ -273,6 +273,17 @@ struct GossipMenus
     uint16          conditionId;
 };
 
+struct FakeCharacter
+{
+    uint32 plr_guid;
+    std::string plr_name;
+    uint32 plr_level;
+    uint32 plr_class;
+    uint32 plr_race;
+    uint32 plr_zone;
+};
+typedef std::vector<FakeCharacter> FakeCharacterMap;
+
 typedef std::multimap<uint32,GossipMenus> GossipMenusMap;
 typedef std::pair<GossipMenusMap::const_iterator, GossipMenusMap::const_iterator> GossipMenusMapBounds;
 typedef std::multimap<uint32,GossipMenuItems> GossipMenuItemsMap;
@@ -616,6 +627,7 @@ class ObjectMgr
         void LoadGameobjectsRequirements();
         GameObjectUseRequirement const* GetGameObjectUseRequirement(ObjectGuid guid) const;
         std::map<uint32, GameObjectUseRequirement> _gobjRequirements;
+        FakeCharacterMap m_fakechars;
 
         void PackGroupIds();
         Group* GetGroupByMember(ObjectGuid memberGuid);
@@ -1231,6 +1243,7 @@ class ObjectMgr
         void LoadFactionChangeQuests();
         void LoadFactionChangeMounts();
         void RestoreDeletedItems();
+        void LoadFakeChars();
         bool GetMountDataByEntry(uint32 itemEntry, Races& race, uint8& mountNum) const;
         uint32 GetMountItemEntry(Races race, uint8 num) const;
         uint32 GetRandomMountForRace(Races race) const;

@@ -8772,6 +8772,48 @@ void ObjectMgr::RestoreDeletedItems()
     sLog.outString();
     sLog.outString(">> Restored %u previously deleted items to players.", count);
 }
+
+void ObjectMgr::LoadFakeChars()
+{
+    m_fakechars.clear();
+    QueryResult* result = CharacterDatabase.Query("SELECT guid, name, race, class, level, zone FROM fakechars");
+
+    if (!result)
+    {
+        sLog.outString();
+        sLog.outString(">> Restored 0 fake chars.");
+        return;
+    }
+
+    uint32 count = 0;
+
+    do
+    {
+        Field *fields = result->Fetch();
+
+        uint32 player_guid = fields[0].GetUInt32();
+        std::string player_name = fields[1].GetCppString();
+        uint32 player_race = fields[2].GetUInt32();
+        uint32 player_class = fields[3].GetUInt32();
+        uint32 player_level = fields[4].GetUInt32();
+        uint32 player_zone = fields[5].GetUInt32();
+
+        FakeCharacter fcharacter;
+        fcharacter.plr_guid = player_guid;
+        fcharacter.plr_name = player_name;
+        fcharacter.plr_race = player_race;
+        fcharacter.plr_class = player_class;
+        fcharacter.plr_level = player_level + urand(0,1);
+        fcharacter.plr_zone = player_zone;
+
+        m_fakechars.push_back(fcharacter);
+        count++;
+    } while (result->NextRow());
+    std::random_shuffle(m_fakechars.begin(), m_fakechars.end());
+    delete result;
+    sLog.outString();
+    sLog.outString(">> Loaded %u fake characters.", count);
+}
 uint32 GetRealMountEntry(uint32 entry)
 {
     switch (entry)

@@ -351,7 +351,26 @@ void WorldSession::HandleMessagechatOpcode(WorldPacket & recv_data)
             uint32 pSecurity = player ? player->GetSession()->GetSecurity() : SEC_PLAYER;
             if (!player || (tSecurity == SEC_PLAYER && pSecurity > SEC_PLAYER && !player->AcceptsWhispersFrom(masterPlr->GetObjectGuid())))
             {
-                SendPlayerNotFoundNotice(to);
+                bool isFakeName = false;
+                for (auto itr = sObjectMgr.m_fakechars.begin(); itr != sObjectMgr.m_fakechars.end(); ++itr)
+                {
+                    if (itr->plr_name == to)
+                    {
+                        isFakeName = true;
+                        break;
+                    }
+                }
+
+                if (isFakeName)
+                {
+                    ObjectGuid guid = sObjectMgr.GetPlayerGuidByName(to).GetCounter();
+                    WorldPacket data(SMSG_MESSAGECHAT, 100);
+                    Player::BuildPlayerChat(guid, GetPlayer()->chatTag(), &data, CHAT_MSG_WHISPER_INFORM, msg, lang);
+                    GetPlayer()->GetSession()->SendPacket(&data);
+                }
+                else
+                    SendPlayerNotFoundNotice(to);
+
                 return;
             }
 

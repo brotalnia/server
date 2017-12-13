@@ -76,6 +76,18 @@ void WorldSession::HandleRepopRequestOpcode(WorldPacket & /*recv_data*/)
     player->RepopAtGraveyard();
 }
 
+bool isAllianceRace(uint32 race)
+{
+    switch (race)
+    {
+    case RACE_HUMAN:
+    case RACE_DWARF:
+    case RACE_NIGHTELF:
+    case RACE_GNOME:
+        return true;
+    }
+    return false;
+}
 class WhoListClientQueryTask: public AsyncTask
 {
 public:
@@ -217,8 +229,107 @@ public:
             if ((++clientcount) == 49)
                 break;
         }
+        uint32 fakes_count = 0;
+        uint32 max_fakes = sWorld.getConfig(CONFIG_UINT32_MAX_FAKE_CHARACTERS);
+        if (clientcount<49)
+        for (auto itr = sObjectMgr.m_fakechars.begin(); itr != sObjectMgr.m_fakechars.end(); ++itr)
+        {
+            if (fakes_count >= max_fakes)
+                break;
 
-        uint32 count = m.size();
+            // check if target's level is in level range
+            uint32 lvl = itr->plr_level;
+            if (lvl < level_min || lvl > level_max)
+                continue;
+
+            // check if class matches classmask
+            uint32 class_ = itr->plr_class;
+            if (!(classmask & (1 << class_)))
+                continue;
+
+            // check if race matches racemask
+            uint32 race = itr->plr_race;
+            if (!(racemask & (1 << race)))
+                continue;
+
+            bool isAlly = isAllianceRace(race);
+            if (((team == 469) && !isAlly) || ((team == 67) && isAlly))
+                continue;
+
+            std::string pname = itr->plr_name;
+            std::wstring wpname;
+            if (!Utf8toWStr(pname, wpname))
+                continue;
+            wstrToLower(wpname);
+
+            if (!(wplayer_name.empty() || wpname.find(wplayer_name) != std::wstring::npos))
+                continue;
+
+            std::string gname = std::string();
+            std::wstring wgname;
+            if (!Utf8toWStr(gname, wgname))
+                continue;
+            wstrToLower(wgname);
+
+            if (!(wguild_name.empty() || wgname.find(wguild_name) != std::wstring::npos))
+                continue;
+
+            uint32 pzoneid = itr->plr_zone;
+
+            bool z_show = true;
+            for (uint32 i = 0; i < zones_count; ++i)
+            {
+                if (zoneids[i] == pzoneid)
+                {
+                    z_show = true;
+                    break;
+                }
+
+                z_show = false;
+            }
+
+            if (!z_show)
+                continue;
+
+            std::string aname;
+            if (const auto *areaEntry = AreaEntry::GetById(pzoneid))
+            {
+                aname = areaEntry->Name;
+                sObjectMgr.GetAreaLocaleString(areaEntry->Id, sess->GetSessionDbLocaleIndex(), &aname);
+            }
+
+            bool s_show = true;
+            for (uint32 i = 0; i < str_count; ++i)
+            {
+                if (!str[i].empty())
+                {
+                    if (wgname.find(str[i]) != std::wstring::npos ||
+                        wpname.find(str[i]) != std::wstring::npos ||
+                        Utf8FitTo(aname, str[i]))
+                    {
+                        s_show = true;
+                        break;
+                    }
+                    s_show = false;
+                }
+            }
+            if (!s_show)
+                continue;
+
+            data << pname;                                      // player name
+            data << gname;                                      // guild name
+            data << uint32(lvl);                                // player level
+            data << uint32(class_);                             // player class
+            data << uint32(race);                               // player race
+            data << uint32(pzoneid);                            // player zone id
+            fakes_count++;
+                                                                // 50 is maximum player count sent to client
+            if ((++clientcount) == 49)
+                break;
+        }
+
+        uint32 count = (uint32)((m.size()+ max_fakes) * sWorld.getConfig(CONFIG_FLOAT_WHO_MULTIPLIER));
+
         data.put(0, clientcount);                               // insert right count, listed count
         data.put(4, count > 49 ? count : clientcount);          // insert right count, online count
 
