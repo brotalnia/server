@@ -220,11 +220,11 @@ class MANGOS_DLL_SPEC CreatureAI
         // Called when filling loot table
         virtual bool FillLoot(Loot* loot, Player* looter) const { return false; }
 
-		/**
-		* Check if unit is visible for MoveInLineOfSight
-		* Note: This check is by default only the state-depending (visibility, range), NOT LineOfSight
-		* @param pWho Unit* who is checked if it is visible for the creature
-		*/
+        /**
+        * Check if unit is visible for MoveInLineOfSight
+        * Note: This check is by default only the state-depending (visibility, range), NOT LineOfSight
+        * @param pWho Unit* who is checked if it is visible for the creature
+        */
         virtual bool IsVisible(Unit* /* pWho */) const { return false; }
         virtual bool IsVisibleFor(Unit const* /* pWho */, bool & /* isVisible */) const { return false; }
 

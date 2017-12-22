@@ -184,10 +184,10 @@ void CreatureAI::SetSpellsTemplate(uint32 entry)
 void CreatureAI::SetSpellsTemplate(const CreatureSpellsTemplate *SpellsTemplate)
 {
     m_CreatureSpells.clear();
-	for (auto & entry : *SpellsTemplate)
-	{
-		m_CreatureSpells.push_back(CreatureAISpellsEntry(entry));
-	}
+    for (auto & entry : *SpellsTemplate)
+    {
+        m_CreatureSpells.push_back(CreatureAISpellsEntry(entry));
+    }
     m_CreatureSpells.shrink_to_fit();
 }
 

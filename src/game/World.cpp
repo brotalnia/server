@@ -125,15 +125,15 @@ World::World()
     m_startTime = m_gameTime;
     m_maxActiveSessionCount = 0;
     m_maxQueuedSessionCount = 0;
-	m_MaintenanceTimeChecker = 0;
-	m_anticrashRearmTimer = 0;
+    m_MaintenanceTimeChecker = 0;
+    m_anticrashRearmTimer = 0;
     m_wowPatch = WOW_PATCH_102;
 
     m_defaultDbcLocale = LOCALE_enUS;
     m_availableDbcLocaleMask = 0;
 
-	for (int i = 0; i < CONFIG_NOSTALRIUS_MAX; ++i)
-		m_configNostalrius[i] = 0;
+    for (int i = 0; i < CONFIG_NOSTALRIUS_MAX; ++i)
+        m_configNostalrius[i] = 0;
 
     for (int i = 0; i < CONFIG_UINT32_VALUE_COUNT; ++i)
         m_configUint32Values[i] = 0;
