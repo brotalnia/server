@@ -183,6 +183,9 @@ void FollowerAI::EnterEvadeMode()
             m_creature->GetMotionMaster()->MoveTargetedHome();
     }
 
+    if (!m_CreatureSpells.empty())
+        ResetSpellTimers();
+
     Reset();
 }
 
@@ -257,6 +260,9 @@ void FollowerAI::UpdateFollowerAI(const uint32 uiDiff)
 {
     if (!m_creature->SelectHostileTarget() || !m_creature->getVictim())
         return;
+
+    if (!m_CreatureSpells.empty())
+        DoSpellTemplateCasts(uiDiff);
 
     DoMeleeAttackIfReady();
 }

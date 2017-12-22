@@ -79,6 +79,10 @@ void ScriptedAI::UpdateAI(const uint32 uiDiff)
 {
     //Check if we have a current target
     m_creature->SelectHostileTarget();
+
+    if (!m_CreatureSpells.empty() && m_creature->isInCombat())
+        DoSpellTemplateCasts(uiDiff);
+
     DoMeleeAttackIfReady();
 }
 
@@ -93,6 +97,9 @@ void ScriptedAI::EnterEvadeMode()
         m_creature->GetMotionMaster()->MoveTargetedHome();
 
     m_creature->SetLootRecipient(nullptr);
+
+    if (!m_CreatureSpells.empty())
+        ResetSpellTimers();
 
     Reset();
 }

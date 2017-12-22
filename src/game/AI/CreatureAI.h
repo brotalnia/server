@@ -65,10 +65,49 @@ enum CastFlags
     CAST_AURA_NOT_PRESENT       = 0x20,                     //Only casts the spell if the target does not have an aura from the spell
 };
 
+enum Target
+{
+    //Self (m_creature)
+    TARGET_T_SELF = 0,                                      //Self cast
+
+    //Hostile targets (if pet then returns pet owner)
+    TARGET_T_HOSTILE,                                       //Our current target (ie: highest aggro)
+    TARGET_T_HOSTILE_SECOND_AGGRO,                          //Second highest aggro (generaly used for cleaves and some special attacks)
+    TARGET_T_HOSTILE_LAST_AGGRO,                            //Dead last on aggro (no idea what this could be used for)
+    TARGET_T_HOSTILE_RANDOM,                                //Just any random target on our threat list
+    TARGET_T_HOSTILE_RANDOM_NOT_TOP,                        //Any random target except top threat
+
+    //Invoker targets (if pet then returns pet owner)
+    TARGET_T_ACTION_INVOKER,                                //Unit who caused this Event to occur (only works for EVENT_T_AGGRO, EVENT_T_KILL, EVENT_T_DEATH, EVENT_T_SPELLHIT, EVENT_T_OOC_LOS, EVENT_T_FRIENDLY_HP, EVENT_T_FRIENDLY_IS_CC, EVENT_T_FRIENDLY_MISSING_BUFF)
+
+    //Friendly targets
+    TARGET_T_FRIENDLY,                                      //Random friendly unit.
+    TARGET_T_FRIENDLY_NOT_SELF,                             //Random friendly unit but not self.
+
+    TARGET_T_END
+};
+
+struct CreatureAISpellsEntry
+{
+    const uint16 spellId;
+    const uint8  probability;
+    const uint8  castTarget;
+    const uint8  castFlags;
+    const uint32 delayInitialMin;
+    const uint32 delayInitialMax;
+    const uint32 delayRepeatMin;
+    const uint32 delayRepeatMax;
+    uint32 cooldown;
+    CreatureAISpellsEntry(const CreatureSpellsEntry &EntryStruct) : spellId(EntryStruct.spellId), probability(EntryStruct.probability), castTarget(EntryStruct.castTarget), castFlags(EntryStruct.castFlags), delayInitialMin(EntryStruct.delayInitialMin), delayInitialMax(EntryStruct.delayInitialMax), delayRepeatMin(EntryStruct.delayRepeatMin), delayRepeatMax(EntryStruct.delayRepeatMax), cooldown(urand(EntryStruct.delayInitialMin, EntryStruct.delayInitialMax)) {}
+};
+
 class MANGOS_DLL_SPEC CreatureAI
 {
     public:
-        explicit CreatureAI(Creature* creature) : m_creature(creature), m_bUseAiAtControl(false), m_uLastAlertTime(0) {}
+        explicit CreatureAI(Creature* creature) : m_creature(creature), m_bUseAiAtControl(false), m_uLastAlertTime(0)
+        {
+            SetSpellsTemplate(creature->GetCreatureInfo()->spells_template);
+        }
 
         virtual ~CreatureAI();
         virtual void OnRemoveFromWorld() {}
@@ -208,6 +247,12 @@ class MANGOS_DLL_SPEC CreatureAI
         bool DoMeleeAttackIfReady();
         CanCastResult DoCastSpellIfCan(Unit* pTarget, uint32 uiSpell, uint32 uiCastFlags = 0, ObjectGuid uiOriginalCasterGUID = ObjectGuid());
         void ClearTargetIcon();
+        inline Unit* GetTargetByType(uint32 Target, Unit* pActionInvoker = nullptr) const;
+        void SetSpellsTemplate(uint32 entry);
+        void SetSpellsTemplate(const CreatureSpellsTemplate *SpellsTemplate);
+        void ResetSpellTimers();
+        void DoSpellTemplateCasts(const uint32 uiDiff);
+
         ///== Fields =======================================
 
         // Pointer to controlled by AI creature
@@ -217,6 +262,7 @@ class MANGOS_DLL_SPEC CreatureAI
     protected:
         bool m_bUseAiAtControl;
         uint32 m_uLastAlertTime;
+        std::vector<CreatureAISpellsEntry> m_CreatureSpells;
 };
 
 struct SelectableAI : FactoryHolder<CreatureAI>, Permissible<Creature>

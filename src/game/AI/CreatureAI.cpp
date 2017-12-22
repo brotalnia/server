@@ -145,6 +145,87 @@ CanCastResult CreatureAI::DoCastSpellIfCan(Unit* pTarget, uint32 uiSpell, uint32
     return CAST_FAIL_IS_CASTING;
 }
 
+inline Unit* CreatureAI::GetTargetByType(uint32 Target, Unit* pActionInvoker) const
+{
+    switch (Target)
+    {
+        case TARGET_T_SELF:
+            return m_creature;
+        case TARGET_T_HOSTILE:
+            return m_creature->getVictim();
+        case TARGET_T_HOSTILE_SECOND_AGGRO:
+            return m_creature->SelectAttackingTarget(ATTACKING_TARGET_TOPAGGRO, 1);
+        case TARGET_T_HOSTILE_LAST_AGGRO:
+            return m_creature->SelectAttackingTarget(ATTACKING_TARGET_BOTTOMAGGRO, 0);
+        case TARGET_T_HOSTILE_RANDOM:
+            return m_creature->SelectAttackingTarget(ATTACKING_TARGET_RANDOM, 0);
+        case TARGET_T_HOSTILE_RANDOM_NOT_TOP:
+            return m_creature->SelectAttackingTarget(ATTACKING_TARGET_RANDOM, 1);
+        case TARGET_T_ACTION_INVOKER:
+            return pActionInvoker;
+        case TARGET_T_FRIENDLY:
+            return m_creature->SelectRandomFriendlyTarget(nullptr, 15.0f);
+        case TARGET_T_FRIENDLY_NOT_SELF:
+            return m_creature->SelectRandomFriendlyTarget(m_creature, 15.0f);
+    }
+    return nullptr;
+}
+
+void CreatureAI::SetSpellsTemplate(uint32 entry)
+{
+    if (entry == 0)
+        m_CreatureSpells.clear();
+    else if (const CreatureSpellsTemplate* pSpellsTemplate = sObjectMgr.GetCreatureSpellsTemplate(entry))
+        SetSpellsTemplate(pSpellsTemplate);
+    else
+        sLog.outError("CreatureAI: Attempt to set spells template of creature %u to non-existent entry %u.", m_creature->GetEntry(), entry);
+}
+
+void CreatureAI::SetSpellsTemplate(const CreatureSpellsTemplate *SpellsTemplate)
+{
+    m_CreatureSpells.clear();
+	for (auto & entry : *SpellsTemplate)
+	{
+		m_CreatureSpells.push_back(CreatureAISpellsEntry(entry));
+	}
+    m_CreatureSpells.shrink_to_fit();
+}
+
+void CreatureAI::ResetSpellTimers()
+{
+    for (auto & spell : m_CreatureSpells)
+    {
+        spell.cooldown = urand(spell.delayInitialMin, spell.delayInitialMax);
+    }
+}
+
+void CreatureAI::DoSpellTemplateCasts(const uint32 uiDiff)
+{
+    for (auto & spell : m_CreatureSpells)
+    {
+        if (spell.cooldown <= uiDiff)
+        {
+            // we roll to see if we cast this time
+            if (spell.probability <= rand() % 100)
+            {
+                spell.cooldown = urand(spell.delayRepeatMin, spell.delayRepeatMax);
+                continue;
+            }
+
+            Unit* spellTarget = GetTargetByType(spell.castTarget);
+
+            // no valid target
+            if (!spellTarget)
+                continue;
+
+            if (DoCastSpellIfCan(spellTarget, spell.spellId, spell.castFlags) == CAST_OK)
+                spell.cooldown = urand(spell.delayRepeatMin, spell.delayRepeatMax);
+        }
+        else
+            spell.cooldown -= uiDiff;
+    }
+}
+
 void CreatureAI::ClearTargetIcon()
 // Clears any group/raid icons this creature may have
 {
@@ -288,6 +369,9 @@ struct EnterEvadeModeHelper
 
 void CreatureAI::EnterEvadeMode()
 {
+    if (!m_CreatureSpells.empty())
+        ResetSpellTimers();
+
     if (!m_creature->isAlive())
     {
         DEBUG_FILTER_LOG(LOG_FILTER_AI_AND_MOVEGENSS, "Creature stopped attacking, he is dead [guid=%u]", m_creature->GetGUIDLow());

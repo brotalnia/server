@@ -132,6 +132,23 @@ struct BroadcastText
 
 typedef std::unordered_map<uint32, BroadcastText> BroadcastTextLocaleMap;
 
+struct CreatureSpellsEntry
+{
+    const uint16 spellId;
+    const uint8  probability;
+    const uint8  castTarget;
+    const uint8  castFlags;
+    const uint32 delayInitialMin;
+    const uint32 delayInitialMax;
+    const uint32 delayRepeatMin;
+    const uint32 delayRepeatMax;
+    CreatureSpellsEntry(uint16 Id, uint8 Prob, uint8 Target, uint8 Flags, uint32 InitialMin, uint32 InitialMax, uint32 RepeatMin, uint32 RepeatMax) : spellId(Id), probability(Prob), castTarget(Target), castFlags(Flags), delayInitialMin(InitialMin), delayInitialMax(InitialMax), delayRepeatMin(RepeatMin), delayRepeatMax(RepeatMax) {}
+};
+
+typedef std::vector<CreatureSpellsEntry> CreatureSpellsTemplate;
+
+typedef std::unordered_map<uint32, CreatureSpellsTemplate> CreatureSpellsMap;
+
 typedef std::map<uint32/*player guid*/,uint32/*instance*/> CellCorpseSet;
 struct CellObjectGuids
 {
@@ -841,6 +858,7 @@ class ObjectMgr
         void LoadCreatures(bool reload = false);
         void LoadCreatureAddons();
         void LoadCreatureModelInfo();
+        void LoadCreatureSpells();
         void LoadEquipmentTemplates();
         void LoadGameObjectLocales();
         void LoadGameobjects(bool reload = false);
@@ -989,6 +1007,13 @@ class ObjectMgr
         {
             auto itr = mCreatureLocaleMap.find(entry);
             if(itr==mCreatureLocaleMap.end()) return nullptr;
+            return &itr->second;
+        }
+
+        CreatureSpellsTemplate const* GetCreatureSpellsTemplate(uint32 entry) const
+        {
+            auto itr = mCreatureSpellsMap.find(entry);
+            if (itr == mCreatureSpellsMap.end()) return nullptr;
             return &itr->second;
         }
 
@@ -1428,6 +1453,7 @@ class ObjectMgr
 
         CreatureDataMap mCreatureDataMap;
         CreatureLocaleMap mCreatureLocaleMap;
+        CreatureSpellsMap mCreatureSpellsMap;
         GameObjectDataMap mGameObjectDataMap;
         GameObjectLocaleMap mGameObjectLocaleMap;
         ItemLocaleMap mItemLocaleMap;
