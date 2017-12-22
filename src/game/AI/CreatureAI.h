@@ -28,6 +28,7 @@
 #include "Dynamic/ObjectRegistry.h"
 #include "Dynamic/FactoryHolder.h"
 #include "ObjectGuid.h"
+#include "ObjectMgr.h"
 
 #include "Utilities/EventMap.h"
 
