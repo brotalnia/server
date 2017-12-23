@@ -142,7 +142,7 @@ struct CreatureSpellsEntry
     const uint32 delayInitialMax;
     const uint32 delayRepeatMin;
     const uint32 delayRepeatMax;
-    CreatureSpellsEntry(uint16 Id, uint8 Prob, uint8 Target, uint8 Flags, uint32 InitialMin, uint32 InitialMax, uint32 RepeatMin, uint32 RepeatMax) : spellId(Id), probability(Prob), castTarget(Target), castFlags(Flags), delayInitialMin(InitialMin), delayInitialMax(InitialMax), delayRepeatMin(RepeatMin), delayRepeatMax(RepeatMax) {}
+    CreatureSpellsEntry(uint16 Id, uint8 Probability, uint8 CastTarget, uint8 CastFlags, uint32 InitialMin, uint32 InitialMax, uint32 RepeatMin, uint32 RepeatMax) : spellId(Id), probability(Probability), castTarget(CastTarget), castFlags(CastFlags), delayInitialMin(InitialMin), delayInitialMax(InitialMax), delayRepeatMin(RepeatMin), delayRepeatMax(RepeatMax) {}
 };
 
 typedef std::vector<CreatureSpellsEntry> CreatureSpellsTemplate;

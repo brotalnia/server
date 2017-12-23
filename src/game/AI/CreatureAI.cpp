@@ -24,6 +24,7 @@
 #include "DBCStores.h"
 #include "Spell.h"
 #include "Totem.h"
+#include "GridSearchers.h"
 
 CreatureAI::~CreatureAI()
 {
@@ -62,6 +63,10 @@ CanCastResult CreatureAI::CanCastSpell(Unit* pTarget, const SpellEntry *pSpell, 
 
     // If the spell requires the target having a specific power type
     if (!IsAreaOfEffectSpell(pSpell) && !IsTargetPowerTypeValid(pSpell, pTarget->getPowerType()))
+        return CAST_FAIL_OTHER;
+
+    // Mind control abilities can't be used with just 1 attacker or mob will reset.
+    if ((m_creature->getThreatManager().getThreatList().size() == 1) && IsCharmSpell(pSpell))
         return CAST_FAIL_OTHER;
 
     // If the unit is disarmed and the skill requires a weapon, it cannot be cast
@@ -145,9 +150,22 @@ CanCastResult CreatureAI::DoCastSpellIfCan(Unit* pTarget, uint32 uiSpell, uint32
     return CAST_FAIL_IS_CASTING;
 }
 
-inline Unit* CreatureAI::GetTargetByType(uint32 Target, Unit* pActionInvoker) const
+
+Unit* CreatureAI::DoSelectLowestHpFriendly(float fRange, uint32 uiMinHPDiff, bool bPercent) const
 {
-    switch (Target)
+    Unit* pUnit = nullptr;
+
+    MaNGOS::MostHPMissingInRangeCheck u_check(m_creature, fRange, uiMinHPDiff, bPercent);
+    MaNGOS::UnitLastSearcher<MaNGOS::MostHPMissingInRangeCheck> searcher(pUnit, u_check);
+
+    Cell::VisitGridObjects(m_creature, searcher, fRange);
+
+    return pUnit;
+}
+
+inline Unit* CreatureAI::GetTargetByType(uint32 CastTarget, uint16 SpellId) const
+{
+    switch (CastTarget)
     {
         case TARGET_T_SELF:
             return m_creature;
@@ -161,12 +179,22 @@ inline Unit* CreatureAI::GetTargetByType(uint32 Target, Unit* pActionInvoker) co
             return m_creature->SelectAttackingTarget(ATTACKING_TARGET_RANDOM, 0);
         case TARGET_T_HOSTILE_RANDOM_NOT_TOP:
             return m_creature->SelectAttackingTarget(ATTACKING_TARGET_RANDOM, 1);
-        case TARGET_T_ACTION_INVOKER:
-            return pActionInvoker;
         case TARGET_T_FRIENDLY:
-            return m_creature->SelectRandomFriendlyTarget(nullptr, 15.0f);
         case TARGET_T_FRIENDLY_NOT_SELF:
-            return m_creature->SelectRandomFriendlyTarget(m_creature, 15.0f);
+        case TARGET_T_FRIENDLY_INJURED:
+        {
+            const SpellEntry* pSpell = sSpellMgr.GetSpellEntry(SpellId);
+            const SpellRangeEntry *pSpellRange = sSpellRangeStore.LookupEntry(pSpell->rangeIndex);
+            switch (CastTarget)
+            {
+                case TARGET_T_FRIENDLY:
+                    return m_creature->SelectRandomFriendlyTarget(nullptr, pSpellRange->maxRange);
+                case TARGET_T_FRIENDLY_NOT_SELF:
+                    return m_creature->SelectRandomFriendlyTarget(m_creature, pSpellRange->maxRange);
+                case TARGET_T_FRIENDLY_INJURED:
+                    return DoSelectLowestHpFriendly(pSpellRange->maxRange, 50, true);
+            }
+        }
     }
     return nullptr;
 }
@@ -212,7 +240,7 @@ void CreatureAI::DoSpellTemplateCasts(const uint32 uiDiff)
                 continue;
             }
 
-            Unit* spellTarget = GetTargetByType(spell.castTarget);
+            Unit* spellTarget = GetTargetByType(spell.castTarget, spell.spellId);
 
             // no valid target
             if (!spellTarget)

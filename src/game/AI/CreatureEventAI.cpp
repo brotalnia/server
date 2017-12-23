@@ -34,6 +34,7 @@
 #include "Chat.h"
 #include "Language.h"
 #include "ScriptMgr.h"
+#include "CreatureAI.h"
 
 bool CreatureEventAIHolder::UpdateRepeatTimer(Creature* creature, uint32 repeatMin, uint32 repeatMax)
 {
@@ -1263,6 +1264,28 @@ inline int32 CreatureEventAI::GetRandActionParam(uint32 rnd, int32 param1, int32
             return param3;
     }
     return 0;
+}
+
+inline Unit* CreatureEventAI::GetTargetByType(uint32 Target, Unit* pActionInvoker) const
+{
+    switch (Target)
+    {
+        case TARGET_T_SELF:
+            return m_creature;
+        case TARGET_T_HOSTILE:
+            return m_creature->getVictim();
+        case TARGET_T_HOSTILE_SECOND_AGGRO:
+            return m_creature->SelectAttackingTarget(ATTACKING_TARGET_TOPAGGRO, 1);
+        case TARGET_T_HOSTILE_LAST_AGGRO:
+            return m_creature->SelectAttackingTarget(ATTACKING_TARGET_BOTTOMAGGRO, 0);
+        case TARGET_T_HOSTILE_RANDOM:
+            return m_creature->SelectAttackingTarget(ATTACKING_TARGET_RANDOM, 0);
+        case TARGET_T_HOSTILE_RANDOM_NOT_TOP:
+            return m_creature->SelectAttackingTarget(ATTACKING_TARGET_RANDOM, 1);
+        case TARGET_T_ACTION_INVOKER:
+            return pActionInvoker;
+    }
+    return nullptr;
 }
 
 Unit* CreatureEventAI::DoSelectLowestHpFriendly(float range, uint32 MinHPDiff)

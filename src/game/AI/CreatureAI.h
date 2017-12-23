@@ -84,22 +84,15 @@ enum Target
     //Friendly targets
     TARGET_T_FRIENDLY,                                      //Random friendly unit.
     TARGET_T_FRIENDLY_NOT_SELF,                             //Random friendly unit but not self.
+    TARGET_T_FRIENDLY_INJURED,                              //Friendly unit missing the most health.
 
     TARGET_T_END
 };
 
-struct CreatureAISpellsEntry
+struct CreatureAISpellsEntry : CreatureSpellsEntry
 {
-    const uint16 spellId;
-    const uint8  probability;
-    const uint8  castTarget;
-    const uint8  castFlags;
-    const uint32 delayInitialMin;
-    const uint32 delayInitialMax;
-    const uint32 delayRepeatMin;
-    const uint32 delayRepeatMax;
     uint32 cooldown;
-    CreatureAISpellsEntry(const CreatureSpellsEntry &EntryStruct) : spellId(EntryStruct.spellId), probability(EntryStruct.probability), castTarget(EntryStruct.castTarget), castFlags(EntryStruct.castFlags), delayInitialMin(EntryStruct.delayInitialMin), delayInitialMax(EntryStruct.delayInitialMax), delayRepeatMin(EntryStruct.delayRepeatMin), delayRepeatMax(EntryStruct.delayRepeatMax), cooldown(urand(EntryStruct.delayInitialMin, EntryStruct.delayInitialMax)) {}
+    CreatureAISpellsEntry(const CreatureSpellsEntry& EntryStruct) : CreatureSpellsEntry(EntryStruct), cooldown(urand(EntryStruct.delayInitialMin, EntryStruct.delayInitialMax)) {}
 };
 
 class MANGOS_DLL_SPEC CreatureAI
@@ -245,14 +238,31 @@ class MANGOS_DLL_SPEC CreatureAI
         void SetGazeOn(Unit *target);
 
         ///== Helper functions =============================
+
+        // Will auto attack if the swing timer is ready.
         bool DoMeleeAttackIfReady();
+
+        // Attempts to cast a spell and returns the result.
         CanCastResult DoCastSpellIfCan(Unit* pTarget, uint32 uiSpell, uint32 uiCastFlags = 0, ObjectGuid uiOriginalCasterGUID = ObjectGuid());
+
+        // Clears any group/raid icons this creature may have
         void ClearTargetIcon();
-        inline Unit* GetTargetByType(uint32 Target, Unit* pActionInvoker = nullptr) const;
+
+        // Returns a target based on the type specified.
+        inline Unit* GetTargetByType(uint32 CastTarget, uint16 Spellid) const;
+
+        // Assigns a creature_spells template to the AI.
         void SetSpellsTemplate(uint32 entry);
         void SetSpellsTemplate(const CreatureSpellsTemplate *SpellsTemplate);
+
+        // Resets the timers of all creature_spells template spells to initial values.
         void ResetSpellTimers();
+
+        // Goes through the creature_spells template to update timers and cast spells.
         void DoSpellTemplateCasts(const uint32 uiDiff);
+
+        // Returns friendly unit with the most amount of hp missing from max hp
+        Unit* DoSelectLowestHpFriendly(float fRange, uint32 uiMinHPDiff = 1, bool bPercent = false) const;
 
         ///== Fields =======================================
 
