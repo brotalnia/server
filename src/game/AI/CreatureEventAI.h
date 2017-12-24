@@ -121,6 +121,7 @@ enum EventAI_ActionType
     ACTION_T_CHANGE_MOVEMENT            = 48,               // MovementType, WanderDistance, unused
     ACTION_T_SET_VARIABLE               = 49,               // VariableEntry, Value, unused
     ACTION_T_EVENT_SCRIPT               = 50,               // EventScriptId
+    ACTION_T_SET_SPELLS_TEMPLATE        = 51,               // Entry from creature_spells table.
     ACTION_T_END,
 };
 
@@ -393,6 +394,11 @@ struct CreatureEventAI_Action
         {
             uint32 eventScriptId;
         } eventScript;
+        // ACTION_T_SET_SPELLS_TEMPLATE                     = 51
+        struct
+        {
+            uint32 spellsTemplateId;
+        } setSpellsTemplate;
         // RAW
         struct
         {

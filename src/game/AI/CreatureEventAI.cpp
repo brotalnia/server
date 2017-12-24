@@ -885,6 +885,11 @@ void CreatureEventAI::ProcessAction(CreatureEventAI_Action const& action, uint32
             m_creature->GetMap()->ScriptsStart(sEventScripts, action.eventScript.eventScriptId, m_creature, pActionInvoker ? pActionInvoker : m_creature);
             break;
         }
+        case ACTION_T_SET_SPELLS_TEMPLATE:
+        {
+            SetSpellsTemplate(action.setSpellsTemplate.spellsTemplateId);
+            break;
+        }
     }
 }
 
