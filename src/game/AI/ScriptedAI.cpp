@@ -98,8 +98,8 @@ void ScriptedAI::EnterEvadeMode()
 
     m_creature->SetLootRecipient(nullptr);
 
-    if (!m_CreatureSpells.empty())
-        ResetSpellTimers();
+    // Reset back to default spells template. This also resets timers.
+    SetSpellsTemplate(m_creature->GetCreatureInfo()->spells_template);
 
     Reset();
 }

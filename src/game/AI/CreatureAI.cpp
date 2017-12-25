@@ -219,14 +219,6 @@ void CreatureAI::SetSpellsTemplate(const CreatureSpellsTemplate *SpellsTemplate)
     m_CreatureSpells.shrink_to_fit();
 }
 
-void CreatureAI::ResetSpellTimers()
-{
-    for (auto & spell : m_CreatureSpells)
-    {
-        spell.cooldown = urand(spell.delayInitialMin, spell.delayInitialMax);
-    }
-}
-
 void CreatureAI::DoSpellTemplateCasts(const uint32 uiDiff)
 {
     for (auto & spell : m_CreatureSpells)
@@ -397,8 +389,8 @@ struct EnterEvadeModeHelper
 
 void CreatureAI::EnterEvadeMode()
 {
-    if (!m_CreatureSpells.empty())
-        ResetSpellTimers();
+    // Reset back to default spells template. This also resets timers.
+    SetSpellsTemplate(m_creature->GetCreatureInfo()->spells_template);
 
     if (!m_creature->isAlive())
     {

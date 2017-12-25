@@ -209,8 +209,8 @@ void npc_escortAI::EnterEvadeMode()
     if (!HasEscortState(STATE_ESCORT_ESCORTING))
         ResetCreature();
 
-    if (!m_CreatureSpells.empty())
-        ResetSpellTimers();
+    // Reset back to default spells template. This also resets timers.
+    SetSpellsTemplate(m_creature->GetCreatureInfo()->spells_template);
 
     ReturnToCombatStartPosition();
     Reset();

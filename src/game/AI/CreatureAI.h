@@ -255,9 +255,6 @@ class MANGOS_DLL_SPEC CreatureAI
         void SetSpellsTemplate(uint32 entry);
         void SetSpellsTemplate(const CreatureSpellsTemplate *SpellsTemplate);
 
-        // Resets the timers of all creature_spells template spells to initial values.
-        void ResetSpellTimers();
-
         // Goes through the creature_spells template to update timers and cast spells.
         void DoSpellTemplateCasts(const uint32 uiDiff);
 
