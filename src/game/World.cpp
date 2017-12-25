@@ -1092,9 +1092,9 @@ public:
     }
 };
 
-char* const World::GetPatchName()
+char* const World::GetPatchName() const
 {
-    switch(sWorld.GetWowPatch())
+    switch(GetWowPatch())
     {
         case 0:
             return "Patch 1.2: Mysteries of Maraudon";

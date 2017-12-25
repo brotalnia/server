@@ -640,7 +640,7 @@ class World
 
         // Get current server's WoW Patch
         uint8 GetWowPatch() const { return m_wowPatch; }
-        static char* const GetPatchName();
+        char* const GetPatchName() const;
 
         LocaleConstant GetDefaultDbcLocale() const { return m_defaultDbcLocale; }
 
