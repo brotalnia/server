@@ -1507,7 +1507,7 @@ void ObjectMgr::LoadCreatureSpells()
                     continue;
                 }
 
-                spellsTemplate.push_back(CreatureSpellsEntry(spellId, probability, castTarget, castFlags, delayInitialMin, delayInitialMax, delayRepeatMin, delayRepeatMax));
+                spellsTemplate.emplace_back(spellId, probability, castTarget, castFlags, delayInitialMin, delayInitialMax, delayRepeatMin, delayRepeatMax);
             }
         }
 
