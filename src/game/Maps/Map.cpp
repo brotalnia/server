@@ -2394,8 +2394,14 @@ void Map::ScriptsProcess()
                     break;
                 }
             }
-        }
 
+            if (!pBuddy)
+            {
+                sLog.outError("ScriptsProcess: Failed to find buddy for script with id %u (buddy_id: %u), (buddy_radius: %u), (buddy_type: %u).", step.script->id, step.script->buddy_id, step.script->buddy_radius, step.script->buddy_type);
+                // ToDo: add code to skip command here
+            }
+        }
+        // ToDo: dont forget to replace all breaks with returns when switch case is removed
         switch (step.script->command)
         {
             case SCRIPT_COMMAND_TALK:
@@ -2408,7 +2414,7 @@ void Map::ScriptsProcess()
                         pSource = pBuddy;
                     else
                     {
-                        sLog.outError("SCRIPT_COMMAND_TALK (script id %u) call for NULL source.", step.script->id);
+                        sLog.outError("SCRIPT_COMMAND_TALK (script id %u) call for a NULL or non-worldobject source, skipping.", step.script->id);
                         break;
                     }
                 }
@@ -2464,61 +2470,36 @@ void Map::ScriptsProcess()
             }
             case SCRIPT_COMMAND_EMOTE:
             {
-                if (!source)
-                {
-                    sLog.outError("SCRIPT_COMMAND_EMOTE (script id %u) call for NULL source.", step.script->id);
-                    break;
-                }
+                Unit* pSource = nullptr;
 
-                if (!source->isType(TYPEMASK_WORLDOBJECT))
+                // Only units can emote.
+                if (step.script->emote.flags & SF_EMOTE_TARGET_AS_SOURCE)
                 {
-                    sLog.outError("SCRIPT_COMMAND_EMOTE (script id %u) call for non-worldobject (TypeId: %u), skipping.", step.script->id, source->GetTypeId());
-                    break;
-                }
-                // When creatureEntry is not defined, GameObject can not be source
-                else if (!step.script->emote.creatureEntry)
-                {
-                    if (!source->isType(TYPEMASK_UNIT))
-                    {
-                        sLog.outError("SCRIPT_COMMAND_EMOTE (script id %u) are missing datalong2 (creature entry). Unsupported call for non-unit (TypeId: %u), skipping.", step.script->id, source->GetTypeId());
-                        break;
-                    }
-                }
-
-                WorldObject* pSource = (WorldObject*)source;
-                
-                // flag_target_as_source            0x01
-
-                // If target is Unit* and should do the emote (or should be source of searcher below)
-                if (target && target->isType(TYPEMASK_UNIT) && step.script->emote.flags & 0x01)
-                {
-                    pSource = (WorldObject*)target;
-                }
-                // Step has flag SCRIPT_FLAG_BUDDY_BY_GUID, so we look for the creature with guid as defined in searchRadius
-                else if (step.script->emote.flags & 0x10) 
-                {
-                    pSource = pSource->GetMap()->GetCreature(ObjectGuid(HIGHGUID_UNIT, step.script->emote.creatureEntry, step.script->emote.searchRadius));
-                    if (!pSource)
-                    {
-                        sLog.outError("SCRIPT_COMMAND_EMOTE (script id %u) had flag SCRIPT_FLAG_BUDDY_BY_GUID, but could not find buddy with entry %u, guid %u", step.script->id, step.script->emote.creatureEntry, step.script->emote.searchRadius);
-                        break;
-                    }
-                }
-                // If step has a buddy entry defined, but not flag SCRIPT_FLAG_BUDDY_BY_GUID, search for it.
-                else if (step.script->emote.creatureEntry)
-                {
-                    Creature* pBuddy = NULL;
-                    MaNGOS::NearestCreatureEntryWithLiveStateInObjectRangeCheck u_check(*pSource, step.script->emote.creatureEntry, true, step.script->emote.searchRadius);
-                    MaNGOS::CreatureLastSearcher<MaNGOS::NearestCreatureEntryWithLiveStateInObjectRangeCheck> searcher(pBuddy, u_check);
-
-                    Cell::VisitGridObjects(pSource, searcher, step.script->emote.searchRadius);
-
-                    // If buddy found, then use it or break (break since we must assume pBuddy was defined for a reason)
-                    if (pBuddy)
-                        pSource = (WorldObject*)pBuddy;
+                    if (target && target->isType(TYPEMASK_UNIT))
+                        pSource = (Unit*)target;
                     else
+                    {
+                        sLog.outError("SCRIPT_COMMAND_EMOTE (script id %u) call with SF_EMOTE_TARGET_AS_SOURCE for a NULL or non-unit target, skipping.", step.script->id);
                         break;
+                    }
                 }
+                else if (pBuddy)
+                {
+                    if (pBuddy->isType(TYPEMASK_UNIT))
+                        pSource = (Unit*)pBuddy;
+                    else
+                    {
+                        sLog.outError("SCRIPT_COMMAND_EMOTE (script id %u) call for a non-unit buddy (TypeId: %u), skipping.", step.script->id, pBuddy->GetTypeId());
+                        break;
+                    }
+                }
+                else if (!source || !source->isType(TYPEMASK_UNIT))
+                {
+                    sLog.outError("SCRIPT_COMMAND_EMOTE (script id %u) call for a NULL or non-unit source, skipping.", step.script->id);
+                    break;
+                }
+                else
+                    pSource = (Unit*)source;
                 
                 // find the emote
                 std::vector<uint32> emotes;
@@ -2530,79 +2511,111 @@ void Map::ScriptsProcess()
                     emotes.push_back(uint32(step.script->emote.randomEmotes[i]));
                 }
 
-                // Must be safe cast to Unit*
-                ((Unit*)pSource)->HandleEmote(emotes[urand(0, emotes.size() - 1)]);
+                pSource->HandleEmote(emotes[urand(0, emotes.size() - 1)]);
                 break;
             }
             case SCRIPT_COMMAND_FIELD_SET:
-                if (!source)
+            {
+                Object* pSource = nullptr;
+
+                if (step.script->setField.flags & SF_SET_FIELD_TARGET_AS_SOURCE)
                 {
-                    sLog.outError("SCRIPT_COMMAND_FIELD_SET (script id %u) call for NULL object.", step.script->id);
+                    if (target)
+                        pSource = target;
+                    else
+                    {
+                        sLog.outError("SCRIPT_COMMAND_FIELD_SET (script id %u) call with SF_SET_FIELD_TARGET_AS_SOURCE but target is NULL, skipping.", step.script->id);
+                        break;
+                    }
+                }
+                else if (pBuddy)
+                    pSource = pBuddy;
+                else if (!source)
+                {
+                    sLog.outError("SCRIPT_COMMAND_FIELD_SET (script id %u) call for a NULL object, skipping.", step.script->id);
                     break;
                 }
+                else
+                    pSource = source;
 
-                if (step.script->setField.fieldId <= OBJECT_FIELD_ENTRY || step.script->setField.fieldId >= source->GetValuesCount())
+                if (step.script->setField.fieldId <= OBJECT_FIELD_ENTRY || step.script->setField.fieldId >= pSource->GetValuesCount())
                 {
                     sLog.outError("SCRIPT_COMMAND_FIELD_SET (script id %u) call for wrong field %u (max count: %u) in object (TypeId: %u).",
-                                  step.script->id, step.script->setField.fieldId, source->GetValuesCount(), source->GetTypeId());
+                        step.script->id, step.script->setField.fieldId, pSource->GetValuesCount(), pSource->GetTypeId());
                     break;
                 }
 
-                source->SetUInt32Value(step.script->setField.fieldId, step.script->setField.fieldValue);
+                pSource->SetUInt32Value(step.script->setField.fieldId, step.script->setField.fieldValue);
                 break;
+            }
             case SCRIPT_COMMAND_MOVE_TO:
             {
-                if (!source)
+                Unit* pSource = nullptr;
+
+                if (pBuddy)
                 {
-                    sLog.outError("SCRIPT_COMMAND_MOVE_TO (script id %u) call for NULL creature.", step.script->id);
+                    if (pBuddy->GetTypeId() == TYPEID_UNIT)
+                        pSource = (Unit*)pBuddy;
+                    else
+                    {
+                        sLog.outError("SCRIPT_COMMAND_MOVE_TO (script id %u) call for a non-creature buddy (TypeId: %u), skipping.", step.script->id, pBuddy->GetTypeId());
+                        break;
+                    }
+                }
+                else if (!source || source->GetTypeId() != TYPEID_UNIT)
+                {
+                    sLog.outError("SCRIPT_COMMAND_MOVE_TO (script id %u) call for a NULL or non-creature source, skipping.", step.script->id);
                     break;
                 }
+                else
+                    pSource = (Unit*)source;
 
-                if (source->GetTypeId() != TYPEID_UNIT)
-                {
-                    sLog.outError("SCRIPT_COMMAND_MOVE_TO (script id %u) call for non-creature (TypeId: %u), skipping.", step.script->id, source->GetTypeId());
-                    break;
-                }
-
-                Unit * unit = (Unit*)source;
                 float x = step.script->x;
                 float y = step.script->y;
                 float z = step.script->z;
 
-                if (step.script->moveTo.coordinatesType && target && target->isType(TYPEMASK_WORLDOBJECT))
+                if (step.script->moveTo.coordinatesType)
                 {
-                    if (WorldObject* pTarget = (WorldObject*)target)
+                    if (target && target->isType(TYPEMASK_WORLDOBJECT))
                     {
+                        WorldObject* pTarget = (WorldObject*)target;
                         switch (step.script->moveTo.coordinatesType)
                         {
-                            case 1: // relative to target coordinates
+                            case MOVETO_COORDINATES_RELATIVE_TO_TARGET:
                             {
+                                // Coordinates are added to those of the target.
                                 x += pTarget->GetPositionX();
                                 y += pTarget->GetPositionY();
                                 z += pTarget->GetPositionZ();
                                 break;
                             }
-                            case 2: // nearby point
+                            case MOVETO_COORDINATES_DISTANCE_FROM_TARGET:
                             {
+                                // X is distance from the target.
                                 float distance = x;
-                                pTarget->GetNearPoint(unit, x, y, z, 0, distance, frand(0, 2 * M_PI_F));
+                                pTarget->GetNearPoint(pSource, x, y, z, 0, distance, frand(0, 2 * M_PI_F));
+                                break;
                             }
                         }
                     }
-
+                    else
+                    {
+                        sLog.outError("SCRIPT_COMMAND_MOVE_TO (script id %u) call with datalong = %u for a NULL or non-unit target, skipping.", step.script->id, step.script->moveTo.coordinatesType);
+                        break;
+                    }
                 }
 
                 // Only move if we can move.
-                if (unit->hasUnitState(UNIT_STAT_NOT_MOVE) && !(step.script->moveTo.flags & SF_MOVETO_FORCED))
+                if (pSource->hasUnitState(UNIT_STAT_NOT_MOVE) && !(step.script->moveTo.flags & SF_MOVETO_FORCED))
                     break;
 
                 if (step.script->moveTo.travelTime != 0)
                 {
-                    float speed = unit->GetDistance(x, y, z) / ((float)step.script->moveTo.travelTime * 0.001f);
-                    unit->MonsterMoveWithSpeed(x, y, z, speed);
+                    float speed = pSource->GetDistance(x, y, z) / ((float)step.script->moveTo.travelTime * 0.001f);
+                    pSource->MonsterMoveWithSpeed(x, y, z, speed);
                 }
                 else
-                    unit->GetMotionMaster()->MovePoint(0, x, y, z, MOVE_PATHFINDING, 0.0f, step.script->o ? step.script->o : -10.0f);
+                    pSource->GetMotionMaster()->MovePoint(0, x, y, z, step.script->moveTo.movementOptions, 0.0f, step.script->o ? step.script->o : -10.0f);
                 
                 break;
             }

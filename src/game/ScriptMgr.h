@@ -44,20 +44,22 @@ class WorldObject;
 
 enum eScriptCommand
 {
-    SCRIPT_COMMAND_TALK                     = 0,            // source = WorldObject, target = any/none, datalong (see enum ChatType for supported CHAT_TYPE_'s)
-                                                            // data_flags = flag_target_player_as_source    = 0x01
-                                                            //              flag_original_source_as_target  = 0x02
-                                                            //              flag_buddy_as_target            = 0x04
-                                                            // dataint = text entry from db_script_string -table. dataint2-4 optional for random selected text.
-    SCRIPT_COMMAND_EMOTE                    = 1,            // source = Unit (or WorldObject when creature entry defined), target = Unit (or none)
+    SCRIPT_COMMAND_TALK                     = 0,            // source = WorldObject, target = Unit/None
+                                                            // datalong = chat_type (see enum ChatType)
+                                                            // data_flags = eTalkFlags
+                                                            // dataint = broadcast_text id. dataint2-4 optional for random selected text.
+    SCRIPT_COMMAND_EMOTE                    = 1,            // source = Unit
                                                             // datalong = emote_id
-                                                            // datalong2 = creature entry (searching for a buddy, closest to source), datalong3 = creature search radius
-                                                            // data_flags = flag_target_as_source           = 0x01
-    SCRIPT_COMMAND_FIELD_SET                = 2,            // source = any, datalong = field_id, datalong2 = value
+                                                            // data_flags = eEmoteFlags
+    SCRIPT_COMMAND_FIELD_SET                = 2,            // source = Any
+                                                            // datalong = field_id
+                                                            // datalong2 = value
+                                                            // data_flags = eFieldSetFlags
     SCRIPT_COMMAND_MOVE_TO                  = 3,            // source = Creature
-                                                            // datalong: 1 = coordinates are relative to target, 2 = x is distance from target
+                                                            // datalong = coordinates_type (see enum eMoveToCoordinateTypes)
                                                             // datalong2 = time, x/y/z
-                                                            // data_flags & 0x1 = force movement even if creature cant move
+                                                            // datalong3 = movement_options (see enum MoveOptions)
+                                                            // data_flags = eMoveToFlags
     SCRIPT_COMMAND_FLAG_SET                 = 4,            // source = any, datalong = field_id, datalong2 = bitmask
     SCRIPT_COMMAND_FLAG_REMOVE              = 5,            // source = any, datalong = field_id, datalong2 = bitmask
     SCRIPT_COMMAND_TELEPORT_TO              = 6,            // source or target with Player, datalong = map_id, x/y/z
@@ -146,6 +148,25 @@ enum eTalkFlags
     SF_TALK_BUDDY_AS_TARGET  = 0x4
 };
 
+enum eEmoteFlags
+{
+    SF_EMOTE_TARGET_AS_SOURCE = 0x1
+};
+
+enum eSetFieldFlags
+{
+    SF_SET_FIELD_TARGET_AS_SOURCE = 0x1
+};
+
+enum eMoveToCoordinateTypes
+{
+    MOVETO_COORDINATES_NORMAL               = 0,
+    MOVETO_COORDINATES_RELATIVE_TO_TARGET   = 1,
+    MOVETO_COORDINATES_DISTANCE_FROM_TARGET = 2,
+
+    MOVETO_COORDINATES_MAX
+};
+
 // Flags used by SCRIPT_COMMAND_TEMP_SUMMON_CREATURE
 enum eSummonCreatureFlags
 {
@@ -192,9 +213,9 @@ struct ScriptInfo
         struct                                              // SCRIPT_COMMAND_EMOTE (1)
         {
             uint32 emoteId;                                 // datalong
-            uint32 creatureEntry;                           // datalong2
-            uint32 searchRadius;                            // datalong3
-            uint32 unused1;                                 // datalong4
+            uint32 unused1;                                 // datalong2
+            uint32 unused2;                                 // datalong3
+            uint32 unused3;                                 // datalong4
             uint32 flags;                                   // data_flags
             uint32 randomEmotes[MAX_EMOTE_ID];              // dataint to dataint4
         } emote;
@@ -203,14 +224,17 @@ struct ScriptInfo
         {
             uint32 fieldId;                                 // datalong
             uint32 fieldValue;                              // datalong2
+            uint32 unused1;                                 // datalong3
+            uint32 unused2;                                 // datalong4
+            uint32 flags;                                   // data_flags
         } setField;
 
         struct                                              // SCRIPT_COMMAND_MOVE_TO (3)
         {
             uint32 coordinatesType;                         // datalong
             uint32 travelTime;                              // datalong2
-            uint32 unused1;                                 // datalong3
-            uint32 unused2;                                 // datalong4
+            uint32 movementOptions;                         // datalong3
+            uint32 unused1;                                 // datalong4
             uint32 flags;                                   // data_flags
         } moveTo;
 
