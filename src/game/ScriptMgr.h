@@ -60,8 +60,14 @@ enum eScriptCommand
                                                             // datalong2 = time, x/y/z
                                                             // datalong3 = movement_options (see enum MoveOptions)
                                                             // data_flags = eMoveToFlags
-    SCRIPT_COMMAND_FLAG_SET                 = 4,            // source = any, datalong = field_id, datalong2 = bitmask
-    SCRIPT_COMMAND_FLAG_REMOVE              = 5,            // source = any, datalong = field_id, datalong2 = bitmask
+    SCRIPT_COMMAND_FLAG_SET                 = 4,            // source = any
+                                                            // datalong = field_id
+                                                            // datalong2 = bitmask
+                                                            // data_flags = eFlagSetFlags
+    SCRIPT_COMMAND_FLAG_REMOVE              = 5,            // source = any
+                                                            // datalong = field_id
+                                                            // datalong2 = bitmask
+                                                            // data_flags = eFlagRemoveFlags
     SCRIPT_COMMAND_TELEPORT_TO              = 6,            // source or target with Player, datalong = map_id, x/y/z
     SCRIPT_COMMAND_QUEST_EXPLORED           = 7,            // one from source or target must be Player, another GO/Creature, datalong=quest_id, datalong2=distance or 0
     SCRIPT_COMMAND_KILL_CREDIT              = 8,            // source or target with Player, datalong = creature entry, datalong2 = bool (0=personal credit, 1=group credit)
@@ -148,16 +154,25 @@ enum eTalkFlags
     SF_TALK_BUDDY_AS_TARGET  = 0x4
 };
 
+// Flags used by SCRIPT_COMMAND_EMOTE
 enum eEmoteFlags
 {
     SF_EMOTE_TARGET_AS_SOURCE = 0x1
 };
 
-enum eSetFieldFlags
+// Flags used by SCRIPT_COMMAND_FIELD_SET
+enum eFieldSetFlags
 {
-    SF_SET_FIELD_TARGET_AS_SOURCE = 0x1
+    SF_FIELD_SET_TARGET_AS_SOURCE = 0x1
 };
 
+// Flags used by SCRIPT_COMMAND_MOVE_TO
+enum eMoveToFlags
+{
+    SF_MOVE_TO_FORCED = 0x1                                      // No check if creature can move.
+};
+
+// Possible datalong3 values for SCRIPT_COMMAND_MOVE_TO
 enum eMoveToCoordinateTypes
 {
     MOVETO_COORDINATES_NORMAL               = 0,
@@ -165,6 +180,18 @@ enum eMoveToCoordinateTypes
     MOVETO_COORDINATES_DISTANCE_FROM_TARGET = 2,
 
     MOVETO_COORDINATES_MAX
+};
+
+// Flags used by SCRIPT_COMMAND_FLAG_SET
+enum eFlagSetFlags
+{
+    SF_FLAG_SET_TARGET_AS_SOURCE = 0x1
+};
+
+// Flags used by SCRIPT_COMMAND_FLAG_REMOVE
+enum eFlagRemoveFlags
+{
+    SF_FLAG_REMOVE_TARGET_AS_SOURCE = 0x1
 };
 
 // Flags used by SCRIPT_COMMAND_TEMP_SUMMON_CREATURE
@@ -175,11 +202,7 @@ enum eSummonCreatureFlags
     SF_SUMMON_CREATURE_UNIQUE_TEMP = 0x4                       // same as 0x2 but check for TempSummon only creatures
 };
 
-// Flags used by SCRIPT_COMMAND_MOVE_TO
-enum eMoveToFlags
-{
-    SF_MOVETO_FORCED  = 0x1                                      // No check if creature can move.
-};
+
 
 // Values used in buddy_type column
 enum eBuddyType
@@ -242,12 +265,18 @@ struct ScriptInfo
         {
             uint32 fieldId;                                 // datalong
             uint32 fieldValue;                              // datalong2
+            uint32 unused1;                                 // datalong3
+            uint32 unused2;                                 // datalong4
+            uint32 flags;                                   // data_flags
         } setFlag;
 
         struct                                              // SCRIPT_COMMAND_FLAG_REMOVE (5)
         {
             uint32 fieldId;                                 // datalong
             uint32 fieldValue;                              // datalong2
+            uint32 unused1;                                 // datalong3
+            uint32 unused2;                                 // datalong4
+            uint32 flags;                                   // data_flags
         } removeFlag;
 
         struct                                              // SCRIPT_COMMAND_TELEPORT_TO (6)

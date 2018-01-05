@@ -2518,7 +2518,7 @@ void Map::ScriptsProcess()
             {
                 Object* pSource = nullptr;
 
-                if (step.script->setField.flags & SF_SET_FIELD_TARGET_AS_SOURCE)
+                if (step.script->setField.flags & SF_FIELD_SET_TARGET_AS_SOURCE)
                 {
                     if (target)
                         pSource = target;
@@ -2606,7 +2606,7 @@ void Map::ScriptsProcess()
                 }
 
                 // Only move if we can move.
-                if (pSource->hasUnitState(UNIT_STAT_NOT_MOVE) && !(step.script->moveTo.flags & SF_MOVETO_FORCED))
+                if (pSource->hasUnitState(UNIT_STAT_NOT_MOVE) && !(step.script->moveTo.flags & SF_MOVE_TO_FORCED))
                     break;
 
                 if (step.script->moveTo.travelTime != 0)
@@ -2620,35 +2620,73 @@ void Map::ScriptsProcess()
                 break;
             }
             case SCRIPT_COMMAND_FLAG_SET:
-                if (!source)
+            {
+                Object* pSource = nullptr;
+
+                if (step.script->setFlag.flags & SF_FLAG_SET_TARGET_AS_SOURCE)
                 {
-                    sLog.outError("SCRIPT_COMMAND_FLAG_SET (script id %u) call for NULL object.", step.script->id);
+                    if (target)
+                        pSource = target;
+                    else
+                    {
+                        sLog.outError("SCRIPT_COMMAND_FLAG_SET (script id %u) call with SF_FLAG_SET_TARGET_AS_SOURCE but target is NULL, skipping.", step.script->id);
+                        break;
+                    }
+                }
+                else if (pBuddy)
+                    pSource = pBuddy;
+                else if (!source)
+                {
+                    sLog.outError("SCRIPT_COMMAND_FLAG_SET (script id %u) call for a NULL object, skipping.", step.script->id);
                     break;
                 }
-                if (step.script->setFlag.fieldId <= OBJECT_FIELD_ENTRY || step.script->setFlag.fieldId >= source->GetValuesCount())
+                else
+                    pSource = source;
+
+                if (step.script->setFlag.fieldId <= OBJECT_FIELD_ENTRY || step.script->setFlag.fieldId >= pSource->GetValuesCount())
                 {
                     sLog.outError("SCRIPT_COMMAND_FLAG_SET (script id %u) call for wrong field %u (max count: %u) in object (TypeId: %u).",
-                                  step.script->id, step.script->setFlag.fieldId, source->GetValuesCount(), source->GetTypeId());
+                        step.script->id, step.script->setFlag.fieldId, pSource->GetValuesCount(), pSource->GetTypeId());
                     break;
                 }
 
-                source->SetFlag(step.script->setFlag.fieldId, step.script->setFlag.fieldValue);
+                pSource->SetFlag(step.script->setFlag.fieldId, step.script->setFlag.fieldValue);
                 break;
+            }
             case SCRIPT_COMMAND_FLAG_REMOVE:
-                if (!source)
+            {
+                Object* pSource = nullptr;
+
+                if (step.script->removeFlag.flags & SF_FLAG_REMOVE_TARGET_AS_SOURCE)
                 {
-                    sLog.outError("SCRIPT_COMMAND_FLAG_REMOVE (script id %u) call for NULL object.", step.script->id);
+                    if (target)
+                        pSource = target;
+                    else
+                    {
+                        sLog.outError("SCRIPT_COMMAND_FLAG_REMOVE (script id %u) call with SF_FLAG_REMOVE_TARGET_AS_SOURCE but target is NULL, skipping.", step.script->id);
+                        break;
+                    }
+                }
+                else if (pBuddy)
+                    pSource = pBuddy;
+                else if (!source)
+                {
+                    sLog.outError("SCRIPT_COMMAND_FLAG_REMOVE (script id %u) call for a NULL object, skipping.", step.script->id);
                     break;
                 }
-                if (step.script->removeFlag.fieldId <= OBJECT_FIELD_ENTRY || step.script->removeFlag.fieldId >= source->GetValuesCount())
+                else
+                    pSource = source;
+
+                if (step.script->removeFlag.fieldId <= OBJECT_FIELD_ENTRY || step.script->removeFlag.fieldId >= pSource->GetValuesCount())
                 {
                     sLog.outError("SCRIPT_COMMAND_FLAG_REMOVE (script id %u) call for wrong field %u (max count: %u) in object (TypeId: %u).",
-                                  step.script->id, step.script->removeFlag.fieldId, source->GetValuesCount(), source->GetTypeId());
+                        step.script->id, step.script->removeFlag.fieldId, pSource->GetValuesCount(), pSource->GetTypeId());
                     break;
                 }
 
-                source->RemoveFlag(step.script->removeFlag.fieldId, step.script->removeFlag.fieldValue);
+                pSource->RemoveFlag(step.script->removeFlag.fieldId, step.script->removeFlag.fieldValue);
                 break;
+            }
             case SCRIPT_COMMAND_TELEPORT_TO:
             {
                 // accept player in any one from target/source arg
