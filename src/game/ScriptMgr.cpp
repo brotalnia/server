@@ -69,7 +69,8 @@ void ScriptMgr::LoadScripts(ScriptMapMap& scripts, const char* tablename)
 
     scripts.clear();                                        // need for reload support
 
-    QueryResult *result = WorldDatabase.PQuery("SELECT id, delay, command, datalong, datalong2, datalong3, datalong4, data_flags, dataint, dataint2, dataint3, dataint4, x, y, z, o FROM %s", tablename);
+    //                                                  0    1       2         3         4          5          6         7           8             9          10        11        12        13        14    15 16 17 18
+    QueryResult *result = WorldDatabase.PQuery("SELECT id, delay, command, datalong, datalong2, datalong3, datalong4, buddy_id, buddy_radius, buddy_type, data_flags, dataint, dataint2, dataint3, dataint4, x, y, z, o FROM %s", tablename);
 
     uint32 count = 0;
 
@@ -91,22 +92,91 @@ void ScriptMgr::LoadScripts(ScriptMapMap& scripts, const char* tablename)
 
         Field *fields = result->Fetch();
         ScriptInfo tmp;
-        tmp.id          = fields[0].GetUInt32();
-        tmp.delay       = fields[1].GetUInt32();
-        tmp.command     = fields[2].GetUInt32();
-        tmp.raw.data[0] = fields[3].GetUInt32();
-        tmp.raw.data[1] = fields[4].GetUInt32();
-        tmp.raw.data[2] = fields[5].GetUInt32();
-        tmp.raw.data[3] = fields[6].GetUInt32();
-        tmp.raw.data[4] = fields[7].GetUInt32();
-        tmp.raw.data[5] = fields[8].GetInt32();
-        tmp.raw.data[6] = fields[9].GetInt32();
-        tmp.raw.data[7] = fields[10].GetInt32();
-        tmp.raw.data[8] = fields[11].GetInt32();
-        tmp.x           = fields[12].GetFloat();
-        tmp.y           = fields[13].GetFloat();
-        tmp.z           = fields[14].GetFloat();
-        tmp.o           = fields[15].GetFloat();
+        tmp.id           = fields[0].GetUInt32();
+        tmp.delay        = fields[1].GetUInt32();
+        tmp.command      = fields[2].GetUInt32();
+        tmp.raw.data[0]  = fields[3].GetUInt32();
+        tmp.raw.data[1]  = fields[4].GetUInt32();
+        tmp.raw.data[2]  = fields[5].GetUInt32();
+        tmp.raw.data[3]  = fields[6].GetUInt32();
+
+        tmp.buddy_id     = fields[7].GetUInt32();
+        tmp.buddy_radius = fields[8].GetUInt32();
+        tmp.buddy_type   = fields[9].GetUInt8();
+
+        tmp.raw.data[4]  = fields[10].GetUInt32();
+        tmp.raw.data[5]  = fields[11].GetInt32();
+        tmp.raw.data[6]  = fields[12].GetInt32();
+        tmp.raw.data[7]  = fields[13].GetInt32();
+        tmp.raw.data[8]  = fields[14].GetInt32();
+        tmp.x            = fields[15].GetFloat();
+        tmp.y            = fields[16].GetFloat();
+        tmp.z            = fields[17].GetFloat();
+        tmp.o            = fields[18].GetFloat();
+
+        if (tmp.buddy_id)
+        {
+            switch (tmp.buddy_type)
+            {
+                case BUDDY_TYPE_CREATURE_ENTRY:
+                {
+                    if (!ObjectMgr::GetCreatureTemplate(tmp.buddy_id))
+                    {
+                        sLog.outErrorDb("Table `%s` has buddy_id = %u for script id %u, but this creature_template does not exist.", tablename, tmp.buddy_id, tmp.id);
+                        continue;
+                    }
+                    if (!tmp.buddy_radius)
+                    {
+                        sLog.outErrorDb("Table `%s` has buddy_id = %u for script id %u, but search radius is too small (buddy_radius = %u).", tablename, tmp.buddy_id, tmp.id, tmp.buddy_radius);
+                        continue;
+                    }
+                    break;
+                }
+                case BUDDY_TYPE_CREATURE_GUID:
+                {
+                    if (!sObjectMgr.GetCreatureData(tmp.buddy_id))
+                    {
+                        sLog.outErrorDb("Table `%s` has buddy_id = %u for script id %u, but this creature guid does not exist.", tablename, tmp.buddy_id, tmp.id);
+                        continue;
+                    }
+                    break;
+                }
+                case BUDDY_TYPE_GAMEOBJECT_ENTRY:
+                {
+                    if (!ObjectMgr::GetGameObjectInfo(tmp.buddy_id))
+                    {
+                        sLog.outErrorDb("Table `%s` has buddy_id = %u for script id %u, but this gameobject_template does not exist.", tablename, tmp.buddy_id, tmp.id);
+                        continue;
+                    }
+                    break;
+                }
+                case BUDDY_TYPE_GAMEOBJECT_GUID:
+                {
+                    GameObjectData const* data = sObjectMgr.GetGOData(tmp.buddy_id);
+                    if (!data)
+                    {
+                        sLog.outErrorDb("Table `%s` has buddy_id = %u for script id %u, but this gameobject guid does not exist.", tablename, tmp.buddy_id, tmp.id);
+                        continue;
+                    }
+
+                    GameObjectInfo const* info = ObjectMgr::GetGameObjectInfo(data->id);
+                    if (!info)
+                    {
+                        sLog.outErrorDb("Table `%s` has buddy_id = %u for script id %u, but this guid is for a non-existent gameobject entry %u.", tablename, tmp.buddy_id, tmp.id, data->id);
+                        continue;
+                    }
+                    break;
+                }
+                case BUDDY_TYPE_CREATURE_INSTANCE_DATA:
+                case BUDDY_TYPE_GAMEOBJECT_INSTANCE_DATA:
+                    break;
+                default:
+                {
+                    sLog.outError("Table `%s` has an unknown buddy_type = %u used for script id %u.", tablename, tmp.buddy_type, tmp.id);
+                    break;
+                }
+            }
+        }
 
         // generic command args check
         switch (tmp.command)
@@ -117,32 +187,6 @@ void ScriptMgr::LoadScripts(ScriptMapMap& scripts, const char* tablename)
                 {
                     sLog.outErrorDb("Table `%s` has invalid CHAT_TYPE_ (datalong = %u) in SCRIPT_COMMAND_TALK for script id %u", tablename, tmp.talk.chatType, tmp.id);
                     continue;
-                }
-                if (tmp.talk.creatureEntry && !ObjectMgr::GetCreatureTemplate(tmp.talk.creatureEntry))
-                {
-                    sLog.outErrorDb("Table `%s` has datalong2 = %u in SCRIPT_COMMAND_TALK for script id %u, but this creature_template does not exist.", tablename, tmp.talk.creatureEntry, tmp.id);
-                    continue;
-                }
-                if (tmp.talk.creatureEntry && !tmp.talk.searchRadius)
-                {
-                    sLog.outErrorDb("Table `%s` has datalong2 = %u in SCRIPT_COMMAND_TALK for script id %u, but search radius is too small (datalong3 = %u).", tablename, tmp.talk.creatureEntry, tmp.id, tmp.talk.searchRadius);
-                    continue;
-                }
-                if (tmp.talk.gameobjectGuid)
-                {
-                    GameObjectData const* data = sObjectMgr.GetGOData(tmp.GetGOGuid());
-                    if (!data)
-                    {
-                        sLog.outErrorDb("Table `%s` has invalid gameobject (GUID: %u) in SCRIPT_COMMAND_TALK for script id %u", tablename, tmp.GetGOGuid(), tmp.id);
-                        continue;
-                    }
-
-                    GameObjectInfo const* info = ObjectMgr::GetGameObjectInfo(data->id);
-                    if (!info)
-                    {
-                        sLog.outErrorDb("Table `%s` has gameobject with invalid entry (GUID: %u Entry: %u) in SCRIPT_COMMAND_TALK for script id %u", tablename, tmp.GetGOGuid(), data->id, tmp.id);
-                        continue;
-                    }
                 }
                 if (tmp.talk.textId[0] == 0)
                 {
@@ -158,8 +202,6 @@ void ScriptMgr::LoadScripts(ScriptMapMap& scripts, const char* tablename)
                         continue;
                     }
                 }
-
-                // if (!GetMangosStringLocale(tmp.dataint)) will be checked after db_script_string loading
                 break;
             }
             case SCRIPT_COMMAND_EMOTE:

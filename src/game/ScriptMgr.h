@@ -45,7 +45,6 @@ class WorldObject;
 enum eScriptCommand
 {
     SCRIPT_COMMAND_TALK                     = 0,            // source = WorldObject, target = any/none, datalong (see enum ChatType for supported CHAT_TYPE_'s)
-                                                            // datalong2 = creature entry (searching for a buddy, closest to source), datalong3 = creature search radius, datalong4 = gameobject db guid
                                                             // data_flags = flag_target_player_as_source    = 0x01
                                                             //              flag_original_source_as_target  = 0x02
                                                             //              flag_buddy_as_target            = 0x04
@@ -66,7 +65,7 @@ enum eScriptCommand
     SCRIPT_COMMAND_KILL_CREDIT              = 8,            // source or target with Player, datalong = creature entry, datalong2 = bool (0=personal credit, 1=group credit)
     SCRIPT_COMMAND_RESPAWN_GAMEOBJECT       = 9,            // source = any (summoner), datalong=db_guid, datalong2=despawn_delay
     SCRIPT_COMMAND_TEMP_SUMMON_CREATURE     = 10,           // source = any (summoner), datalong=creature entry, datalong2=despawn_delay
-                                                            // data_flags & SCRIPT_FLAG_COMMAND_ADDITIONAL = summon active, SUMMON_CREATURE_UNIQUE = check for same entry in radius, SUMMON_CREATURE_UNIQUE_TEMP = same but only TempSummon
+                                                            // data_flags & SCRIPT_FLAG_COMMAND_ADDITIONAL = summon active, SF_SUMMON_CREATURE_UNIQUE = check for same entry in radius, SF_SUMMON_CREATURE_UNIQUE_TEMP = same but only TempSummon
                                                             // dataint = (bool) setRun; 0 = off (default), 1 = on
                                                             // dataint2: 0 = use orientation specified, 1 = face source, 2 = face target
     SCRIPT_COMMAND_OPEN_DOOR                = 11,           // source = unit, datalong=db_guid, datalong2=reset_delay
@@ -139,16 +138,37 @@ enum eScriptCommand
 #define MAX_TEXT_ID 4                                       // used for SCRIPT_COMMAND_TALK
 static constexpr uint32 MAX_EMOTE_ID = 4;                   // used for SCRIPT_COMMAND_EMOTE
 
-enum SummonCreatureFlags
+// Flags used by SCRIPT_COMMAND_TALK
+enum eTalkFlags
 {
-    SUMMON_CREATURE_ACTIVE      = 0x1,
-    SUMMON_CREATURE_UNIQUE      = 0x2,                      // not actually unique, just checks for same entry in certain range
-    SUMMON_CREATURE_UNIQUE_TEMP = 0x4,                      // same as 0x2 but check for TempSummon only creatures
+    SF_TALK_TARGET_AS_SOURCE = 0x1,
+    SF_TALK_SOURCE_AS_TARGET = 0x2,
+    SF_TALK_BUDDY_AS_TARGET  = 0x4
 };
 
-enum MoveToFlags
+// Flags used by SCRIPT_COMMAND_TEMP_SUMMON_CREATURE
+enum eSummonCreatureFlags
 {
-    MOVE_FORCED  = 0x1                                      // No check if creature can move.
+    SF_SUMMON_CREATURE_ACTIVE      = 0x1,
+    SF_SUMMON_CREATURE_UNIQUE      = 0x2,                      // not actually unique, just checks for same entry in certain range
+    SF_SUMMON_CREATURE_UNIQUE_TEMP = 0x4                       // same as 0x2 but check for TempSummon only creatures
+};
+
+// Flags used by SCRIPT_COMMAND_MOVE_TO
+enum eMoveToFlags
+{
+    SF_MOVETO_FORCED  = 0x1                                      // No check if creature can move.
+};
+
+// Values used in buddy_type column
+enum eBuddyType
+{
+    BUDDY_TYPE_CREATURE_ENTRY           = 0,
+    BUDDY_TYPE_CREATURE_GUID            = 1,
+    BUDDY_TYPE_CREATURE_INSTANCE_DATA   = 2,
+    BUDDY_TYPE_GAMEOBJECT_ENTRY         = 3,
+    BUDDY_TYPE_GAMEOBJECT_GUID          = 4,
+    BUDDY_TYPE_GAMEOBJECT_INSTANCE_DATA = 5,
 };
 
 struct ScriptInfo
@@ -162,9 +182,9 @@ struct ScriptInfo
         struct                                              // SCRIPT_COMMAND_TALK (0)
         {
             uint32 chatType;                                // datalong
-            uint32 creatureEntry;                           // datalong2
-            uint32 searchRadius;                            // datalong3
-            uint32 gameobjectGuid;                          // datalong4
+            uint32 unused1;                                 // datalong2
+            uint32 unused2;                                 // datalong3
+            uint32 unused3;                                 // datalong4
             uint32 flags;                                   // data_flags
             int32  textId[MAX_TEXT_ID];                     // dataint to dataint4
         } talk;
@@ -419,6 +439,10 @@ struct ScriptInfo
         } raw;
     };
 
+    uint32 buddy_id;
+    uint32 buddy_radius;
+    uint8 buddy_type;
+
     float x;
     float y;
     float z;
@@ -429,7 +453,6 @@ struct ScriptInfo
     {
         switch(command)
         {
-            case SCRIPT_COMMAND_TALK: return talk.gameobjectGuid;
             case SCRIPT_COMMAND_RESPAWN_GAMEOBJECT: return respawnGo.goGuid;
             case SCRIPT_COMMAND_OPEN_DOOR: return openDoor.goGuid;
             case SCRIPT_COMMAND_CLOSE_DOOR: return closeDoor.goGuid;

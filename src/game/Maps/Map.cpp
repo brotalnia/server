@@ -2233,7 +2233,7 @@ void Map::ScriptsProcess()
         ScriptAction step = iter->second;
         m_scriptSchedule_lock.release();
 
-        Object* source = NULL;
+        Object* source = nullptr;
 
         if (step.sourceGuid)
         {
@@ -2268,9 +2268,9 @@ void Map::ScriptsProcess()
         }
 
         if (source && !source->IsInWorld())
-            source = NULL;
+            source = nullptr;
 
-        Object* target = NULL;
+        Object* target = nullptr;
 
         if (step.targetGuid)
         {
@@ -2298,67 +2298,150 @@ void Map::ScriptsProcess()
         }
 
         if (target && !target->IsInWorld())
-            target = NULL;
+            target = nullptr;
+
+        WorldObject* pBuddy = nullptr;
+
+        // If we have a buddy lets find it.
+        if (step.script->buddy_id)
+        {
+            switch (step.script->buddy_type)
+            {
+                case BUDDY_TYPE_CREATURE_ENTRY:
+                {
+                    if (source && source->isType(TYPEMASK_WORLDOBJECT))
+                    {
+                        WorldObject* pSource = (WorldObject*)source;
+                        Creature* pCreatureBuddy = nullptr;
+
+                        MaNGOS::NearestCreatureEntryWithLiveStateInObjectRangeCheck u_check(*pSource, step.script->buddy_id, true, step.script->buddy_radius);
+                        MaNGOS::CreatureLastSearcher<MaNGOS::NearestCreatureEntryWithLiveStateInObjectRangeCheck> searcher(pCreatureBuddy, u_check);
+
+                        Cell::VisitGridObjects(pSource, searcher, step.script->buddy_radius);
+
+                        if (pCreatureBuddy)
+                            pBuddy = pCreatureBuddy;
+                    }
+                    else
+                        sLog.outError("ScriptsProcess: Attempt to search for nearby creature in script with id %u but source is not a world object.", step.script->id);
+                    break;
+                }
+                case BUDDY_TYPE_CREATURE_GUID:
+                {
+                    const CreatureData* pCreatureData = sObjectMgr.GetCreatureData(step.script->buddy_id);
+                    if (pCreatureData)
+                    {
+                        Creature* pCreatureBuddy = this->GetCreature(ObjectGuid(HIGHGUID_UNIT, pCreatureData->id, step.script->buddy_id));
+
+                        if (pCreatureBuddy)
+                            pBuddy = pCreatureBuddy;
+                    }
+                    break;
+                }
+                case BUDDY_TYPE_CREATURE_INSTANCE_DATA:
+                {
+                    InstanceData* pInstanceData = this->GetInstanceData();
+                    if (pInstanceData)
+                    {
+                        Creature* pCreatureBuddy = pInstanceData->GetCreature(pInstanceData->GetData64(step.script->buddy_id));
+
+                        if (pCreatureBuddy)
+                            pBuddy = pCreatureBuddy;
+                    }
+                    break;
+                }
+                case BUDDY_TYPE_GAMEOBJECT_ENTRY:
+                {
+                    if (source && source->isType(TYPEMASK_WORLDOBJECT))
+                    {
+                        WorldObject* pSource = (WorldObject*)source;
+                        GameObject* pGameObjectBuddy = nullptr;
+
+                        MaNGOS::NearestGameObjectEntryInObjectRangeCheck u_check(*pSource, step.script->buddy_id, step.script->buddy_radius);
+                        MaNGOS::GameObjectLastSearcher<MaNGOS::NearestGameObjectEntryInObjectRangeCheck> searcher(pGameObjectBuddy, u_check);
+
+                        Cell::VisitGridObjects(pSource, searcher, step.script->buddy_radius);
+
+                        if (pGameObjectBuddy)
+                            pBuddy = pGameObjectBuddy;
+                    }
+                    else
+                        sLog.outError("ScriptsProcess: Attempt to search for nearby gameobject in script with id %u but source is not a world object.", step.script->id);
+                    break;
+                }
+                case BUDDY_TYPE_GAMEOBJECT_GUID:
+                {
+                    GameObjectData const* pGameObjectData = sObjectMgr.GetGOData(step.script->buddy_id);
+                    if (pGameObjectData)
+                    {
+                        GameObject* pGameObjectBuddy = this->GetGameObject(ObjectGuid(HIGHGUID_GAMEOBJECT, pGameObjectData->id, step.script->buddy_id));
+
+                        if (pGameObjectBuddy)
+                            pBuddy = pGameObjectBuddy;
+                    }
+                    break;
+                }
+                case BUDDY_TYPE_GAMEOBJECT_INSTANCE_DATA:
+                {
+                    InstanceData* pInstanceData = this->GetInstanceData();
+                    if (pInstanceData)
+                    {
+                        GameObject* pGameObjectBuddy = pInstanceData->GetGameObject(pInstanceData->GetData64(step.script->buddy_id));
+
+                        if (pGameObjectBuddy)
+                            pBuddy = pGameObjectBuddy;
+                    }
+                    break;
+                }
+            }
+        }
 
         switch (step.script->command)
         {
             case SCRIPT_COMMAND_TALK:
             {
-                if (!source)
+                WorldObject* pSource = nullptr;
+
+                if (!source || !source->isType(TYPEMASK_WORLDOBJECT))
                 {
-                    sLog.outError("SCRIPT_COMMAND_TALK (script id %u) call for NULL source.", step.script->id);
-                    break;
+                    if (pBuddy && !(step.script->talk.flags & SF_TALK_BUDDY_AS_TARGET))
+                        pSource = pBuddy;
+                    else
+                    {
+                        sLog.outError("SCRIPT_COMMAND_TALK (script id %u) call for NULL source.", step.script->id);
+                        break;
+                    }
                 }
-
-                if (!source->isType(TYPEMASK_WORLDOBJECT))
-                {
-                    sLog.outError("SCRIPT_COMMAND_TALK (script id %u) call for unsupported non-worldobject (TypeId: %u), skipping.", step.script->id, source->GetTypeId());
-                    break;
-                }
-
-                WorldObject* pSource = (WorldObject*)source;
-                Creature* pBuddy = NULL;
-
-                // flag_target_player_as_source     0x01
-                // flag_original_source_as_target   0x02
-                // flag_buddy_as_target             0x04
+                else
+                    pSource = (WorldObject*)source;
 
                 // If target is player (and not already the source) but should be the source
-                if (target && target->GetTypeId() == TYPEID_PLAYER && step.script->talk.flags & 0x01)
+                if (target && target->GetTypeId() == TYPEID_PLAYER && step.script->talk.flags & SF_TALK_TARGET_AS_SOURCE)
                 {
                     if (source->GetTypeId() != TYPEID_PLAYER)
                         pSource = (WorldObject*)target;
-                }
-
-                // If step has a buddy entry defined, search for it.
-                if (step.script->talk.creatureEntry)
-                {
-                    MaNGOS::NearestCreatureEntryWithLiveStateInObjectRangeCheck u_check(*pSource, step.script->talk.creatureEntry, true, step.script->talk.searchRadius);
-                    MaNGOS::CreatureLastSearcher<MaNGOS::NearestCreatureEntryWithLiveStateInObjectRangeCheck> searcher(pBuddy, u_check);
-
-                    Cell::VisitGridObjects(pSource, searcher, step.script->talk.searchRadius);
                 }
 
                 // If buddy found, then use it
                 if (pBuddy)
                 {
                     // pBuddy can be target of talk
-                    if (step.script->talk.flags & 0x04)
+                    if (step.script->talk.flags & SF_TALK_BUDDY_AS_TARGET)
                         target = (Object*)pBuddy;
                     else
                     {
                         // If not target of talk, then set pBuddy as source
                         // Useless when source is already flagged to be player, and should maybe produce error.
-                        if (!(step.script->talk.flags & 0x01))
+                        if (!(step.script->talk.flags & SF_TALK_TARGET_AS_SOURCE))
                             pSource = (WorldObject*)pBuddy;
                     }
                 }
                 
                 // If we should talk to the original source instead of target
-                if (step.script->talk.flags & 0x02)
+                if (step.script->talk.flags & SF_TALK_SOURCE_AS_TARGET)
                     target = source;
 
-                Unit* unitTarget = target && target->isType(TYPEMASK_UNIT) ? static_cast<Unit*>(target) : NULL;
+                Unit* unitTarget = target && target->isType(TYPEMASK_UNIT) ? static_cast<Unit*>(target) : nullptr;
                 int32 textId = step.script->talk.textId[0];
 
                 // May have text for random
@@ -2373,19 +2456,6 @@ void Map::ScriptsProcess()
 
                     // Use one random
                     textId = step.script->talk.textId[rand() % i];
-                }
-
-                if (step.script->talk.gameobjectGuid)
-                {
-                    uint32 guidlow = step.script->talk.gameobjectGuid;
-                    GameObjectData const* goData = sObjectMgr.GetGOData(guidlow);
-                    if (!goData)
-                        break;                                  // checked at load
-
-                    GameObject *go = pSource->GetMap()->GetGameObject(ObjectGuid(HIGHGUID_GAMEOBJECT, goData->id, guidlow));
-
-                    if (go)
-                        pSource = go;
                 }
 
                 DoScriptText(textId, pSource, unitTarget, step.script->talk.chatType);
@@ -2523,7 +2593,7 @@ void Map::ScriptsProcess()
                 }
 
                 // Only move if we can move.
-                if (unit->hasUnitState(UNIT_STAT_NOT_MOVE) && !(step.script->moveTo.flags & MOVE_FORCED))
+                if (unit->hasUnitState(UNIT_STAT_NOT_MOVE) && !(step.script->moveTo.flags & SF_MOVETO_FORCED))
                     break;
 
                 if (step.script->moveTo.travelTime != 0)
@@ -2751,7 +2821,7 @@ void Map::ScriptsProcess()
                 float z = step.script->z;
                 float o = step.script->o;
 
-                if (step.script->summonCreature.flags & SUMMON_CREATURE_UNIQUE || step.script->summonCreature.flags & SUMMON_CREATURE_UNIQUE_TEMP)
+                if (step.script->summonCreature.flags & SF_SUMMON_CREATURE_UNIQUE || step.script->summonCreature.flags & SF_SUMMON_CREATURE_UNIQUE_TEMP)
                 {
                     float dist = step.script->summonCreature.uniqueDistance ? step.script->summonCreature.uniqueDistance : (summoner->GetDistance(x, y, z) + 50.0f) * 2;
                     std::list<Creature*> foundCreatures;
@@ -2763,7 +2833,7 @@ void Map::ScriptsProcess()
                         uint32 exAmount = 0;
                         uint32 reqAmount = step.script->summonCreature.uniqueLimit ? step.script->summonCreature.uniqueLimit : 1;
 
-                        if (step.script->summonCreature.flags & SUMMON_CREATURE_UNIQUE)
+                        if (step.script->summonCreature.flags & SF_SUMMON_CREATURE_UNIQUE)
                             exAmount = foundCreatures.size();
                         else
                             exAmount = count_if(foundCreatures.begin(), foundCreatures.end(), [&](Creature* c) { return c->IsTemporarySummon(); });
@@ -2787,7 +2857,7 @@ void Map::ScriptsProcess()
                 }
 
                 Creature* pCreature = summoner->SummonCreature(step.script->summonCreature.creatureEntry, x, y, z, orientation,
-                    TEMPSUMMON_TIMED_OR_DEAD_DESPAWN, step.script->summonCreature.despawnDelay, step.script->summonCreature.flags & SUMMON_CREATURE_ACTIVE);
+                    TEMPSUMMON_TIMED_OR_DEAD_DESPAWN, step.script->summonCreature.despawnDelay, step.script->summonCreature.flags & SF_SUMMON_CREATURE_ACTIVE);
 
                 if (!pCreature)
                 {
