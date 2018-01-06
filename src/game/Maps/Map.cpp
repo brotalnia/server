@@ -2401,7 +2401,7 @@ void Map::ScriptsProcess()
                 // ToDo: add code to skip command here
             }
         }
-        printf("entering swtich \n");
+        
         // ToDo: dont forget to replace all breaks with returns when switch case is removed
         switch (step.script->command)
         {
@@ -2434,13 +2434,13 @@ void Map::ScriptsProcess()
                 {
                     // pBuddy can be target of talk
                     if (step.script->talk.flags & SF_TALK_BUDDY_AS_TARGET)
-                        target = (Object*)pBuddy;
+                        target = pBuddy;
                     else
                     {
                         // If not target of talk, then set pBuddy as source
                         // Useless when source is already flagged to be player, and should maybe produce error.
                         if (!(step.script->talk.flags & SF_TALK_TARGET_AS_SOURCE))
-                            pSource = (WorldObject*)pBuddy;
+                            pSource = pBuddy;
                     }
                 }
                 
@@ -2529,8 +2529,16 @@ void Map::ScriptsProcess()
                         break;
                     }
                 }
-                else if (pBuddy)
-                    pSource = pBuddy;
+                else if (step.script->buddy_id)
+                {
+                    if (pBuddy)
+                        pSource = pBuddy;
+                    else
+                    {
+                        sLog.outError("SCRIPT_COMMAND_FIELD_SET (script id %u) call for a NULL buddy, skipping.", step.script->id);
+                        break;
+                    }
+                }
                 else if (!source)
                 {
                     sLog.outError("SCRIPT_COMMAND_FIELD_SET (script id %u) call for a NULL object, skipping.", step.script->id);
@@ -2641,8 +2649,16 @@ void Map::ScriptsProcess()
                         break;
                     }
                 }
-                else if (pBuddy)
-                    pSource = pBuddy;
+                else if (step.script->buddy_id)
+                {
+                    if (pBuddy)
+                        pSource = pBuddy;
+                    else
+                    {
+                        sLog.outError("SCRIPT_COMMAND_FLAG_SET (script id %u) call for a NULL buddy, skipping.", step.script->id);
+                        break;
+                    }
+                }
                 else if (!source)
                 {
                     sLog.outError("SCRIPT_COMMAND_FLAG_SET (script id %u) call for a NULL object, skipping.", step.script->id);
@@ -2675,8 +2691,16 @@ void Map::ScriptsProcess()
                         break;
                     }
                 }
-                else if (pBuddy)
-                    pSource = pBuddy;
+                else if (step.script->buddy_id)
+                {
+                    if (pBuddy)
+                        pSource = pBuddy;
+                    else
+                    {
+                        sLog.outError("SCRIPT_COMMAND_FLAG_REMOVE (script id %u) call for a NULL buddy, skipping.", step.script->id);
+                        break;
+                    }
+                }
                 else if (!source)
                 {
                     sLog.outError("SCRIPT_COMMAND_FLAG_REMOVE (script id %u) call for a NULL object, skipping.", step.script->id);
@@ -2697,23 +2721,46 @@ void Map::ScriptsProcess()
             }
             case SCRIPT_COMMAND_TELEPORT_TO:
             {
-                // accept player in any one from target/source arg
-                if (!target && !source)
+                Unit* pSource = nullptr;
+
+                if (step.script->teleportTo.flags & SF_TELEPORT_TO_TELE_CREATURE)
+                {
+                    if (step.script->buddy_id)
+                    {
+                        if (pBuddy && pBuddy->GetTypeId() == TYPEID_UNIT)
+                            pSource = (Unit*)pBuddy;
+                        else
+                        {
+                            sLog.outError("SCRIPT_COMMAND_MOVE_TO (script id %u) call for a NULL or non-creature buddy, skipping.", step.script->id);
+                            break;
+                        }
+                    }
+                    else if (target && target->GetTypeId() == TYPEID_UNIT)
+                        pSource = (Unit*)target;
+                    else if (source && source->GetTypeId() == TYPEID_UNIT)
+                        pSource = (Unit*)source;
+                    else
+                    {
+                        sLog.outError("SCRIPT_COMMAND_MOVE_TO (script id %u) call with SF_TELEPORT_TO_TELE_CREATURE without any creature targets, skipping.", step.script->id);
+                        break;
+                    }
+                }
+                else if (target && target->GetTypeId() == TYPEID_PLAYER)
+                    pSource = (Player*)target;
+                else if (source && source->GetTypeId() == TYPEID_PLAYER)
+                    pSource = (Player*)source;
+                
+                if (!pSource)
                 {
                     sLog.outError("SCRIPT_COMMAND_TELEPORT_TO (script id %u) call for NULL object.", step.script->id);
                     break;
                 }
 
-                // must be only Player
-                if ((!target || target->GetTypeId() != TYPEID_PLAYER) && (!source || source->GetTypeId() != TYPEID_PLAYER))
-                {
-                    sLog.outError("SCRIPT_COMMAND_TELEPORT_TO (script id %u) call for non-player (TypeIdSource: %u)(TypeIdTarget: %u), skipping.", step.script->id, source ? source->GetTypeId() : 0, target ? target->GetTypeId() : 0);
-                    break;
-                }
+                if (pSource->GetTypeId() == TYPEID_PLAYER)
+                    ((Player*)pSource)->TeleportTo(step.script->teleportTo.mapId, step.script->x, step.script->y, step.script->z, step.script->o);
+                else
+                    pSource->NearTeleportTo(step.script->x, step.script->y, step.script->z, step.script->o);
 
-                Player* pSource = target && target->GetTypeId() == TYPEID_PLAYER ? (Player*)target : (Player*)source;
-
-                pSource->TeleportTo(step.script->teleportTo.mapId, step.script->x, step.script->y, step.script->z, step.script->o);
                 break;
             }
             case SCRIPT_COMMAND_QUEST_EXPLORED:

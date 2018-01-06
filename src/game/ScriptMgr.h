@@ -42,6 +42,12 @@ class SpellCastTargets;
 class Unit;
 class WorldObject;
 
+// Targeting has been reworked, commands can be executed without source provided as long as there is a valid target
+// or buddy that can serve as the source of the action. Look at flags for every command to see when it is the case.
+// For the purpose of the comments in this enum, source is the object that executes the action, target means the
+// object which will be used as the target of the action. For example with TALK command target name will be in $n.
+// Not all commands require a target, for example FIELD SET is executed on single object, so it does not need target.
+
 enum eScriptCommand
 {
     SCRIPT_COMMAND_TALK                     = 0,            // source = WorldObject, target = Unit/None
@@ -56,19 +62,24 @@ enum eScriptCommand
                                                             // datalong2 = value
                                                             // data_flags = eFieldSetFlags
     SCRIPT_COMMAND_MOVE_TO                  = 3,            // source = Creature
+                                                            // target = WorldObject (for datalong > 0)
                                                             // datalong = coordinates_type (see enum eMoveToCoordinateTypes)
-                                                            // datalong2 = time, x/y/z
+                                                            // datalong2 = time
                                                             // datalong3 = movement_options (see enum MoveOptions)
                                                             // data_flags = eMoveToFlags
-    SCRIPT_COMMAND_FLAG_SET                 = 4,            // source = any
+                                                            // x/y/z = coordinates
+    SCRIPT_COMMAND_FLAG_SET                 = 4,            // source = Any
                                                             // datalong = field_id
                                                             // datalong2 = bitmask
                                                             // data_flags = eFlagSetFlags
-    SCRIPT_COMMAND_FLAG_REMOVE              = 5,            // source = any
+    SCRIPT_COMMAND_FLAG_REMOVE              = 5,            // source = Any
                                                             // datalong = field_id
                                                             // datalong2 = bitmask
                                                             // data_flags = eFlagRemoveFlags
-    SCRIPT_COMMAND_TELEPORT_TO              = 6,            // source or target with Player, datalong = map_id, x/y/z
+    SCRIPT_COMMAND_TELEPORT_TO              = 6,            // source = Unit
+                                                            // datalong = map_id (only used for players but still required)
+                                                            // datalong2 = eTeleportToFlags
+                                                            // x/y/z = coordinates
     SCRIPT_COMMAND_QUEST_EXPLORED           = 7,            // one from source or target must be Player, another GO/Creature, datalong=quest_id, datalong2=distance or 0
     SCRIPT_COMMAND_KILL_CREDIT              = 8,            // source or target with Player, datalong = creature entry, datalong2 = bool (0=personal credit, 1=group credit)
     SCRIPT_COMMAND_RESPAWN_GAMEOBJECT       = 9,            // source = any (summoner), datalong=db_guid, datalong2=despawn_delay
@@ -169,17 +180,22 @@ enum eFieldSetFlags
 // Flags used by SCRIPT_COMMAND_MOVE_TO
 enum eMoveToFlags
 {
-    SF_MOVE_TO_FORCED = 0x1,                                     // No check if creature can move.
-    SF_MOVE_TO_SWAP_INITIAL_TARGETS = 0x2,
-    SF_MOVE_TO_SWAP_FINAL_TARGETS = 0x4
+    SF_MOVE_TO_FORCED = 0x1,                                // No check if creature can move.
+    SF_MOVE_TO_SWAP_INITIAL_TARGETS = 0x2,                  // Swaps the provided source and target, before buddy is checked.
+    SF_MOVE_TO_SWAP_FINAL_TARGETS = 0x4                     // Swaps the local source and target, after buddy is assigned.
+};
+
+enum eTeleportToFlags
+{
+    SF_TELEPORT_TO_TELE_CREATURE = 0x1                      // Teleports the creature instead of player. Same map only.
 };
 
 // Possible datalong3 values for SCRIPT_COMMAND_MOVE_TO
 enum eMoveToCoordinateTypes
 {
     MOVETO_COORDINATES_NORMAL               = 0,
-    MOVETO_COORDINATES_RELATIVE_TO_TARGET   = 1,
-    MOVETO_COORDINATES_DISTANCE_FROM_TARGET = 2,
+    MOVETO_COORDINATES_RELATIVE_TO_TARGET   = 1,            // Coordinates are added to that of target.
+    MOVETO_COORDINATES_DISTANCE_FROM_TARGET = 2,            // X is distance from target, others not used.
 
     MOVETO_COORDINATES_MAX
 };
@@ -284,6 +300,7 @@ struct ScriptInfo
         struct                                              // SCRIPT_COMMAND_TELEPORT_TO (6)
         {
             uint32 mapId;                                   // datalong
+            uint32 flags;                                   // datalong2
         } teleportTo;
 
         struct                                              // SCRIPT_COMMAND_QUEST_EXPLORED (7)

@@ -228,6 +228,13 @@ void ScriptMgr::LoadScripts(ScriptMapMap& scripts, const char* tablename)
                     sLog.outErrorDb("Table `%s` has invalid movement options (datalong3 = %u) in SCRIPT_COMMAND_MOVE_TO for script id %u", tablename, tmp.moveTo.movementOptions, tmp.id);
                     continue;
                 }
+
+                if (!tmp.buddy_id && (tmp.moveTo.flags & (SF_MOVE_TO_SWAP_INITIAL_TARGETS | SF_MOVE_TO_SWAP_FINAL_TARGETS)))
+                {
+                    sLog.outErrorDb("Table `%s` has nonsensical flag combination (data_flags = %u) without a buddy in SCRIPT_COMMAND_MOVE_TO for script id %u", tablename, tmp.moveTo.flags, tmp.id);
+                    continue;
+                }
+
                 break;
             }
             case SCRIPT_COMMAND_TELEPORT_TO:
