@@ -169,7 +169,9 @@ enum eFieldSetFlags
 // Flags used by SCRIPT_COMMAND_MOVE_TO
 enum eMoveToFlags
 {
-    SF_MOVE_TO_FORCED = 0x1                                      // No check if creature can move.
+    SF_MOVE_TO_FORCED = 0x1,                                     // No check if creature can move.
+    SF_MOVE_TO_SWAP_INITIAL_TARGETS = 0x2,
+    SF_MOVE_TO_SWAP_FINAL_TARGETS = 0x4
 };
 
 // Possible datalong3 values for SCRIPT_COMMAND_MOVE_TO

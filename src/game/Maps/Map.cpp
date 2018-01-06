@@ -2401,6 +2401,7 @@ void Map::ScriptsProcess()
                 // ToDo: add code to skip command here
             }
         }
+        printf("entering swtich \n");
         // ToDo: dont forget to replace all breaks with returns when switch case is removed
         switch (step.script->command)
         {
@@ -2550,35 +2551,42 @@ void Map::ScriptsProcess()
             }
             case SCRIPT_COMMAND_MOVE_TO:
             {
-                Unit* pSource = nullptr;
-
-                if (pBuddy)
+                WorldObject* pSource = dynamic_cast<WorldObject*>((step.script->moveTo.flags & SF_MOVE_TO_SWAP_INITIAL_TARGETS) ? target : source);
+                WorldObject* pTarget = dynamic_cast<WorldObject*>((step.script->moveTo.flags & SF_MOVE_TO_SWAP_INITIAL_TARGETS) ? source : target);;
+                
+                // Buddy is always saved to pSource initially.
+                if (step.script->buddy_id)
                 {
-                    if (pBuddy->GetTypeId() == TYPEID_UNIT)
-                        pSource = (Unit*)pBuddy;
+                    if (pBuddy)
+                        pSource = pBuddy;
                     else
                     {
-                        sLog.outError("SCRIPT_COMMAND_MOVE_TO (script id %u) call for a non-creature buddy (TypeId: %u), skipping.", step.script->id, pBuddy->GetTypeId());
+                        sLog.outError("SCRIPT_COMMAND_MOVE_TO (script id %u) call for a NULL buddy, skipping.", step.script->id);
                         break;
                     }
                 }
-                else if (!source || source->GetTypeId() != TYPEID_UNIT)
+                
+                if (step.script->moveTo.flags & SF_MOVE_TO_SWAP_FINAL_TARGETS)
+                    std::swap(pSource, pTarget);
+                
+                Unit* pUnitSource = nullptr;
+
+                if (pSource && pSource->GetTypeId() == TYPEID_UNIT)
+                    pUnitSource = (Unit*)pSource;
+                else
                 {
                     sLog.outError("SCRIPT_COMMAND_MOVE_TO (script id %u) call for a NULL or non-creature source, skipping.", step.script->id);
                     break;
                 }
-                else
-                    pSource = (Unit*)source;
-
+                
                 float x = step.script->x;
                 float y = step.script->y;
                 float z = step.script->z;
 
                 if (step.script->moveTo.coordinatesType)
                 {
-                    if (target && target->isType(TYPEMASK_WORLDOBJECT))
+                    if (pTarget && pTarget->isType(TYPEMASK_WORLDOBJECT))
                     {
-                        WorldObject* pTarget = (WorldObject*)target;
                         switch (step.script->moveTo.coordinatesType)
                         {
                             case MOVETO_COORDINATES_RELATIVE_TO_TARGET:
@@ -2593,29 +2601,29 @@ void Map::ScriptsProcess()
                             {
                                 // X is distance from the target.
                                 float distance = x;
-                                pTarget->GetNearPoint(pSource, x, y, z, 0, distance, frand(0, 2 * M_PI_F));
+                                pTarget->GetNearPoint(pUnitSource, x, y, z, 0, distance, frand(0, 2 * M_PI_F));
                                 break;
                             }
                         }
                     }
                     else
                     {
-                        sLog.outError("SCRIPT_COMMAND_MOVE_TO (script id %u) call with datalong = %u for a NULL or non-unit target, skipping.", step.script->id, step.script->moveTo.coordinatesType);
+                        sLog.outError("SCRIPT_COMMAND_MOVE_TO (script id %u) call with datalong = %u for a NULL or non-worldobject target, skipping.", step.script->id, step.script->moveTo.coordinatesType);
                         break;
                     }
                 }
 
                 // Only move if we can move.
-                if (pSource->hasUnitState(UNIT_STAT_NOT_MOVE) && !(step.script->moveTo.flags & SF_MOVE_TO_FORCED))
+                if (pUnitSource->hasUnitState(UNIT_STAT_NOT_MOVE) && !(step.script->moveTo.flags & SF_MOVE_TO_FORCED))
                     break;
 
                 if (step.script->moveTo.travelTime != 0)
                 {
-                    float speed = pSource->GetDistance(x, y, z) / ((float)step.script->moveTo.travelTime * 0.001f);
-                    pSource->MonsterMoveWithSpeed(x, y, z, speed);
+                    float speed = pUnitSource->GetDistance(x, y, z) / ((float)step.script->moveTo.travelTime * 0.001f);
+                    pUnitSource->MonsterMoveWithSpeed(x, y, z, speed);
                 }
                 else
-                    pSource->GetMotionMaster()->MovePoint(0, x, y, z, step.script->moveTo.movementOptions, 0.0f, step.script->o ? step.script->o : -10.0f);
+                    pUnitSource->GetMotionMaster()->MovePoint(0, x, y, z, step.script->moveTo.movementOptions, 0.0f, step.script->o ? step.script->o : -10.0f);
                 
                 break;
             }
