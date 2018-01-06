@@ -2752,7 +2752,7 @@ void Map::ScriptsProcess()
                 
                 if (!pSource)
                 {
-                    sLog.outError("SCRIPT_COMMAND_TELEPORT_TO (script id %u) call for NULL object.", step.script->id);
+                    sLog.outError("SCRIPT_COMMAND_TELEPORT_TO (script id %u) call for a NULL object.", step.script->id);
                     break;
                 }
 
@@ -2767,13 +2767,13 @@ void Map::ScriptsProcess()
             {
                 if (!source)
                 {
-                    sLog.outError("SCRIPT_COMMAND_QUEST_EXPLORED (script id %u) call for NULL source.", step.script->id);
+                    sLog.outError("SCRIPT_COMMAND_QUEST_EXPLORED (script id %u) call for a NULL source.", step.script->id);
                     break;
                 }
 
                 if (!target)
                 {
-                    sLog.outError("SCRIPT_COMMAND_QUEST_EXPLORED (script id %u) call for NULL target.", step.script->id);
+                    sLog.outError("SCRIPT_COMMAND_QUEST_EXPLORED (script id %u) call for a NULL target.", step.script->id);
                     break;
                 }
 
@@ -2785,7 +2785,7 @@ void Map::ScriptsProcess()
                 {
                     if (source->GetTypeId() != TYPEID_UNIT && source->GetTypeId() != TYPEID_GAMEOBJECT && source->GetTypeId() != TYPEID_PLAYER)
                     {
-                        sLog.outError("SCRIPT_COMMAND_QUEST_EXPLORED (script id %u) call for non-creature, non-gameobject or non-player (TypeId: %u), skipping.", step.script->id, source->GetTypeId());
+                        sLog.outError("SCRIPT_COMMAND_QUEST_EXPLORED (script id %u) call for a non-creature, non-gameobject or non-player (TypeId: %u), skipping.", step.script->id, source->GetTypeId());
                         break;
                     }
 
@@ -2796,13 +2796,13 @@ void Map::ScriptsProcess()
                 {
                     if (target->GetTypeId() != TYPEID_UNIT && target->GetTypeId() != TYPEID_GAMEOBJECT && target->GetTypeId() != TYPEID_PLAYER)
                     {
-                        sLog.outError("SCRIPT_COMMAND_QUEST_EXPLORED (script id %u) call for non-creature, non-gameobject or non-player (TypeId: %u), skipping.", step.script->id, target->GetTypeId());
+                        sLog.outError("SCRIPT_COMMAND_QUEST_EXPLORED (script id %u) call for a non-creature, non-gameobject or non-player (TypeId: %u), skipping.", step.script->id, target->GetTypeId());
                         break;
                     }
 
                     if (source->GetTypeId() != TYPEID_PLAYER)
                     {
-                        sLog.outError("SCRIPT_COMMAND_QUEST_EXPLORED (script id %u) call for non-player (TypeId: %u), skipping.", step.script->id, source->GetTypeId());
+                        sLog.outError("SCRIPT_COMMAND_QUEST_EXPLORED (script id %u) call for a non-player (TypeId: %u), skipping.", step.script->id, source->GetTypeId());
                         break;
                     }
 
@@ -2824,14 +2824,14 @@ void Map::ScriptsProcess()
                 // accept player in any one from target/source arg
                 if (!target && !source)
                 {
-                    sLog.outError("SCRIPT_COMMAND_KILL_CREDIT (script id %u) call for NULL object.", step.script->id);
+                    sLog.outError("SCRIPT_COMMAND_KILL_CREDIT (script id %u) call for a NULL object.", step.script->id);
                     break;
                 }
 
                 // must be only Player
                 if ((!target || target->GetTypeId() != TYPEID_PLAYER) && (!source || source->GetTypeId() != TYPEID_PLAYER))
                 {
-                    sLog.outError("SCRIPT_COMMAND_KILL_CREDIT (script id %u) call for non-player (TypeIdSource: %u)(TypeIdTarget: %u), skipping.", step.script->id, source ? source->GetTypeId() : 0, target ? target->GetTypeId() : 0);
+                    sLog.outError("SCRIPT_COMMAND_KILL_CREDIT (script id %u) call for a non-player (TypeIdSource: %u)(TypeIdTarget: %u), skipping.", step.script->id, source ? source->GetTypeId() : 0, target ? target->GetTypeId() : 0);
                     break;
                 }
 
@@ -2863,7 +2863,7 @@ void Map::ScriptsProcess()
                         pGo = (GameObject*)pBuddy;
                     else
                     {
-                        sLog.outError("SCRIPT_COMMAND_RESPAWN_GAMEOBJECT (script id %u) call for NULL or non-gameobject buddy.", step.script->id);
+                        sLog.outError("SCRIPT_COMMAND_RESPAWN_GAMEOBJECT (script id %u) call for a NULL or non-gameobject buddy.", step.script->id);
                         break;
                     }
                 }
@@ -2902,7 +2902,7 @@ void Map::ScriptsProcess()
             {
                 if (!step.script->summonCreature.creatureEntry)
                 {
-                    sLog.outError("SCRIPT_COMMAND_TEMP_SUMMON_CREATURE (script id %u) call for NULL creature.", step.script->id);
+                    sLog.outError("SCRIPT_COMMAND_TEMP_SUMMON_CREATURE (script id %u) call for a NULL creature.", step.script->id);
                     break;
                 }
 
@@ -2914,7 +2914,7 @@ void Map::ScriptsProcess()
                         pSummoner = (WorldObject*)pBuddy;
                     else
                     {
-                        sLog.outError("SCRIPT_COMMAND_TEMP_SUMMON_CREATURE (script id %u) call for NULL or non-worldobject buddy.", step.script->id);
+                        sLog.outError("SCRIPT_COMMAND_TEMP_SUMMON_CREATURE (script id %u) call for a NULL or non-worldobject buddy.", step.script->id);
                         break;
                     }
                 }
@@ -2999,7 +2999,7 @@ void Map::ScriptsProcess()
                         pDoor = (GameObject*)pBuddy;
                     else
                     {
-                        sLog.outError("SCRIPT_COMMAND_OPEN_DOOR (script id %u) call for NULL or non-gameobject buddy.", step.script->id);
+                        sLog.outError("SCRIPT_COMMAND_OPEN_DOOR (script id %u) call for a NULL or non-gameobject buddy.", step.script->id);
                         break;
                     }
                 }
@@ -3051,7 +3051,7 @@ void Map::ScriptsProcess()
                         pDoor = (GameObject*)pBuddy;
                     else
                     {
-                        sLog.outError("SCRIPT_COMMAND_CLOSE_DOOR (script id %u) call for NULL or non-gameobject buddy.", step.script->id);
+                        sLog.outError("SCRIPT_COMMAND_CLOSE_DOOR (script id %u) call for a NULL or non-gameobject buddy.", step.script->id);
                         break;
                     }
                 }
@@ -3085,35 +3085,57 @@ void Map::ScriptsProcess()
             }
             case SCRIPT_COMMAND_ACTIVATE_OBJECT:
             {
-                if (!source)
+                Unit* pUser = nullptr;
+                GameObject *pGo = nullptr;
+
+                if (step.script->buddy_id)
                 {
-                    sLog.outError("SCRIPT_COMMAND_ACTIVATE_OBJECT must have source caster.");
-                    break;
+                    if (pBuddy)
+                    {
+                        if (pBuddy->IsCreature() || pBuddy->IsPlayer())
+                            pUser = (Unit*)pBuddy;
+                        else if (pBuddy->GetTypeId() == TYPEID_GAMEOBJECT)
+                            pGo = (GameObject*)pBuddy;
+                        else
+                        {
+                            sLog.outError("SCRIPT_COMMAND_ACTIVATE_OBJECT (script id %u) call for a non-unit, non-gameobject buddy (TypeId: %u), skipping.", pBuddy->GetTypeId());
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        sLog.outError("SCRIPT_COMMAND_ACTIVATE_OBJECT (script id %u) call for a NULL buddy.", step.script->id);
+                        break;
+                    }
                 }
 
-                if (!source->isType(TYPEMASK_UNIT))
+                if (!pUser)
                 {
-                    sLog.outError("SCRIPT_COMMAND_ACTIVATE_OBJECT source caster isn't unit (TypeId: %u), skipping.", source->GetTypeId());
-                    break;
+                    if (source && source->isType(TYPEMASK_UNIT))
+                        pUser = (Unit*)source;
+                    else if (target && target->isType(TYPEMASK_UNIT))
+                        pUser = (Unit*)target;
+                    else
+                    {
+                        sLog.outError("SCRIPT_COMMAND_ACTIVATE_OBJECT (script id %u) call for a NULL user.", step.script->id);
+                        break;
+                    }
                 }
 
-                if (!target)
+                if (!pGo)
                 {
-                    sLog.outError("SCRIPT_COMMAND_ACTIVATE_OBJECT call for NULL gameobject.");
-                    break;
+                    if (target && target->isType(TYPEMASK_UNIT))
+                        pGo = (GameObject*)target;
+                    else if (source && source->isType(TYPEMASK_UNIT))
+                        pGo = (GameObject*)source;
+                    else
+                    {
+                        sLog.outError("SCRIPT_COMMAND_ACTIVATE_OBJECT (script id %u) call for a NULL gameobject.", step.script->id);
+                        break;
+                    }
                 }
 
-                if (target->GetTypeId() != TYPEID_GAMEOBJECT)
-                {
-                    sLog.outError("SCRIPT_COMMAND_ACTIVATE_OBJECT call for non-gameobject (TypeId: %u), skipping.", target->GetTypeId());
-                    break;
-                }
-
-                Unit* caster = (Unit*)source;
-
-                GameObject *go = (GameObject*)target;
-
-                go->Use(caster);
+                pGo->Use(pUser);
                 break;
             }
             case SCRIPT_COMMAND_REMOVE_AURA:

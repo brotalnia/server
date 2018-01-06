@@ -49,15 +49,16 @@ class WorldObject;
 // Not all commands require a target, for example FIELD SET is executed on single object, so it does not need target.
 
 // Legend:
-// source - object which executes the command
-// target - object used as target of the command if needed
+// source - the type of object which executes the command
+// target - the type of object used as target of the command if needed
 // provided source - the original "Object* source" provided to the command
 // provided target - the original "Object* target" provided to the command
 // buddy - the original "WorldObject* pBuddy" provided to the command
 
 enum eScriptCommand
 {
-    SCRIPT_COMMAND_TALK                     = 0,            // source = WorldObject, target = Unit/None
+    SCRIPT_COMMAND_TALK                     = 0,            // source = WorldObject
+                                                            // target = Unit/None
                                                             // datalong = chat_type (see enum ChatType)
                                                             // data_flags = eTalkFlags
                                                             // dataint = broadcast_text id. dataint2-4 optional for random selected text.
@@ -105,14 +106,15 @@ enum eScriptCommand
                                                             // dataint = (bool) setRun; 0 = off (default), 1 = on
                                                             // dataint2 = eSummonCreatureFacingOptions
     SCRIPT_COMMAND_OPEN_DOOR                = 11,           // source = GameObject (from datalong, buddy, provided source or target)
-                                                            // If provided target is BUTTON GameObject command is run on it too.
+                                                            // If provided target is BUTTON GameObject, command is run on it too.
                                                             // datalong=db_guid
                                                             // datalong2=reset_delay
     SCRIPT_COMMAND_CLOSE_DOOR               = 12,           // source = GameObject (from datalong, buddy, provided source or target)
-                                                            // If provided target is BUTTON GameObject command is run on it too.
+                                                            // If provided target is BUTTON GameObject, command is run on it too.
                                                             // datalong=db_guid
                                                             // datalong2=reset_delay
-    SCRIPT_COMMAND_ACTIVATE_OBJECT          = 13,           // source = unit, target=GO
+    SCRIPT_COMMAND_ACTIVATE_OBJECT          = 13,           // source = GameObject
+                                                            // target = Unit
     SCRIPT_COMMAND_REMOVE_AURA              = 14,           // source (datalong2!=0) or target (datalong==0) unit, datalong = spell_id
     SCRIPT_COMMAND_CAST_SPELL               = 15,           // source/target cast spell at target/source
                                                             // datalong2: 0: s->t 1: s->s 2: t->t 3: t->s (this values in 2 bits), and 0x4 mask for cast triggered can be added to
