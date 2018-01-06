@@ -2846,58 +2846,56 @@ void Map::ScriptsProcess()
             }
             case SCRIPT_COMMAND_RESPAWN_GAMEOBJECT:
             {
-                if (!step.script->respawnGo.goGuid)         // checked at load
-                    break;
-
-                if (!source)
-                {
-                    sLog.outError("SCRIPT_COMMAND_RESPAWN_GAMEOBJECT (script id %u) call for NULL world object.", step.script->id);
-                    break;
-                }
-
-                if (!source->isType(TYPEMASK_WORLDOBJECT))
-                {
-                    sLog.outError("SCRIPT_COMMAND_RESPAWN_GAMEOBJECT (script id %u) call for non-WorldObject (TypeId: %u), skipping.", step.script->id, source->GetTypeId());
-                    break;
-                }
-
-                WorldObject* summoner = (WorldObject*)source;
-                if (!summoner->IsInWorld())
-                {
-                    sLog.outError("SCRIPT_COMMAND_RESPAWN_GAMEOBJECT (script id %u) call for non-in-world WorldObject (TypeId: %u), skipping.", step.script->id, source->GetTypeId());
-                    break;
-                }
-
-                int32 time_to_despawn = step.script->respawnGo.despawnDelay < 5 ? 5 : step.script->respawnGo.despawnDelay;
-
+                GameObject *pGo = nullptr;
                 uint32 guidlow = step.script->respawnGo.goGuid;
-                GameObjectData const* goData = sObjectMgr.GetGOData(guidlow);
-                if (!goData)
-                    break;                                  // checked at load
+                
+                if (guidlow)
+                {
+                    GameObjectData const* goData = sObjectMgr.GetGOData(guidlow);
+                    if (!goData)
+                        break;                                  // checked at load
 
-                GameObject *go = summoner->GetMap()->GetGameObject(ObjectGuid(HIGHGUID_GAMEOBJECT, goData->id, guidlow));
-                if (!go)
+                    pGo = this->GetGameObject(ObjectGuid(HIGHGUID_GAMEOBJECT, goData->id, guidlow));
+                }
+                else if (step.script->buddy_id)
+                {
+                    if (pBuddy && pBuddy->GetTypeId() == TYPEID_GAMEOBJECT)
+                        pGo = (GameObject*)pBuddy;
+                    else
+                    {
+                        sLog.outError("SCRIPT_COMMAND_RESPAWN_GAMEOBJECT (script id %u) call for NULL or non-gameobject buddy.", step.script->id);
+                        break;
+                    }
+                }
+                else if (target && target->GetTypeId() == TYPEID_GAMEOBJECT)
+                    pGo = (GameObject*)target;
+                else if (source && source->GetTypeId() == TYPEID_GAMEOBJECT)
+                    pGo = (GameObject*)source;
+                
+                if (!pGo)
                 {
                     sLog.outError("SCRIPT_COMMAND_RESPAWN_GAMEOBJECT (script id %u) failed for gameobject(guid: %u).", step.script->id, guidlow);
                     break;
                 }
 
-                if (go->GetGoType() == GAMEOBJECT_TYPE_FISHINGNODE ||
-                        go->GetGoType() == GAMEOBJECT_TYPE_DOOR        ||
-                        go->GetGoType() == GAMEOBJECT_TYPE_BUTTON      ||
-                        go->GetGoType() == GAMEOBJECT_TYPE_TRAP)
+                int32 time_to_despawn = step.script->respawnGo.despawnDelay < 5 ? 5 : step.script->respawnGo.despawnDelay;
+
+                if (pGo->GetGoType() == GAMEOBJECT_TYPE_FISHINGNODE ||
+                    pGo->GetGoType() == GAMEOBJECT_TYPE_DOOR        ||
+                    pGo->GetGoType() == GAMEOBJECT_TYPE_BUTTON      ||
+                    pGo->GetGoType() == GAMEOBJECT_TYPE_TRAP)
                 {
-                    sLog.outError("SCRIPT_COMMAND_RESPAWN_GAMEOBJECT (script id %u) can not be used with gameobject of type %u (guid: %u).", step.script->id, uint32(go->GetGoType()), step.script->respawnGo.goGuid);
+                    sLog.outError("SCRIPT_COMMAND_RESPAWN_GAMEOBJECT (script id %u) can not be used with gameobject of type %u (guid: %u).", step.script->id, uint32(pGo->GetGoType()), step.script->respawnGo.goGuid);
                     break;
                 }
 
-                if (go->isSpawned())
+                if (pGo->isSpawned())
                     break;                                  //gameobject already spawned
 
-                go->SetLootState(GO_READY);
-                go->SetRespawnTime(time_to_despawn);        //despawn object in ? seconds
+                pGo->SetLootState(GO_READY);
+                pGo->SetRespawnTime(time_to_despawn);        //despawn object in ? seconds
 
-                go->GetMap()->Add(go);
+                this->Add(pGo);
                 break;
             }
             case SCRIPT_COMMAND_TEMP_SUMMON_CREATURE:
@@ -2908,19 +2906,25 @@ void Map::ScriptsProcess()
                     break;
                 }
 
-                if (!source)
+                WorldObject* pSummoner = nullptr;
+
+                if (step.script->buddy_id)
                 {
-                    sLog.outError("SCRIPT_COMMAND_TEMP_SUMMON_CREATURE (script id %u) call for NULL world object.", step.script->id);
+                    if (pBuddy && pBuddy->isType(TYPEMASK_WORLDOBJECT))
+                        pSummoner = (WorldObject*)pBuddy;
+                    else
+                    {
+                        sLog.outError("SCRIPT_COMMAND_TEMP_SUMMON_CREATURE (script id %u) call for NULL or non-worldobject buddy.", step.script->id);
+                        break;
+                    }
+                }
+                else if (!source || !source->isType(TYPEMASK_WORLDOBJECT))
+                {
+                    sLog.outError("SCRIPT_COMMAND_TEMP_SUMMON_CREATURE (script id %u) call for a NULL or non-worldobject source.", step.script->id);
                     break;
                 }
-
-                if (!source->isType(TYPEMASK_WORLDOBJECT))
-                {
-                    sLog.outError("SCRIPT_COMMAND_TEMP_SUMMON_CREATURE (script id %u) call for non-WorldObject (TypeId: %u), skipping.", step.script->id, source->GetTypeId());
-                    break;
-                }
-
-                WorldObject* summoner = (WorldObject*)source;
+                else
+                    pSummoner = (WorldObject*)source;
 
                 float x = step.script->x;
                 float y = step.script->y;
@@ -2929,10 +2933,10 @@ void Map::ScriptsProcess()
 
                 if (step.script->summonCreature.flags & SF_SUMMON_CREATURE_UNIQUE || step.script->summonCreature.flags & SF_SUMMON_CREATURE_UNIQUE_TEMP)
                 {
-                    float dist = step.script->summonCreature.uniqueDistance ? step.script->summonCreature.uniqueDistance : (summoner->GetDistance(x, y, z) + 50.0f) * 2;
+                    float dist = step.script->summonCreature.uniqueDistance ? step.script->summonCreature.uniqueDistance : (pSummoner->GetDistance(x, y, z) + 50.0f) * 2;
                     std::list<Creature*> foundCreatures;
 
-                    GetCreatureListWithEntryInGrid(foundCreatures, summoner, step.script->summonCreature.creatureEntry, dist);
+                    GetCreatureListWithEntryInGrid(foundCreatures, pSummoner, step.script->summonCreature.creatureEntry, dist);
 
                     if (!foundCreatures.empty())
                     {
@@ -2951,9 +2955,9 @@ void Map::ScriptsProcess()
 
                 float orientation = o;
                 
-                if ((step.script->summonCreature.facingLogic == 1) || (step.script->summonCreature.facingLogic == 2))
+                if ((step.script->summonCreature.facingLogic == SUMMON_CREATURE_FACE_SUMMONER) || (step.script->summonCreature.facingLogic == SUMMON_CREATURE_FACE_TARGET))
                 {
-                    WorldObject* facingTarget = ((step.script->summonCreature.facingLogic == 2) && target && target->isType(TYPEMASK_WORLDOBJECT)) ? (WorldObject*)target : summoner;
+                    WorldObject* facingTarget = ((step.script->summonCreature.facingLogic == SUMMON_CREATURE_FACE_TARGET) && target && target->isType(TYPEMASK_WORLDOBJECT)) ? (WorldObject*)target : pSummoner;
 
                     float dx = facingTarget->GetPositionX() - x;
                     float dy = facingTarget->GetPositionY() - y;
@@ -2962,7 +2966,7 @@ void Map::ScriptsProcess()
                     orientation = (orientation >= 0) ? orientation : 2 * M_PI_F + orientation;
                 }
 
-                Creature* pCreature = summoner->SummonCreature(step.script->summonCreature.creatureEntry, x, y, z, orientation,
+                Creature* pCreature = pSummoner->SummonCreature(step.script->summonCreature.creatureEntry, x, y, z, orientation,
                     TEMPSUMMON_TIMED_OR_DEAD_DESPAWN, step.script->summonCreature.despawnDelay, step.script->summonCreature.flags & SF_SUMMON_CREATURE_ACTIVE);
 
                 if (!pCreature)
@@ -2978,52 +2982,50 @@ void Map::ScriptsProcess()
             }
             case SCRIPT_COMMAND_OPEN_DOOR:
             {
-                if (!step.script->openDoor.goGuid)          // checked at load
-                    break;
+                GameObject *pDoor = nullptr;
+                uint32 guidlow = step.script->openDoor.goGuid;
 
-                if (!source)
+                if (guidlow)
                 {
-                    sLog.outError("SCRIPT_COMMAND_OPEN_DOOR (script id %u) call for NULL unit.", step.script->id);
+                    GameObjectData const* goData = sObjectMgr.GetGOData(guidlow);
+                    if (!goData)                                // checked at load
+                        break;
+
+                    pDoor = this->GetGameObject(ObjectGuid(HIGHGUID_GAMEOBJECT, goData->id, guidlow));
+                }
+                else if (step.script->buddy_id)
+                {
+                    if (pBuddy && pBuddy->GetTypeId() == TYPEID_GAMEOBJECT)
+                        pDoor = (GameObject*)pBuddy;
+                    else
+                    {
+                        sLog.outError("SCRIPT_COMMAND_OPEN_DOOR (script id %u) call for NULL or non-gameobject buddy.", step.script->id);
+                        break;
+                    }
+                }
+                else if (target && target->GetTypeId() == TYPEID_GAMEOBJECT)
+                    pDoor = (GameObject*)target;
+                else if (source && source->GetTypeId() == TYPEID_GAMEOBJECT)
+                    pDoor = (GameObject*)source;
+
+                if (!pDoor)
+                {
+                    sLog.outError("SCRIPT_COMMAND_OPEN_DOOR (script id %u) failed for gameobject(guid: %u).", step.script->id, guidlow);
                     break;
                 }
 
-                if (!source->isType(TYPEMASK_UNIT))         // must be any Unit (creature or player)
+                if (pDoor->GetGoType() != GAMEOBJECT_TYPE_DOOR)
                 {
-                    sLog.outError("SCRIPT_COMMAND_OPEN_DOOR (script id %u) call for non-unit (TypeId: %u), skipping.", step.script->id, source->GetTypeId());
+                    sLog.outError("SCRIPT_COMMAND_OPEN_DOOR (script id %u) failed for non-door(GoType: %u).", step.script->id, pDoor->GetGoType());
                     break;
                 }
 
-                Unit* caster = (Unit*)source;
-                if (!caster->IsInWorld())
-                {
-                    sLog.outError("SCRIPT_COMMAND_OPEN_DOOR (script id %u) call for non-in-world unit (TypeId: %u), skipping.", step.script->id, source->GetTypeId());
-                    break;
-                }
+                if (pDoor->GetGoState() != GO_STATE_READY)
+                    break;                                  //door already  open
 
                 int32 time_to_close = step.script->openDoor.resetDelay < 3 ? 3 : step.script->openDoor.resetDelay; // Ustaag <Nostalrius> : duree minimale de reset fixee a 3 sec au lieu de 15
 
-                uint32 guidlow = step.script->openDoor.goGuid;
-                GameObjectData const* goData = sObjectMgr.GetGOData(guidlow);
-                if (!goData)                                // checked at load
-                    break;
-
-                GameObject *door = caster->GetMap()->GetGameObject(ObjectGuid(HIGHGUID_GAMEOBJECT, goData->id, guidlow));
-                if (!door)
-                {
-                    sLog.outError("SCRIPT_COMMAND_OPEN_DOOR (script id %u) failed for gameobject(guid: %u).", step.script->id, step.script->openDoor.goGuid);
-                    break;
-                }
-
-                if (door->GetGoType() != GAMEOBJECT_TYPE_DOOR)
-                {
-                    sLog.outError("SCRIPT_COMMAND_OPEN_DOOR (script id %u) failed for non-door(GoType: %u).", step.script->id, door->GetGoType());
-                    break;
-                }
-
-                if (door->GetGoState() != GO_STATE_READY)
-                    break;                                  //door already  open
-
-                door->UseDoorOrButton(time_to_close);
+                pDoor->UseDoorOrButton(time_to_close);
 
                 if (target && target->isType(TYPEMASK_GAMEOBJECT) && ((GameObject*)target)->GetGoType() == GAMEOBJECT_TYPE_BUTTON)
                     ((GameObject*)target)->UseDoorOrButton(time_to_close);
@@ -3032,51 +3034,49 @@ void Map::ScriptsProcess()
             }
             case SCRIPT_COMMAND_CLOSE_DOOR:
             {
-                if (!step.script->closeDoor.goGuid)         // checked at load
-                    break;
-
-                if (!source)
-                {
-                    sLog.outError("SCRIPT_COMMAND_CLOSE_DOOR (script id %u) call for NULL unit.", step.script->id);
-                    break;
-                }
-
-                if (!source->isType(TYPEMASK_UNIT))         // must be any Unit (creature or player)
-                {
-                    sLog.outError("SCRIPT_COMMAND_CLOSE_DOOR (script id %u) call for non-unit (TypeId: %u), skipping.", step.script->id, source->GetTypeId());
-                    break;
-                }
-
-                Unit* caster = (Unit*)source;
-                if (!caster->IsInWorld())
-                {
-                    sLog.outError("SCRIPT_COMMAND_CLOSE_DOOR (script id %u) call for non-in-world unit (TypeId: %u), skipping.", step.script->id, source->GetTypeId());
-                    break;
-                }
-
-                int32 time_to_open = step.script->closeDoor.resetDelay < 3 ? 3 : step.script->closeDoor.resetDelay; // Ustaag <Nostalrius> : duree minimale de reset fixee a 3 sec au lieu de 15
-
+                GameObject *pDoor = nullptr;
                 uint32 guidlow = step.script->closeDoor.goGuid;
-                GameObjectData const* goData = sObjectMgr.GetGOData(guidlow);
-                if (!goData)                                // checked at load
-                    break;
 
-                GameObject *door = caster->GetMap()->GetGameObject(ObjectGuid(HIGHGUID_GAMEOBJECT, goData->id, guidlow));
-                if (!door)
+                if (guidlow)
+                {
+                    GameObjectData const* goData = sObjectMgr.GetGOData(guidlow);
+                    if (!goData)                                // checked at load
+                        break;
+
+                    pDoor = this->GetGameObject(ObjectGuid(HIGHGUID_GAMEOBJECT, goData->id, guidlow));
+                }
+                else if (step.script->buddy_id)
+                {
+                    if (pBuddy && pBuddy->GetTypeId() == TYPEID_GAMEOBJECT)
+                        pDoor = (GameObject*)pBuddy;
+                    else
+                    {
+                        sLog.outError("SCRIPT_COMMAND_CLOSE_DOOR (script id %u) call for NULL or non-gameobject buddy.", step.script->id);
+                        break;
+                    }
+                }
+                else if (target && target->GetTypeId() == TYPEID_GAMEOBJECT)
+                    pDoor = (GameObject*)target;
+                else if (source && source->GetTypeId() == TYPEID_GAMEOBJECT)
+                    pDoor = (GameObject*)source;
+
+                if (!pDoor)
                 {
                     sLog.outError("SCRIPT_COMMAND_CLOSE_DOOR (script id %u) failed for gameobject(guid: %u).", step.script->id, guidlow);
                     break;
                 }
-                if (door->GetGoType() != GAMEOBJECT_TYPE_DOOR)
+                if (pDoor->GetGoType() != GAMEOBJECT_TYPE_DOOR)
                 {
-                    sLog.outError("SCRIPT_COMMAND_CLOSE_DOOR (script id %u) failed for non-door(GoType: %u).", step.script->id, door->GetGoType());
+                    sLog.outError("SCRIPT_COMMAND_CLOSE_DOOR (script id %u) failed for non-door(GoType: %u).", step.script->id, pDoor->GetGoType());
                     break;
                 }
 
-                if (door->GetGoState() == GO_STATE_READY)
+                if (pDoor->GetGoState() == GO_STATE_READY)
                     break;                                  //door already closed
 
-                door->UseDoorOrButton(time_to_open);
+                int32 time_to_open = step.script->closeDoor.resetDelay < 3 ? 3 : step.script->closeDoor.resetDelay; // Ustaag <Nostalrius> : duree minimale de reset fixee a 3 sec au lieu de 15
+
+                pDoor->UseDoorOrButton(time_to_open);
 
                 if (target && target->isType(TYPEMASK_GAMEOBJECT) && ((GameObject*)target)->GetGoType() == GAMEOBJECT_TYPE_BUTTON)
                     ((GameObject*)target)->UseDoorOrButton(time_to_open);

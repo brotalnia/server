@@ -48,6 +48,13 @@ class WorldObject;
 // object which will be used as the target of the action. For example with TALK command target name will be in $n.
 // Not all commands require a target, for example FIELD SET is executed on single object, so it does not need target.
 
+// Legend:
+// source - object which executes the command
+// target - object used as target of the command if needed
+// provided source - the original "Object* source" provided to the command
+// provided target - the original "Object* target" provided to the command
+// buddy - the original "WorldObject* pBuddy" provided to the command
+
 enum eScriptCommand
 {
     SCRIPT_COMMAND_TALK                     = 0,            // source = WorldObject, target = Unit/None
@@ -57,7 +64,7 @@ enum eScriptCommand
     SCRIPT_COMMAND_EMOTE                    = 1,            // source = Unit
                                                             // datalong = emote_id
                                                             // data_flags = eEmoteFlags
-    SCRIPT_COMMAND_FIELD_SET                = 2,            // source = Any
+    SCRIPT_COMMAND_FIELD_SET                = 2,            // source = Object
                                                             // datalong = field_id
                                                             // datalong2 = value
                                                             // data_flags = eFieldSetFlags
@@ -68,11 +75,11 @@ enum eScriptCommand
                                                             // datalong3 = movement_options (see enum MoveOptions)
                                                             // data_flags = eMoveToFlags
                                                             // x/y/z = coordinates
-    SCRIPT_COMMAND_FLAG_SET                 = 4,            // source = Any
+    SCRIPT_COMMAND_FLAG_SET                 = 4,            // source = Object
                                                             // datalong = field_id
                                                             // datalong2 = bitmask
                                                             // data_flags = eFlagSetFlags
-    SCRIPT_COMMAND_FLAG_REMOVE              = 5,            // source = Any
+    SCRIPT_COMMAND_FLAG_REMOVE              = 5,            // source = Object
                                                             // datalong = field_id
                                                             // datalong2 = bitmask
                                                             // data_flags = eFlagRemoveFlags
@@ -80,15 +87,31 @@ enum eScriptCommand
                                                             // datalong = map_id (only used for players but still required)
                                                             // datalong2 = eTeleportToFlags
                                                             // x/y/z = coordinates
-    SCRIPT_COMMAND_QUEST_EXPLORED           = 7,            // one from source or target must be Player, another GO/Creature, datalong=quest_id, datalong2=distance or 0
-    SCRIPT_COMMAND_KILL_CREDIT              = 8,            // source or target with Player, datalong = creature entry, datalong2 = bool (0=personal credit, 1=group credit)
-    SCRIPT_COMMAND_RESPAWN_GAMEOBJECT       = 9,            // source = any (summoner), datalong=db_guid, datalong2=despawn_delay
-    SCRIPT_COMMAND_TEMP_SUMMON_CREATURE     = 10,           // source = any (summoner), datalong=creature entry, datalong2=despawn_delay
-                                                            // data_flags & SCRIPT_FLAG_COMMAND_ADDITIONAL = summon active, SF_SUMMON_CREATURE_UNIQUE = check for same entry in radius, SF_SUMMON_CREATURE_UNIQUE_TEMP = same but only TempSummon
+    SCRIPT_COMMAND_QUEST_EXPLORED           = 7,            // source = Player (in provided source or target)
+                                                            // target = WorldObject (in provided source or target, no buddy)
+                                                            // datalong = quest_id
+                                                            // datalong2 = distance or 0
+    SCRIPT_COMMAND_KILL_CREDIT              = 8,            // source = Player (in provided source or target)
+                                                            // datalong = creature entry
+                                                            // datalong2 = bool (0=personal credit, 1=group credit)
+    SCRIPT_COMMAND_RESPAWN_GAMEOBJECT       = 9,            // source = Map
+                                                            // target = GameObject (from datalong, buddy, provided source or target)
+                                                            // datalong=db_guid
+                                                            // datalong2=despawn_delay
+    SCRIPT_COMMAND_TEMP_SUMMON_CREATURE     = 10,           // source = WorldObject (provided source or buddy)
+                                                            // datalong = creature_entry
+                                                            // datalong2=despawn_delay
+                                                            // data_flags = eSummonCreatureFlags
                                                             // dataint = (bool) setRun; 0 = off (default), 1 = on
-                                                            // dataint2: 0 = use orientation specified, 1 = face source, 2 = face target
-    SCRIPT_COMMAND_OPEN_DOOR                = 11,           // source = unit, datalong=db_guid, datalong2=reset_delay
-    SCRIPT_COMMAND_CLOSE_DOOR               = 12,           // source = unit, datalong=db_guid, datalong2=reset_delay
+                                                            // dataint2 = eSummonCreatureFacingOptions
+    SCRIPT_COMMAND_OPEN_DOOR                = 11,           // source = GameObject (from datalong, buddy, provided source or target)
+                                                            // If provided target is BUTTON GameObject command is run on it too.
+                                                            // datalong=db_guid
+                                                            // datalong2=reset_delay
+    SCRIPT_COMMAND_CLOSE_DOOR               = 12,           // source = GameObject (from datalong, buddy, provided source or target)
+                                                            // If provided target is BUTTON GameObject command is run on it too.
+                                                            // datalong=db_guid
+                                                            // datalong2=reset_delay
     SCRIPT_COMMAND_ACTIVATE_OBJECT          = 13,           // source = unit, target=GO
     SCRIPT_COMMAND_REMOVE_AURA              = 14,           // source (datalong2!=0) or target (datalong==0) unit, datalong = spell_id
     SCRIPT_COMMAND_CAST_SPELL               = 15,           // source/target cast spell at target/source
@@ -220,6 +243,12 @@ enum eSummonCreatureFlags
     SF_SUMMON_CREATURE_UNIQUE_TEMP = 0x4                       // same as 0x2 but check for TempSummon only creatures
 };
 
+// Possible dataint2 values for SCRIPT_COMMAND_TEMP_SUMMON_CREATURE
+enum eSummonCreatureFacingOptions
+{
+    SUMMON_CREATURE_FACE_SUMMONER = 1,                         // Creature will face the summoner.
+    SUMMON_CREATURE_FACE_TARGET   = 2                          // Creature will face the provided target object.
+};
 
 
 // Values used in buddy_type column
