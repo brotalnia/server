@@ -423,11 +423,26 @@ void ScriptMgr::LoadScripts(ScriptMapMap& scripts, const char* tablename)
             {
                 break;
             }
-            case SCRIPT_COMMAND_PLAY_MOVIE:
+            case SCRIPT_COMMAND_SET_EQUIPMENT:
             {
-                sLog.outErrorDb("Table `%s` use unsupported SCRIPT_COMMAND_PLAY_MOVIE for script id %u",
-                                tablename, tmp.id);
-                continue;
+                bool cancel = false;
+                for (int i = 0; i < 3; i++)
+                {
+                    if (tmp.setEquipment.slot[i] > 0)
+                    {
+                        if (!ObjectMgr::GetItemPrototype(tmp.setEquipment.slot[i]))
+                        {
+                            sLog.outErrorDb("Table `%s` has nonexistent item (dataint%i: %u) in SCRIPT_COMMAND_SET_EQUIPMENT for script id %u",
+                                tablename, i, tmp.setEquipment.slot[i], tmp.id);
+                            cancel=true;
+                        }
+                    }
+                }
+                
+                if (cancel)
+                    continue;
+
+                break;
             }
             case SCRIPT_COMMAND_MOVEMENT:
             {

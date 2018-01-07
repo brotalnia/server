@@ -122,7 +122,11 @@ enum eScriptCommand
                                                             // datalong2 = amount
     SCRIPT_COMMAND_DESPAWN_CREATURE         = 18,           // source = creature
                                                             // datalong = despawn delay
-    SCRIPT_COMMAND_PLAY_MOVIE               = 19,           // target can only be a player, datalog = movie id
+    SCRIPT_COMMAND_SET_EQUIPMENT            = 19,           // source = creature
+                                                            // datalong = (bool) resetDefault
+                                                            // dataint = main-hand item_id
+                                                            // dataint2 = off-hand item_id
+                                                            // dataint3 = ranged item_id
     SCRIPT_COMMAND_MOVEMENT                 = 20,           // source or target must be creature. datalong = MovementType (0:idle, 1:random or 2:waypoint)
                                                             // datalong2 = creature entry (searching for a buddy, closest to source), datalong3 = creature search radius
     SCRIPT_COMMAND_SET_ACTIVEOBJECT         = 21,           // source=any, target=creature
@@ -373,10 +377,15 @@ struct ScriptInfo
             uint32 despawnDelay;                            // datalong
         } despawn;
 
-        struct                                              // SCRIPT_COMMAND_PLAY_MOVIE (19)
+        struct                                              // SCRIPT_COMMAND_SET_EQUIPMENT (19)
         {
-            uint32 movieId;                                 // datalong
-        } playMovie;
+            uint32 resetDefault;                            // datalong
+            uint32 unused1;                                 // datalong2
+            uint32 unused2;                                 // datalong3
+            uint32 unused3;                                 // datalong4
+            uint32 unused4;                                 // data_flags
+            int32  slot[MAX_TEXT_ID];                       // dataint to dataint4
+        } setEquipment;
 
         struct                                              // SCRIPT_COMMAND_MOVEMENT (20)
         {

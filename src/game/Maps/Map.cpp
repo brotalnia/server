@@ -3075,8 +3075,42 @@ void Map::ScriptsProcess()
 
                 break;
             }
-            case SCRIPT_COMMAND_PLAY_MOVIE:
-                break;                                      // must be skipped at loading
+            case SCRIPT_COMMAND_SET_EQUIPMENT:
+            {
+                if (!source)
+                {
+                    sLog.outError("SCRIPT_COMMAND_DESPAWN_CREATURE (script id %u) call for a NULL source.", step.script->id);
+                    break;
+                }
+
+                if (!source->GetTypeId() == TYPEID_UNIT)
+                {
+                    sLog.outError("SCRIPT_COMMAND_DESPAWN_CREATURE (script id %u) call for a non-creature source (TypeId: %u), skipping.", step.script->id, source->GetTypeId());
+                    break;
+                }
+
+                Creature* pSource = static_cast<Creature*>(source);
+
+                if (step.script->setEquipment.resetDefault)
+                {
+                    pSource->LoadEquipment(pSource->GetCreatureInfo()->equipmentId, true);
+                    break;
+                }
+
+                // main hand
+                if (step.script->setEquipment.slot[0] >= 0)
+                    pSource->SetVirtualItem(VIRTUAL_ITEM_SLOT_0, step.script->setEquipment.slot[0]);
+
+                // off hand
+                if (step.script->setEquipment.slot[1] >= 0)
+                    pSource->SetVirtualItem(VIRTUAL_ITEM_SLOT_1, step.script->setEquipment.slot[1]);
+
+                // ranged
+                if (step.script->setEquipment.slot[2] >= 0)
+                    pSource->SetVirtualItem(VIRTUAL_ITEM_SLOT_2, step.script->setEquipment.slot[2]);
+
+                break;
+            }
             case SCRIPT_COMMAND_MOVEMENT:
             {
                 if (!source)
