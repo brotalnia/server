@@ -42,61 +42,53 @@ class SpellCastTargets;
 class Unit;
 class WorldObject;
 
-// Targeting has been reworked, commands can be executed without source provided as long as there is a valid target
-// or buddy that can serve as the source of the action. Look at flags for every command to see when it is the case.
-// For the purpose of the comments in this enum, source is the object that executes the action, target means the
-// object which will be used as the target of the action. For example with TALK command target name will be in $n.
-// Not all commands require a target, for example FIELD SET is executed on single object, so it does not need target.
-
 // Legend:
 // source - the type of object which executes the command
 // target - the type of object used as target of the command if needed
-// provided source - the original "Object* source" provided to the command
-// provided target - the original "Object* target" provided to the command
-// buddy - the original "WorldObject* pBuddy" provided to the command
+// provided source - the "Object* source" provided to the command
+// provided target - the "Object* target" provided to the command
+
+// For example the talk command can be used by any WorldObject and the text will
+// be said by this object. If there is also a target provided of type Unit, then
+// any use of $n in the text will be replaced by that of the unit used as target.
 
 enum eScriptCommand
 {
     SCRIPT_COMMAND_TALK                     = 0,            // source = WorldObject
                                                             // target = Unit/None
                                                             // datalong = chat_type (see enum ChatType)
-                                                            // data_flags = eTalkFlags
                                                             // dataint = broadcast_text id. dataint2-4 optional for random selected text.
     SCRIPT_COMMAND_EMOTE                    = 1,            // source = Unit
                                                             // datalong = emote_id
-                                                            // data_flags = eEmoteFlags
     SCRIPT_COMMAND_FIELD_SET                = 2,            // source = Object
                                                             // datalong = field_id
                                                             // datalong2 = value
-                                                            // data_flags = eFieldSetFlags
     SCRIPT_COMMAND_MOVE_TO                  = 3,            // source = Creature
                                                             // target = WorldObject (for datalong > 0)
                                                             // datalong = coordinates_type (see enum eMoveToCoordinateTypes)
                                                             // datalong2 = time
                                                             // datalong3 = movement_options (see enum MoveOptions)
-                                                            // data_flags = eMoveToFlags
+                                                            // datalong4 = eMoveToFlags
                                                             // x/y/z = coordinates
     SCRIPT_COMMAND_FLAG_SET                 = 4,            // source = Object
                                                             // datalong = field_id
                                                             // datalong2 = bitmask
-                                                            // data_flags = eFlagSetFlags
     SCRIPT_COMMAND_FLAG_REMOVE              = 5,            // source = Object
                                                             // datalong = field_id
                                                             // datalong2 = bitmask
-                                                            // data_flags = eFlagRemoveFlags
     SCRIPT_COMMAND_TELEPORT_TO              = 6,            // source = Unit
                                                             // datalong = map_id (only used for players but still required)
                                                             // datalong2 = eTeleportToFlags
                                                             // x/y/z = coordinates
     SCRIPT_COMMAND_QUEST_EXPLORED           = 7,            // source = Player (in provided source or target)
-                                                            // target = WorldObject (in provided source or target, no buddy)
+                                                            // target = WorldObject (in provided source or target)
                                                             // datalong = quest_id
                                                             // datalong2 = distance or 0
     SCRIPT_COMMAND_KILL_CREDIT              = 8,            // source = Player (in provided source or target)
                                                             // datalong = creature entry
                                                             // datalong2 = bool (0=personal credit, 1=group credit)
     SCRIPT_COMMAND_RESPAWN_GAMEOBJECT       = 9,            // source = Map
-                                                            // target = GameObject (from datalong, buddy, provided source or target)
+                                                            // target = GameObject (from datalong, provided source or target)
                                                             // datalong=db_guid
                                                             // datalong2=despawn_delay
     SCRIPT_COMMAND_TEMP_SUMMON_CREATURE     = 10,           // source = WorldObject (provided source or buddy)
@@ -105,19 +97,22 @@ enum eScriptCommand
                                                             // data_flags = eSummonCreatureFlags
                                                             // dataint = (bool) setRun; 0 = off (default), 1 = on
                                                             // dataint2 = eSummonCreatureFacingOptions
-    SCRIPT_COMMAND_OPEN_DOOR                = 11,           // source = GameObject (from datalong, buddy, provided source or target)
+    SCRIPT_COMMAND_OPEN_DOOR                = 11,           // source = GameObject (from datalong, provided source or target)
                                                             // If provided target is BUTTON GameObject, command is run on it too.
-                                                            // datalong=db_guid
-                                                            // datalong2=reset_delay
-    SCRIPT_COMMAND_CLOSE_DOOR               = 12,           // source = GameObject (from datalong, buddy, provided source or target)
+                                                            // datalong = db_guid
+                                                            // datalong2 = reset_delay
+    SCRIPT_COMMAND_CLOSE_DOOR               = 12,           // source = GameObject (from datalong, provided source or target)
                                                             // If provided target is BUTTON GameObject, command is run on it too.
-                                                            // datalong=db_guid
-                                                            // datalong2=reset_delay
+                                                            // datalong = db_guid
+                                                            // datalong2 = reset_delay
     SCRIPT_COMMAND_ACTIVATE_OBJECT          = 13,           // source = GameObject
                                                             // target = Unit
-    SCRIPT_COMMAND_REMOVE_AURA              = 14,           // source (datalong2!=0) or target (datalong==0) unit, datalong = spell_id
-    SCRIPT_COMMAND_CAST_SPELL               = 15,           // source/target cast spell at target/source
-                                                            // datalong2: 0: s->t 1: s->s 2: t->t 3: t->s (this values in 2 bits), and 0x4 mask for cast triggered can be added to
+    SCRIPT_COMMAND_REMOVE_AURA              = 14,           // source = Unit
+                                                            // datalong = spell_id
+    SCRIPT_COMMAND_CAST_SPELL               = 15,           // source = Unit
+                                                            // target = Unit
+                                                            // datalong = spell_id
+                                                            // datalong2 = eCastSpellFlags
     SCRIPT_COMMAND_PLAY_SOUND               = 16,           // source = any object, target=any/player, datalong (sound_id), datalong2 (bitmask: 0/1=anyone/target, 0/2=with distance dependent, so 1|2 = 3 is target with distance dependent)
     SCRIPT_COMMAND_CREATE_ITEM              = 17,           // source or target must be player, datalong = item entry, datalong2 = amount
     SCRIPT_COMMAND_DESPAWN_CREATURE         = 18,           // source or target must be creature
@@ -182,37 +177,10 @@ enum eScriptCommand
 #define MAX_TEXT_ID 4                                       // used for SCRIPT_COMMAND_TALK
 static constexpr uint32 MAX_EMOTE_ID = 4;                   // used for SCRIPT_COMMAND_EMOTE
 
-// Flags used by SCRIPT_COMMAND_TALK
-enum eTalkFlags
-{
-    SF_TALK_TARGET_AS_SOURCE = 0x1,
-    SF_TALK_SOURCE_AS_TARGET = 0x2,
-    SF_TALK_BUDDY_AS_TARGET  = 0x4
-};
-
-// Flags used by SCRIPT_COMMAND_EMOTE
-enum eEmoteFlags
-{
-    SF_EMOTE_TARGET_AS_SOURCE = 0x1
-};
-
-// Flags used by SCRIPT_COMMAND_FIELD_SET
-enum eFieldSetFlags
-{
-    SF_FIELD_SET_TARGET_AS_SOURCE = 0x1
-};
-
 // Flags used by SCRIPT_COMMAND_MOVE_TO
 enum eMoveToFlags
 {
     SF_MOVE_TO_FORCED = 0x1,                                // No check if creature can move.
-    SF_MOVE_TO_SWAP_INITIAL_TARGETS = 0x2,                  // Swaps the provided source and target, before buddy is checked.
-    SF_MOVE_TO_SWAP_FINAL_TARGETS = 0x4                     // Swaps the local source and target, after buddy is assigned.
-};
-
-enum eTeleportToFlags
-{
-    SF_TELEPORT_TO_TELE_CREATURE = 0x1                      // Teleports the creature instead of player. Same map only.
 };
 
 // Possible datalong3 values for SCRIPT_COMMAND_MOVE_TO
@@ -225,24 +193,12 @@ enum eMoveToCoordinateTypes
     MOVETO_COORDINATES_MAX
 };
 
-// Flags used by SCRIPT_COMMAND_FLAG_SET
-enum eFlagSetFlags
-{
-    SF_FLAG_SET_TARGET_AS_SOURCE = 0x1
-};
-
-// Flags used by SCRIPT_COMMAND_FLAG_REMOVE
-enum eFlagRemoveFlags
-{
-    SF_FLAG_REMOVE_TARGET_AS_SOURCE = 0x1
-};
-
 // Flags used by SCRIPT_COMMAND_TEMP_SUMMON_CREATURE
 enum eSummonCreatureFlags
 {
-    SF_SUMMON_CREATURE_ACTIVE      = 0x1,
-    SF_SUMMON_CREATURE_UNIQUE      = 0x2,                      // not actually unique, just checks for same entry in certain range
-    SF_SUMMON_CREATURE_UNIQUE_TEMP = 0x4                       // same as 0x2 but check for TempSummon only creatures
+    SF_SUMMON_CREATURE_ACTIVE      = 0x08,                     // active creatures are always updated
+    SF_SUMMON_CREATURE_UNIQUE      = 0x10,                     // not actually unique, just checks for same entry in certain range
+    SF_SUMMON_CREATURE_UNIQUE_TEMP = 0x20                      // same as 0x10 but check for TempSummon only creatures
 };
 
 // Possible dataint2 values for SCRIPT_COMMAND_TEMP_SUMMON_CREATURE
@@ -252,6 +208,12 @@ enum eSummonCreatureFacingOptions
     SUMMON_CREATURE_FACE_TARGET   = 2                          // Creature will face the provided target object.
 };
 
+// Flags used by SCRIPT_COMMAND_CAST_SPELL
+enum eCastSpellFlags
+{
+    SF_CAST_SPELL_TRIGGERED          = 0x1,                    // Triggered spells skip checks.
+    SF_CAST_SPELL_INTERRUPT_PREVIOUS = 0x2                     // Will interrupt the current spell cast.
+};
 
 // Values used in buddy_type column
 enum eBuddyType
@@ -262,6 +224,13 @@ enum eBuddyType
     BUDDY_TYPE_GAMEOBJECT_ENTRY         = 3,
     BUDDY_TYPE_GAMEOBJECT_GUID          = 4,
     BUDDY_TYPE_GAMEOBJECT_INSTANCE_DATA = 5,
+};
+
+enum eDataFlags
+{
+    SF_GENERAL_SWAP_INITIAL_TARGETS = 0x1,                  // Swaps the provided source and target, before buddy is checked.
+    SF_GENERAL_SWAP_FINAL_TARGETS   = 0x2,                  // Swaps the local source and target, after buddy is assigned.
+    SF_GENERAL_TARGET_SELF          = 0x4                   // Replaces the provided target with the provided source.
 };
 
 struct ScriptInfo
@@ -278,7 +247,7 @@ struct ScriptInfo
             uint32 unused1;                                 // datalong2
             uint32 unused2;                                 // datalong3
             uint32 unused3;                                 // datalong4
-            uint32 flags;                                   // data_flags
+            uint32 unused4;                                 // data_flags
             int32  textId[MAX_TEXT_ID];                     // dataint to dataint4
         } talk;
 
@@ -288,7 +257,7 @@ struct ScriptInfo
             uint32 unused1;                                 // datalong2
             uint32 unused2;                                 // datalong3
             uint32 unused3;                                 // datalong4
-            uint32 flags;                                   // data_flags
+            uint32 unused4;                                 // data_flags
             uint32 randomEmotes[MAX_EMOTE_ID];              // dataint to dataint4
         } emote;
 
@@ -296,9 +265,6 @@ struct ScriptInfo
         {
             uint32 fieldId;                                 // datalong
             uint32 fieldValue;                              // datalong2
-            uint32 unused1;                                 // datalong3
-            uint32 unused2;                                 // datalong4
-            uint32 flags;                                   // data_flags
         } setField;
 
         struct                                              // SCRIPT_COMMAND_MOVE_TO (3)
@@ -306,32 +272,24 @@ struct ScriptInfo
             uint32 coordinatesType;                         // datalong
             uint32 travelTime;                              // datalong2
             uint32 movementOptions;                         // datalong3
-            uint32 unused1;                                 // datalong4
-            uint32 flags;                                   // data_flags
+            uint32 flags;                                   // datalong4
         } moveTo;
 
         struct                                              // SCRIPT_COMMAND_FLAG_SET (4)
         {
             uint32 fieldId;                                 // datalong
             uint32 fieldValue;                              // datalong2
-            uint32 unused1;                                 // datalong3
-            uint32 unused2;                                 // datalong4
-            uint32 flags;                                   // data_flags
         } setFlag;
 
         struct                                              // SCRIPT_COMMAND_FLAG_REMOVE (5)
         {
             uint32 fieldId;                                 // datalong
             uint32 fieldValue;                              // datalong2
-            uint32 unused1;                                 // datalong3
-            uint32 unused2;                                 // datalong4
-            uint32 flags;                                   // data_flags
         } removeFlag;
 
         struct                                              // SCRIPT_COMMAND_TELEPORT_TO (6)
         {
             uint32 mapId;                                   // datalong
-            uint32 flags;                                   // datalong2
         } teleportTo;
 
         struct                                              // SCRIPT_COMMAND_QUEST_EXPLORED (7)
@@ -380,7 +338,6 @@ struct ScriptInfo
         struct                                              // SCRIPT_COMMAND_REMOVE_AURA (14)
         {
             uint32 spellId;                                 // datalong
-            uint32 isSourceTarget;                          // datalong2
         } removeAura;
 
         struct                                              // SCRIPT_COMMAND_CAST_SPELL (15)

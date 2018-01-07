@@ -178,6 +178,12 @@ void ScriptMgr::LoadScripts(ScriptMapMap& scripts, const char* tablename)
             }
         }
 
+        if (!tmp.buddy_id && (tmp.raw.data[4] & (SF_GENERAL_SWAP_INITIAL_TARGETS | SF_GENERAL_SWAP_FINAL_TARGETS)))
+        {
+            sLog.outErrorDb("Table `%s` has nonsensical flag combination (data_flags = %u) without a buddy for script id %u", tablename, tmp.moveTo.flags, tmp.id);
+            continue;
+        }
+
         // generic command args check
         switch (tmp.command)
         {
@@ -226,12 +232,6 @@ void ScriptMgr::LoadScripts(ScriptMapMap& scripts, const char* tablename)
                 if (tmp.moveTo.movementOptions > 511)
                 {
                     sLog.outErrorDb("Table `%s` has invalid movement options (datalong3 = %u) in SCRIPT_COMMAND_MOVE_TO for script id %u", tablename, tmp.moveTo.movementOptions, tmp.id);
-                    continue;
-                }
-
-                if (!tmp.buddy_id && (tmp.moveTo.flags & (SF_MOVE_TO_SWAP_INITIAL_TARGETS | SF_MOVE_TO_SWAP_FINAL_TARGETS)))
-                {
-                    sLog.outErrorDb("Table `%s` has nonsensical flag combination (data_flags = %u) without a buddy in SCRIPT_COMMAND_MOVE_TO for script id %u", tablename, tmp.moveTo.flags, tmp.id);
                     continue;
                 }
 
@@ -385,12 +385,6 @@ void ScriptMgr::LoadScripts(ScriptMapMap& scripts, const char* tablename)
                                     tablename, tmp.removeAura.spellId, tmp.id);
                     continue;
                 }
-                if (tmp.removeAura.isSourceTarget & ~0x1)   // 1 bits (0,1)
-                {
-                    sLog.outErrorDb("Table `%s` using unknown flags in datalong2 (%u)i n SCRIPT_COMMAND_CAST_SPELL for script id %u",
-                                    tablename, tmp.removeAura.isSourceTarget, tmp.id);
-                    continue;
-                }
                 break;
             }
             case SCRIPT_COMMAND_CAST_SPELL:
@@ -401,7 +395,7 @@ void ScriptMgr::LoadScripts(ScriptMapMap& scripts, const char* tablename)
                                     tablename, tmp.castSpell.spellId, tmp.id);
                     continue;
                 }
-                if (tmp.castSpell.flags & ~0xF)             // 3 bits
+                if (tmp.castSpell.flags & ~0x3)
                 {
                     sLog.outErrorDb("Table `%s` using unknown flags in datalong2 (%u)i n SCRIPT_COMMAND_CAST_SPELL for script id %u",
                                     tablename, tmp.castSpell.flags, tmp.id);
