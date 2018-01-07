@@ -2995,40 +2995,38 @@ void Map::ScriptsProcess()
             {
                 if (!source)
                 {
-                    sLog.outError("SCRIPT_COMMAND_PLAY_SOUND (script id %u) call for NULL creature.", step.script->id);
+                    sLog.outError("SCRIPT_COMMAND_PLAY_SOUND (script id %u) call for a NULL source.", step.script->id);
                     break;
                 }
 
                 if (!source->isType(TYPEMASK_WORLDOBJECT))
                 {
-                    sLog.outError("SCRIPT_COMMAND_PLAY_SOUND (script id %u) call for non-world object (TypeId: %u), skipping.", step.script->id, source->GetTypeId());
+                    sLog.outError("SCRIPT_COMMAND_PLAY_SOUND (script id %u) call for a non-worldobject source (TypeId: %u), skipping.", step.script->id, source->GetTypeId());
                     break;
                 }
 
-                WorldObject* pSource = (WorldObject*)source;
+                WorldObject* pSource = static_cast<WorldObject*>(source);
 
-                // bitmask: 0/1=anyone/target, 0/2=with distance dependent
-                Player* pTarget = NULL;
+                Player* pTarget = nullptr;
 
-                if (step.script->playSound.flags & 1)
+                if (step.script->playSound.flags & SF_PLAY_SOUND_ONLY_TO_TARGET)
                 {
                     if (!target)
                     {
-                        sLog.outError("SCRIPT_COMMAND_PLAY_SOUND (script id %u) in targeted mode call for NULL target.", step.script->id);
+                        sLog.outError("SCRIPT_COMMAND_PLAY_SOUND (script id %u) in targeted mode call for a NULL target.", step.script->id);
                         break;
                     }
 
                     if (target->GetTypeId() != TYPEID_PLAYER)
                     {
-                        sLog.outError("SCRIPT_COMMAND_PLAY_SOUND (script id %u) in targeted mode call for non-player (TypeId: %u), skipping.", step.script->id, target->GetTypeId());
+                        sLog.outError("SCRIPT_COMMAND_PLAY_SOUND (script id %u) in targeted mode call for a non-player target (TypeId: %u), skipping.", step.script->id, target->GetTypeId());
                         break;
                     }
 
-                    pTarget = (Player*)target;
+                    pTarget = static_cast<Player*>(target);
                 }
 
-                // bitmask: 0/1=anyone/target, 0/2=with distance dependent
-                if (step.script->playSound.flags & 2)
+                if (step.script->playSound.flags & SF_PLAY_SOUND_DISTANCE_DEPENDENT)
                     pSource->PlayDistanceSound(step.script->playSound.soundId, pTarget);
                 else
                     pSource->PlayDirectSound(step.script->playSound.soundId, pTarget);
@@ -3039,18 +3037,18 @@ void Map::ScriptsProcess()
             {
                 if (!target && !source)
                 {
-                    sLog.outError("SCRIPT_COMMAND_CREATE_ITEM (script id %u) call for NULL object.", step.script->id);
+                    sLog.outError("SCRIPT_COMMAND_CREATE_ITEM (script id %u) call for a NULL object.", step.script->id);
                     break;
                 }
 
                 // only Player
                 if ((!target || target->GetTypeId() != TYPEID_PLAYER) && (!source || source->GetTypeId() != TYPEID_PLAYER))
                 {
-                    sLog.outError("SCRIPT_COMMAND_CREATE_ITEM (script id %u) call for non-player (TypeIdSource: %u)(TypeIdTarget: %u), skipping.", step.script->id, source ? source->GetTypeId() : 0, target ? target->GetTypeId() : 0);
+                    sLog.outError("SCRIPT_COMMAND_CREATE_ITEM (script id %u) call for a non-player object (TypeIdSource: %u)(TypeIdTarget: %u), skipping.", step.script->id, source ? source->GetTypeId() : 0, target ? target->GetTypeId() : 0);
                     break;
                 }
 
-                Player* pReceiver = target && target->GetTypeId() == TYPEID_PLAYER ? (Player*)target : (Player*)source;
+                Player* pReceiver = target && target->GetTypeId() == TYPEID_PLAYER ? static_cast<Player*>(target) : static_cast<Player*>(source);
 
                 if (Item* pItem = pReceiver->StoreNewItemInInventorySlot(step.script->createItem.itemEntry, step.script->createItem.amount))
                     pReceiver->SendNewItem(pItem, step.script->createItem.amount, true, false);
@@ -3061,46 +3059,19 @@ void Map::ScriptsProcess()
             {
                 if (!source)
                 {
-                    sLog.outError("SCRIPT_COMMAND_DESPAWN_CREATURE (script id %u) call for NULL source.", step.script->id);
+                    sLog.outError("SCRIPT_COMMAND_DESPAWN_CREATURE (script id %u) call for a NULL source.", step.script->id);
                     break;
                 }
 
-                if (!source->isType(TYPEMASK_WORLDOBJECT))
+                if (!source->GetTypeId() == TYPEID_UNIT)
                 {
-                    sLog.outError("SCRIPT_COMMAND_DESPAWN_CREATURE (script id %u) call for unsupported non-worldobject (TypeId: %u), skipping.", step.script->id, source->GetTypeId());
+                    sLog.outError("SCRIPT_COMMAND_DESPAWN_CREATURE (script id %u) call for a non-creature source (TypeId: %u), skipping.", step.script->id, source->GetTypeId());
                     break;
                 }
 
-                WorldObject* pSource = (WorldObject*)source;
-                Creature* pOwner = NULL;
+                Creature* pSource = static_cast<Creature*>(source);
 
-                // No buddy defined, so try use source (or target if source is not creature)
-                if (!step.script->despawn.creatureEntry)
-                {
-                    if (pSource->GetTypeId() != TYPEID_UNIT)
-                    {
-                        // we can't be non-creature, so see if target is creature
-                        if (target && target->GetTypeId() == TYPEID_UNIT)
-                            pOwner = (Creature*)target;
-                    }
-                    else if (pSource->GetTypeId() == TYPEID_UNIT)
-                        pOwner = (Creature*)pSource;
-                }
-                else                                        // If step has a buddy entry defined, search for it
-                {
-                    MaNGOS::NearestCreatureEntryWithLiveStateInObjectRangeCheck u_check(*pSource, step.script->despawn.creatureEntry, true, step.script->despawn.searchRadius);
-                    MaNGOS::CreatureLastSearcher<MaNGOS::NearestCreatureEntryWithLiveStateInObjectRangeCheck> searcher(pOwner, u_check);
-
-                    Cell::VisitGridObjects(pSource, searcher, step.script->despawn.searchRadius);
-                }
-
-                if (!pOwner)
-                {
-                    sLog.outError("SCRIPT_COMMAND_DESPAWN_CREATURE (script id %u) call for non-creature (TypeIdSource: %u)(TypeIdTarget: %u), skipping.", step.script->id, source->GetTypeId(), target ? target->GetTypeId() : 0);
-                    break;
-                }
-
-                pOwner->ForcedDespawn(step.script->despawn.despawnDelay);
+                pSource->DespawnOrUnsummon(step.script->despawn.despawnDelay);
 
                 break;
             }

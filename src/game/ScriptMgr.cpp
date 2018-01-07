@@ -421,16 +421,6 @@ void ScriptMgr::LoadScripts(ScriptMapMap& scripts, const char* tablename)
             }
             case SCRIPT_COMMAND_DESPAWN_CREATURE:
             {
-                if (tmp.despawn.creatureEntry && !ObjectMgr::GetCreatureTemplate(tmp.despawn.creatureEntry))
-                {
-                    sLog.outErrorDb("Table `%s` has datalong2 = %u in SCRIPT_COMMAND_DESPAWN_CREATURE for script id %u, but this creature_template does not exist.", tablename, tmp.despawn.creatureEntry, tmp.id);
-                    continue;
-                }
-                if (tmp.despawn.creatureEntry && !tmp.despawn.searchRadius)
-                {
-                    sLog.outErrorDb("Table `%s` has datalong2 = %u in SCRIPT_COMMAND_DESPAWN_CREATURE for script id %u, but search radius is too small (datalong3 = %u).", tablename, tmp.despawn.creatureEntry, tmp.id, tmp.despawn.searchRadius);
-                    continue;
-                }
                 break;
             }
             case SCRIPT_COMMAND_PLAY_MOVIE:

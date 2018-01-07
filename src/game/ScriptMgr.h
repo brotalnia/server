@@ -80,18 +80,18 @@ enum eScriptCommand
                                                             // datalong = map_id (only used for players but still required)
                                                             // datalong2 = eTeleportToFlags
                                                             // x/y/z = coordinates
-    SCRIPT_COMMAND_QUEST_EXPLORED           = 7,            // source = Player (in provided source or target)
-                                                            // target = WorldObject (in provided source or target)
+    SCRIPT_COMMAND_QUEST_EXPLORED           = 7,            // source = Player (from provided source or target)
+                                                            // target = WorldObject (from provided source or target)
                                                             // datalong = quest_id
                                                             // datalong2 = distance or 0
-    SCRIPT_COMMAND_KILL_CREDIT              = 8,            // source = Player (in provided source or target)
+    SCRIPT_COMMAND_KILL_CREDIT              = 8,            // source = Player (from provided source or target)
                                                             // datalong = creature entry
                                                             // datalong2 = bool (0=personal credit, 1=group credit)
     SCRIPT_COMMAND_RESPAWN_GAMEOBJECT       = 9,            // source = Map
                                                             // target = GameObject (from datalong, provided source or target)
                                                             // datalong=db_guid
                                                             // datalong2=despawn_delay
-    SCRIPT_COMMAND_TEMP_SUMMON_CREATURE     = 10,           // source = WorldObject (provided source or buddy)
+    SCRIPT_COMMAND_TEMP_SUMMON_CREATURE     = 10,           // source = WorldObject (from provided source or buddy)
                                                             // datalong = creature_entry
                                                             // datalong2=despawn_delay
                                                             // data_flags = eSummonCreatureFlags
@@ -113,12 +113,15 @@ enum eScriptCommand
                                                             // target = Unit
                                                             // datalong = spell_id
                                                             // datalong2 = eCastSpellFlags
-    SCRIPT_COMMAND_PLAY_SOUND               = 16,           // source = any object, target=any/player, datalong (sound_id), datalong2 (bitmask: 0/1=anyone/target, 0/2=with distance dependent, so 1|2 = 3 is target with distance dependent)
-    SCRIPT_COMMAND_CREATE_ITEM              = 17,           // source or target must be player, datalong = item entry, datalong2 = amount
-    SCRIPT_COMMAND_DESPAWN_CREATURE         = 18,           // source or target must be creature
+    SCRIPT_COMMAND_PLAY_SOUND               = 16,           // source = WorldObject
+                                                            // target = Player/None
+                                                            // datalong = sound_id
+                                                            // datalong2 = ePlaySoundFlags
+    SCRIPT_COMMAND_CREATE_ITEM              = 17,           // source = Player (from provided source or target)
+                                                            // datalong = item_entry
+                                                            // datalong2 = amount
+    SCRIPT_COMMAND_DESPAWN_CREATURE         = 18,           // source = creature
                                                             // datalong = despawn delay
-                                                            // datalong2 = search for npc entry if provided
-                                                            // datalong3 = search distance
     SCRIPT_COMMAND_PLAY_MOVIE               = 19,           // target can only be a player, datalog = movie id
     SCRIPT_COMMAND_MOVEMENT                 = 20,           // source or target must be creature. datalong = MovementType (0:idle, 1:random or 2:waypoint)
                                                             // datalong2 = creature entry (searching for a buddy, closest to source), datalong3 = creature search radius
@@ -213,6 +216,13 @@ enum eCastSpellFlags
 {
     SF_CAST_SPELL_TRIGGERED          = 0x1,                    // Triggered spells skip checks.
     SF_CAST_SPELL_INTERRUPT_PREVIOUS = 0x2                     // Will interrupt the current spell cast.
+};
+
+// Flags used by SCRIPT_COMMAND_PLAY_SOUND
+enum ePlaySoundFlags
+{
+    SF_PLAY_SOUND_ONLY_TO_TARGET     = 0x1,
+    SF_PLAY_SOUND_DISTANCE_DEPENDENT = 0x2
 };
 
 // Values used in buddy_type column
@@ -361,8 +371,6 @@ struct ScriptInfo
         struct                                              // SCRIPT_COMMAND_DESPAWN_CREATURE (18)
         {
             uint32 despawnDelay;                            // datalong
-            uint32 creatureEntry;                           // datalong2
-            uint32 searchRadius;                            // datalong3
         } despawn;
 
         struct                                              // SCRIPT_COMMAND_PLAY_MOVIE (19)
