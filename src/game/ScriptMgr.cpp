@@ -446,20 +446,31 @@ void ScriptMgr::LoadScripts(ScriptMapMap& scripts, const char* tablename)
             }
             case SCRIPT_COMMAND_MOVEMENT:
             {
-                if (tmp.movement.movementType >= MAX_DB_MOTION_TYPE)
+                switch (tmp.movement.movementType)
                 {
-                    sLog.outErrorDb("Table `%s` SCRIPT_COMMAND_MOVEMENT has invalid MovementType %u for script id %u",
-                                    tablename, tmp.movement.movementType, tmp.id);
-                    continue;
+                    case IDLE_MOTION_TYPE:
+                    case RANDOM_MOTION_TYPE:
+                    case WAYPOINT_MOTION_TYPE:
+                    case CONFUSED_MOTION_TYPE:
+                    case CHASE_MOTION_TYPE:
+                    case HOME_MOTION_TYPE:
+                    case FLEEING_MOTION_TYPE:
+                    case DISTRACT_MOTION_TYPE:
+                    case FOLLOW_MOTION_TYPE:
+                    case CHARGE_MOTION_TYPE:
+                        break;
+                    default:
+                    {
+                        sLog.outErrorDb("Table `%s` SCRIPT_COMMAND_MOVEMENT has invalid MovementType %u for script id %u",
+                            tablename, tmp.movement.movementType, tmp.id);
+                        continue;
+                    }
                 }
-                if (tmp.movement.creatureEntry && !ObjectMgr::GetCreatureTemplate(tmp.movement.creatureEntry))
+
+                if (tmp.movement.boolParam > 1)
                 {
-                    sLog.outErrorDb("Table `%s` has datalong2 = %u in SCRIPT_COMMAND_MOVEMENT for script id %u, but this creature_template does not exist.", tablename, tmp.movement.creatureEntry, tmp.id);
-                    continue;
-                }
-                if (tmp.movement.creatureEntry && !tmp.movement.searchRadius)
-                {
-                    sLog.outErrorDb("Table `%s` has datalong2 = %u in SCRIPT_COMMAND_MOVEMENT for script id %u, but search radius is too small (datalong3 = %u).", tablename, tmp.movement.creatureEntry, tmp.id, tmp.movement.searchRadius);
+                    sLog.outErrorDb("Table `%s` SCRIPT_COMMAND_MOVEMENT has wrong value in datalong2=%u (must be bool 0/1) for script id %u",
+                                    tablename, tmp.movement.boolParam, tmp.id);
                     continue;
                 }
 
@@ -467,17 +478,6 @@ void ScriptMgr::LoadScripts(ScriptMapMap& scripts, const char* tablename)
             }
             case SCRIPT_COMMAND_SET_ACTIVEOBJECT:
             {
-                if (tmp.activeObject.creatureEntry && !ObjectMgr::GetCreatureTemplate(tmp.activeObject.creatureEntry))
-                {
-                    sLog.outErrorDb("Table `%s` has datalong2 = %u in SCRIPT_COMMAND_SET_ACTIVEOBJECT for script id %u, but this creature_template does not exist.", tablename, tmp.activeObject.creatureEntry, tmp.id);
-                    continue;
-                }
-                if (tmp.activeObject.creatureEntry && !tmp.activeObject.searchRadius)
-                {
-                    sLog.outErrorDb("Table `%s` has datalong2 = %u in SCRIPT_COMMAND_SET_ACTIVEOBJECT for script id %u, but search radius is too small (datalong3 = %u).", tablename, tmp.activeObject.creatureEntry, tmp.id, tmp.activeObject.searchRadius);
-                    continue;
-                }
-
                 break;
             }
             case SCRIPT_COMMAND_SET_FACTION:

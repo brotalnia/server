@@ -3113,43 +3113,26 @@ void Map::ScriptsProcess()
             }
             case SCRIPT_COMMAND_MOVEMENT:
             {
-                if (!source)
+                Creature* pSource = nullptr;
+                Unit* pTarget = nullptr;
+
+                if (source && source->GetTypeId() == TYPEID_UNIT)
                 {
-                    sLog.outError("SCRIPT_COMMAND_MOVEMENT (script id %u) call for NULL source.", step.script->id);
-                    break;
+                    pSource = static_cast<Creature*>(source);
+
+                    if (target && target->isType(TYPEMASK_UNIT))
+                        pTarget = static_cast<Unit*>(target);
+                } 
+                else if (target && target->GetTypeId() == TYPEID_UNIT)
+                {
+                    pSource = static_cast<Creature*>(target);
+
+                    if (source && source->isType(TYPEMASK_UNIT))
+                        pTarget = static_cast<Unit*>(source);
                 }
-
-                if (!source->isType(TYPEMASK_WORLDOBJECT))
+                else
                 {
-                    sLog.outError("SCRIPT_COMMAND_MOVEMENT (script id %u) call for unsupported non-worldobject (TypeId: %u), skipping.", step.script->id, source->GetTypeId());
-                    break;
-                }
-
-                WorldObject* pSource = (WorldObject*)source;
-                Creature* pMover = NULL;
-
-                if (!step.script->movement.creatureEntry)   // No buddy defined, so try use source (or target where source is player)
-                {
-                    if (pSource->GetTypeId() != TYPEID_UNIT)
-                    {
-                        // we can't move source being non-creature, so see if target is creature
-                        if (target && target->GetTypeId() == TYPEID_UNIT)
-                            pMover = (Creature*)target;
-                    }
-                    else if (pSource->GetTypeId() == TYPEID_UNIT)
-                        pMover = (Creature*)pSource;
-                }
-                else                                        // If step has a buddy entry defined, search for it
-                {
-                    MaNGOS::NearestCreatureEntryWithLiveStateInObjectRangeCheck u_check(*pSource, step.script->movement.creatureEntry, true, step.script->movement.searchRadius);
-                    MaNGOS::CreatureLastSearcher<MaNGOS::NearestCreatureEntryWithLiveStateInObjectRangeCheck> searcher(pMover, u_check);
-
-                    Cell::VisitGridObjects(pSource, searcher, step.script->movement.searchRadius);
-                }
-
-                if (!pMover)
-                {
-                    sLog.outError("SCRIPT_COMMAND_MOVEMENT (script id %u) call for non-creature (TypeIdSource: %u)(TypeIdTarget: %u), skipping.", step.script->id, source->GetTypeId(), target ? target->GetTypeId() : 0);
+                    sLog.outError("SCRIPT_COMMAND_MOVEMENT (script id %u) call for a NULL or non-creature source and target, skipping", step.script->id);
                     break;
                 }
 
@@ -3159,13 +3142,53 @@ void Map::ScriptsProcess()
                 switch (step.script->movement.movementType)
                 {
                     case IDLE_MOTION_TYPE:
-                        pMover->GetMotionMaster()->MoveIdle();
+                        pSource->GetMotionMaster()->MoveIdle();
                         break;
                     case RANDOM_MOTION_TYPE:
-                        pMover->GetMotionMaster()->MoveRandom();
+                        pSource->GetMotionMaster()->MoveRandom();
                         break;
                     case WAYPOINT_MOTION_TYPE:
-                        pMover->GetMotionMaster()->MoveWaypoint();
+                        pSource->GetMotionMaster()->MoveWaypoint(step.script->movement.boolParam);
+                        break;
+                    case CONFUSED_MOTION_TYPE:
+                        pSource->GetMotionMaster()->MoveConfused();
+                        break;
+                    case CHASE_MOTION_TYPE:
+                        if (step.script->movement.boolParam) // chase victim
+                        {
+                            if (Unit* pVictim = pSource->getVictim())
+                                pSource->GetMotionMaster()->MoveChase(pVictim, step.script->x, step.script->o);
+                            break;
+                        }
+                        else if (pTarget)
+                            pSource->GetMotionMaster()->MoveChase(pTarget, step.script->x, step.script->o);
+                        break;
+                    case HOME_MOTION_TYPE:
+                        pSource->GetMotionMaster()->MoveTargetedHome();
+                        break;
+                    case FLEEING_MOTION_TYPE:
+                        if (step.script->movement.boolParam) // flee from victim
+                        {
+                            if (Unit* pVictim = pSource->getVictim())
+                                pSource->GetMotionMaster()->MoveFleeing(pVictim, step.script->movement.intParam);
+                            break;
+                        }
+                        else if (pTarget)
+                            pSource->GetMotionMaster()->MoveFleeing(pTarget, step.script->movement.intParam);
+                        break;
+                    case DISTRACT_MOTION_TYPE:
+                        pSource->GetMotionMaster()->MoveDistract(step.script->movement.intParam);
+                        break;
+                    case FOLLOW_MOTION_TYPE:
+                        if (pTarget)
+                            pSource->GetMotionMaster()->MoveFollow(pTarget, step.script->x, step.script->o);
+                        break;
+                    case CHARGE_MOTION_TYPE:
+                        if (pTarget)
+                            pSource->GetMotionMaster()->MoveCharge(pTarget, step.script->movement.intParam, step.script->movement.boolParam);
+                        break;
+                    default:
+                        sLog.outError("SCRIPT_COMMAND_MOVEMENT (script id %u) call for an invalid motion type (MotionType: %u), skipping.", step.script->id, step.script->movement.movementType);
                         break;
                 }
 
@@ -3173,48 +3196,19 @@ void Map::ScriptsProcess()
             }
             case SCRIPT_COMMAND_SET_ACTIVEOBJECT:
             {
-                if (!source)
+                Creature* pSource = nullptr;
+
+                if (source && source->GetTypeId() == TYPEID_UNIT)
+                    pSource = static_cast<Creature*>(source);
+                else if (target && target->GetTypeId() == TYPEID_UNIT)
+                    pSource = static_cast<Creature*>(target);
+                else
                 {
-                    sLog.outError("SCRIPT_COMMAND_SET_ACTIVEOBJECT (script id %u) call for NULL source.", step.script->id);
+                    sLog.outError("SCRIPT_COMMAND_SET_ACTIVEOBJECT (script id %u) call for a NULL or non-creature source.", step.script->id);
                     break;
                 }
 
-                if (!source->isType(TYPEMASK_WORLDOBJECT))
-                {
-                    sLog.outError("SCRIPT_COMMAND_SET_ACTIVEOBJECT (script id %u) call for unsupported non-worldobject (TypeId: %u), skipping.", step.script->id, source->GetTypeId());
-                    break;
-                }
-
-                WorldObject* pSource = (WorldObject*)source;
-                Creature* pOwner = NULL;
-
-                // No buddy defined, so try use source (or target if source is not creature)
-                if (!step.script->activeObject.creatureEntry)
-                {
-                    if (pSource->GetTypeId() != TYPEID_UNIT)
-                    {
-                        // we can't be non-creature, so see if target is creature
-                        if (target && target->GetTypeId() == TYPEID_UNIT)
-                            pOwner = (Creature*)target;
-                    }
-                    else if (pSource->GetTypeId() == TYPEID_UNIT)
-                        pOwner = (Creature*)pSource;
-                }
-                else                                        // If step has a buddy entry defined, search for it
-                {
-                    MaNGOS::NearestCreatureEntryWithLiveStateInObjectRangeCheck u_check(*pSource, step.script->activeObject.creatureEntry, true, step.script->activeObject.searchRadius);
-                    MaNGOS::CreatureLastSearcher<MaNGOS::NearestCreatureEntryWithLiveStateInObjectRangeCheck> searcher(pOwner, u_check);
-
-                    Cell::VisitGridObjects(pSource, searcher, step.script->activeObject.searchRadius);
-                }
-
-                if (!pOwner)
-                {
-                    sLog.outError("SCRIPT_COMMAND_SET_ACTIVEOBJECT (script id %u) call for non-creature (TypeIdSource: %u)(TypeIdTarget: %u), skipping.", step.script->id, source->GetTypeId(), target ? target->GetTypeId() : 0);
-                    break;
-                }
-
-                pOwner->SetActiveObjectState(step.script->activeObject.activate);
+                pSource->SetActiveObjectState(step.script->activeObject.activate);
                 break;
             }
             case SCRIPT_COMMAND_SET_FACTION:

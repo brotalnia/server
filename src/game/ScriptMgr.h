@@ -120,18 +120,19 @@ enum eScriptCommand
     SCRIPT_COMMAND_CREATE_ITEM              = 17,           // source = Player (from provided source or target)
                                                             // datalong = item_entry
                                                             // datalong2 = amount
-    SCRIPT_COMMAND_DESPAWN_CREATURE         = 18,           // source = creature
+    SCRIPT_COMMAND_DESPAWN_CREATURE         = 18,           // source = Creature
                                                             // datalong = despawn delay
-    SCRIPT_COMMAND_SET_EQUIPMENT            = 19,           // source = creature
+    SCRIPT_COMMAND_SET_EQUIPMENT            = 19,           // source = Creature
                                                             // datalong = (bool) resetDefault
                                                             // dataint = main-hand item_id
                                                             // dataint2 = off-hand item_id
                                                             // dataint3 = ranged item_id
-    SCRIPT_COMMAND_MOVEMENT                 = 20,           // source or target must be creature. datalong = MovementType (0:idle, 1:random or 2:waypoint)
-                                                            // datalong2 = creature entry (searching for a buddy, closest to source), datalong3 = creature search radius
-    SCRIPT_COMMAND_SET_ACTIVEOBJECT         = 21,           // source=any, target=creature
-                                                            // datalong=bool 0=off, 1=on
-                                                            // datalong2=creature entry, datalong3=search radius
+    SCRIPT_COMMAND_MOVEMENT                 = 20,           // source = Creature
+                                                            // datalong = see enum MovementGeneratorType (not all are supported)
+                                                            // datalong2 = bool_param (meaning depends on the motion type)
+                                                            // datalong3 = int_param (meaning depends on the motion type)
+    SCRIPT_COMMAND_SET_ACTIVEOBJECT         = 21,           // source = Creature
+                                                            // datalong = (bool) 0=off, 1=on
     SCRIPT_COMMAND_SET_FACTION              = 22,           // source=any, target=creature
                                                             // datalong=factionId,
                                                             // datalong2=creature entry, datalong3=search radius
@@ -201,6 +202,7 @@ enum eMoveToCoordinateTypes
 };
 
 // Flags used by SCRIPT_COMMAND_TEMP_SUMMON_CREATURE
+// Must start from 0x8 because of target selection flags.
 enum eSummonCreatureFlags
 {
     SF_SUMMON_CREATURE_ACTIVE      = 0x08,                     // active creatures are always updated
@@ -390,15 +392,13 @@ struct ScriptInfo
         struct                                              // SCRIPT_COMMAND_MOVEMENT (20)
         {
             uint32 movementType;                            // datalong
-            uint32 creatureEntry;                           // datalong2
-            uint32 searchRadius;                            // datalong3
+            uint32 boolParam;                               // datalong2
+            uint32 intParam;                                // datalong3
         } movement;
 
         struct                                              // SCRIPT_COMMAND_SET_ACTIVEOBJECT (21)
         {
             uint32 activate;                                // datalong
-            uint32 creatureEntry;                           // datalong2
-            uint32 searchRadius;                            // datalong3
         } activeObject;
 
         struct                                              // SCRIPT_COMMAND_SET_FACTION (22)
