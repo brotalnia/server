@@ -142,11 +142,10 @@ enum eScriptCommand
     SCRIPT_COMMAND_MOUNT_TO_ENTRY_OR_MODEL  = 24,           // source = Creature
                                                             // datalong = creature entry/modelid (depend on datalong2)
                                                             // datalong2 = (bool) is_display_id
-    SCRIPT_COMMAND_SET_RUN                  = 25,           // source=any, target=creature
-                                                            // datalong= bool 0=off, 1=on
-                                                            // datalong2=creature entry, datalong3=search radius
-    SCRIPT_COMMAND_ATTACK_START             = 26,           // source = Creature (or WorldObject when creature entry are defined), target = Player
-                                                            // datalong2 = creature entry (searching for a buddy, closest to source), datalong3 = creature search radius
+    SCRIPT_COMMAND_SET_RUN                  = 25,           // source = Creature
+                                                            // datalong = (bool) 0 = off, 1 = on
+    SCRIPT_COMMAND_ATTACK_START             = 26,           // source = Creature
+                                                            // target = Player
     SCRIPT_COMMAND_GO_LOCK_STATE            = 27,           // source or target must be WorldObject
                                                             // datalong= 1=lock, 2=unlock, 4=set not-interactable, 8=set interactable
                                                             // datalong2= go entry, datalong3= go search radius
@@ -420,18 +419,9 @@ struct ScriptInfo
         struct                                              // SCRIPT_COMMAND_SET_RUN (25)
         {
             uint32 run;                                     // datalong
-            uint32 creatureEntry;                           // datalong2
-            uint32 searchRadius;                            // datalong3
         } run;
 
-        struct                                              // SCRIPT_COMMAND_ATTACK_START (26)
-        {
-            uint32 empty1;                                  // datalong
-            uint32 creatureEntry;                           // datalong2
-            uint32 searchRadius;                            // datalong3
-            uint32 empty2;                                  // datalong4
-            uint32 flags;                                   // data_flags
-        } attack;
+                                                            // SCRIPT_COMMAND_ATTACK_START (26)
 
         struct                                              // SCRIPT_COMMAND_GO_LOCK_STATE (27)
         {

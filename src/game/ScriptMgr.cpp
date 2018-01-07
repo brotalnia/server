@@ -534,31 +534,10 @@ void ScriptMgr::LoadScripts(ScriptMapMap& scripts, const char* tablename)
             }
             case SCRIPT_COMMAND_SET_RUN:
             {
-                if (tmp.run.creatureEntry && !ObjectMgr::GetCreatureTemplate(tmp.run.creatureEntry))
-                {
-                    sLog.outErrorDb("Table `%s` has datalong2 = %u in SCRIPT_COMMAND_SET_RUN for script id %u, but this creature_template does not exist.", tablename, tmp.run.creatureEntry, tmp.id);
-                    continue;
-                }
-                if (tmp.run.creatureEntry && !tmp.run.searchRadius)
-                {
-                    sLog.outErrorDb("Table `%s` has datalong2 = %u in SCRIPT_COMMAND_SET_RUN for script id %u, but search radius is too small (datalong3 = %u).", tablename, tmp.run.creatureEntry, tmp.id, tmp.run.searchRadius);
-                    continue;
-                }
-
                 break;
             }
             case SCRIPT_COMMAND_ATTACK_START:
             {
-                if (tmp.attack.creatureEntry && !ObjectMgr::GetCreatureTemplate(tmp.attack.creatureEntry))
-                {
-                    sLog.outErrorDb("Table `%s` has datalong2 = %u in SCRIPT_COMMAND_ATTACK_START for script id %u, but this creature_template does not exist.", tablename, tmp.attack.creatureEntry, tmp.id);
-                    continue;
-                }
-                if (tmp.attack.creatureEntry && !tmp.attack.searchRadius)
-                {
-                    sLog.outErrorDb("Table `%s` has datalong2 = %u in SCRIPT_COMMAND_ATTACK_START for script id %u, but search radius is too small (datalong3 = %u).", tablename, tmp.attack.creatureEntry, tmp.id, tmp.attack.searchRadius);
-                    continue;
-                }
                 break;
             }
             case SCRIPT_COMMAND_GO_LOCK_STATE:

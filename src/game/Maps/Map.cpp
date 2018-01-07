@@ -3063,7 +3063,7 @@ void Map::ScriptsProcess()
                     break;
                 }
 
-                if (!source->GetTypeId() == TYPEID_UNIT)
+                if (source->GetTypeId() != TYPEID_UNIT)
                 {
                     sLog.outError("SCRIPT_COMMAND_DESPAWN_CREATURE (script id %u) call for a non-creature source (TypeId: %u), skipping.", step.script->id, source->GetTypeId());
                     break;
@@ -3290,106 +3290,26 @@ void Map::ScriptsProcess()
             }
             case SCRIPT_COMMAND_SET_RUN:
             {
-                if (!source)
+                Creature* pSource = nullptr;
+
+                if (source && source->GetTypeId() == TYPEID_UNIT)
+                    pSource = static_cast<Creature*>(source);
+                else if (target && target->GetTypeId() == TYPEID_UNIT)
+                    pSource = static_cast<Creature*>(target);
+                else
                 {
-                    sLog.outError("SCRIPT_COMMAND_SET_RUN (script id %u) call for NULL source.", step.script->id);
+                    sLog.outError("SCRIPT_COMMAND_SET_RUN (script id %u) call for a NULL or non-creature source and target.", step.script->id);
                     break;
                 }
 
-                if (!source->isType(TYPEMASK_WORLDOBJECT))
-                {
-                    sLog.outError("SCRIPT_COMMAND_SET_RUN (script id %u) call for unsupported non-worldobject (TypeId: %u), skipping.", step.script->id, source->GetTypeId());
-                    break;
-                }
-
-                WorldObject* pSource = (WorldObject*)source;
-                Creature* pOwner = NULL;
-
-                // No buddy defined, so try use source (or target if source is not creature)
-                if (!step.script->run.creatureEntry)
-                {
-                    if (pSource->GetTypeId() != TYPEID_UNIT)
-                    {
-                        // we can't be non-creature, so see if target is creature
-                        if (target && target->GetTypeId() == TYPEID_UNIT)
-                            pOwner = (Creature*)target;
-                    }
-                    else if (pSource->GetTypeId() == TYPEID_UNIT)
-                        pOwner = (Creature*)pSource;
-                }
-                else                                        // If step has a buddy entry defined, search for it
-                {
-                    MaNGOS::NearestCreatureEntryWithLiveStateInObjectRangeCheck u_check(*pSource, step.script->run.creatureEntry, true, step.script->run.searchRadius);
-                    MaNGOS::CreatureLastSearcher<MaNGOS::NearestCreatureEntryWithLiveStateInObjectRangeCheck> searcher(pOwner, u_check);
-
-                    Cell::VisitGridObjects(pSource, searcher, step.script->run.searchRadius);
-                }
-
-                if (!pOwner)
-                {
-                    sLog.outError("SCRIPT_COMMAND_SET_RUN (script id %u) call for non-creature (TypeIdSource: %u)(TypeIdTarget: %u), skipping.", step.script->id, source->GetTypeId(), target ? target->GetTypeId() : 0);
-                    break;
-                }
-
-                pOwner->SetWalk(!step.script->run.run);
+                pSource->SetWalk(!step.script->run.run);
 
                 break;
             }
             case SCRIPT_COMMAND_ATTACK_START:
             {
-                if (!source)
-                {
-                    sLog.outError("SCRIPT_COMMAND_ATTACK_START (script id %u) call for NULL source.", step.script->id);
-                    break;
-                }
-
-                if (!source->isType(TYPEMASK_WORLDOBJECT))
-                {
-                    sLog.outError("SCRIPT_COMMAND_ATTACK_START (script id %u) call for unsupported non-worldobject (TypeId: %u), skipping.", step.script->id, source->GetTypeId());
-                    break;
-                }
-
-                WorldObject* pSource = (WorldObject*)source;
-
-                // flag_original_source_as_target   0x02
-                // flag_buddy_as_target             0x04
-
-                // If step has a buddy entry defined, search for it.
-                if (step.script->attack.creatureEntry)
-                {
-                    Creature* pBuddy = NULL;
-                    MaNGOS::NearestCreatureEntryWithLiveStateInObjectRangeCheck u_check(*pSource, step.script->attack.creatureEntry, true, step.script->attack.searchRadius);
-                    MaNGOS::CreatureLastSearcher<MaNGOS::NearestCreatureEntryWithLiveStateInObjectRangeCheck> searcher(pBuddy, u_check);
-
-                    Cell::VisitGridObjects(pSource, searcher, step.script->attack.searchRadius);
-
-                    // If buddy found, then use it
-                    if (pBuddy)
-                    {
-                        if (step.script->attack.flags & 0x04)
-                        {
-                            // pBuddy is target of attack
-                            target = (Object*)pBuddy;
-                        }
-                        else
-                        {
-                            // If not target of attack, then set pBuddy as source, the attacker
-                            pSource = (WorldObject*)pBuddy;
-                        }
-                    }
-                    else
-                    {
-                        // No buddy found, so don't do anything
-                        break;
-                    }
-                }
-
-                // If we should attack the original source instead of target
-                if (step.script->attack.flags & 0x02)
-                    target = source;
-
-                Unit* unitTarget = target && target->isType(TYPEMASK_UNIT) ? static_cast<Unit*>(target) : NULL;
-                Creature* pAttacker = pSource && pSource->GetTypeId() == TYPEID_UNIT ? static_cast<Creature*>(pSource) : NULL;
+                Unit* unitTarget = target && target->isType(TYPEMASK_UNIT) ? static_cast<Unit*>(target) : nullptr;
+                Creature* pAttacker = source && source->GetTypeId() == TYPEID_UNIT ? static_cast<Creature*>(source) : nullptr;
 
                 if (pAttacker && unitTarget)
                 {
