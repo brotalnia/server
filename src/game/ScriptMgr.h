@@ -121,9 +121,9 @@ enum eScriptCommand
                                                             // datalong = item_entry
                                                             // datalong2 = amount
     SCRIPT_COMMAND_DESPAWN_CREATURE         = 18,           // source = Creature
-                                                            // datalong = despawn delay
+                                                            // datalong = despawn_delay
     SCRIPT_COMMAND_SET_EQUIPMENT            = 19,           // source = Creature
-                                                            // datalong = (bool) resetDefault
+                                                            // datalong = (bool) reset_default
                                                             // dataint = main-hand item_id
                                                             // dataint2 = off-hand item_id
                                                             // dataint3 = ranged item_id
@@ -133,17 +133,15 @@ enum eScriptCommand
                                                             // datalong3 = int_param (meaning depends on the motion type)
     SCRIPT_COMMAND_SET_ACTIVEOBJECT         = 21,           // source = Creature
                                                             // datalong = (bool) 0=off, 1=on
-    SCRIPT_COMMAND_SET_FACTION              = 22,           // source=any, target=creature
-                                                            // datalong=factionId,
-                                                            // datalong2=creature entry, datalong3=search radius
-    SCRIPT_COMMAND_MORPH_TO_ENTRY_OR_MODEL  = 23,           // source=any, target=creature
-                                                            // datalong=creature entry/modelid (depend on data_flags)
-                                                            // datalong2=creature entry, datalong3=search radius
-                                                            // dataflags= 0x01 to use datalong value as modelid explicit
-    SCRIPT_COMMAND_MOUNT_TO_ENTRY_OR_MODEL  = 24,           // source=any, target=creature
-                                                            // datalong=creature entry/modelid (depend on data_flags)
-                                                            // datalong2=creature entry, datalong3=search radius
-                                                            // dataflags= 0x01 to use datalong value as modelid explicit
+    SCRIPT_COMMAND_SET_FACTION              = 22,           // source = Creature
+                                                            // datalong = faction_Id,
+                                                            // datalong2= see enum TemporaryFactionFlags
+    SCRIPT_COMMAND_MORPH_TO_ENTRY_OR_MODEL  = 23,           // source = Creature
+                                                            // datalong = creature entry/modelid (depend on datalong2)
+                                                            // datalong2 = (bool) is_display_id
+    SCRIPT_COMMAND_MOUNT_TO_ENTRY_OR_MODEL  = 24,           // source = Creature
+                                                            // datalong = creature entry/modelid (depend on datalong2)
+                                                            // datalong2 = (bool) is_display_id
     SCRIPT_COMMAND_SET_RUN                  = 25,           // source=any, target=creature
                                                             // datalong= bool 0=off, 1=on
                                                             // datalong2=creature entry, datalong3=search radius
@@ -404,28 +402,19 @@ struct ScriptInfo
         struct                                              // SCRIPT_COMMAND_SET_FACTION (22)
         {
             uint32 factionId;                               // datalong
-            uint32 creatureEntry;                           // datalong2
-            uint32 searchRadius;                            // datalong3
-            uint32 empty1;                                  // datalong4
-            uint32 flags;                                   // data_flags
+            uint32 flags;                                   // datalong2
         } faction;
 
         struct                                              // SCRIPT_COMMAND_MORPH_TO_ENTRY_OR_MODEL (23)
         {
             uint32 creatureOrModelEntry;                    // datalong
-            uint32 creatureEntry;                           // datalong2
-            uint32 searchRadius;                            // datalong3
-            uint32 empty1;                                  // datalong4
-            uint32 flags;                                   // data_flags
+            uint32 isDisplayId;                             // datalong2
         } morph;
 
         struct                                              // SCRIPT_COMMAND_MOUNT_TO_ENTRY_OR_MODEL (24)
         {
             uint32 creatureOrModelEntry;                    // datalong
-            uint32 creatureEntry;                           // datalong2
-            uint32 searchRadius;                            // datalong3
-            uint32 empty1;                                  // datalong4
-            uint32 flags;                                   // data_flags
+            uint32 isDisplayId;                             // datalong2
         } mount;
 
         struct                                              // SCRIPT_COMMAND_SET_RUN (25)

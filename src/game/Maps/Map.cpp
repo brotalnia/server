@@ -3213,164 +3213,77 @@ void Map::ScriptsProcess()
             }
             case SCRIPT_COMMAND_SET_FACTION:
             {
-                if (!source)
-                {
-                    sLog.outError("SCRIPT_COMMAND_SET_FACTION (script id %u) call for NULL source.", step.script->id);
-                    break;
-                }
+                Creature* pSource = nullptr;
 
-                if (!source->isType(TYPEMASK_WORLDOBJECT))
+                if (source && source->GetTypeId() == TYPEID_UNIT)
+                    pSource = static_cast<Creature*>(source);
+                else if (target && target->GetTypeId() == TYPEID_UNIT)
+                    pSource = static_cast<Creature*>(target);
+                else
                 {
-                    sLog.outError("SCRIPT_COMMAND_SET_FACTION (script id %u) call for unsupported non-worldobject (TypeId: %u), skipping.", step.script->id, source->GetTypeId());
-                    break;
-                }
-
-                WorldObject* pSource = (WorldObject*)source;
-                Creature* pOwner = NULL;
-
-                // No buddy defined, so try use source (or target if source is not creature)
-                if (!step.script->faction.creatureEntry)
-                {
-                    if (pSource->GetTypeId() != TYPEID_UNIT)
-                    {
-                        // we can't be non-creature, so see if target is creature
-                        if (target && target->GetTypeId() == TYPEID_UNIT)
-                            pOwner = (Creature*)target;
-                    }
-                    else if (pSource->GetTypeId() == TYPEID_UNIT)
-                        pOwner = (Creature*)pSource;
-                }
-                else                                        // If step has a buddy entry defined, search for it
-                {
-                    MaNGOS::NearestCreatureEntryWithLiveStateInObjectRangeCheck u_check(*pSource, step.script->faction.creatureEntry, true, step.script->faction.searchRadius);
-                    MaNGOS::CreatureLastSearcher<MaNGOS::NearestCreatureEntryWithLiveStateInObjectRangeCheck> searcher(pOwner, u_check);
-
-                    Cell::VisitGridObjects(pSource, searcher, step.script->faction.searchRadius);
-                }
-
-                if (!pOwner)
-                {
-                    sLog.outError("SCRIPT_COMMAND_SET_FACTION (script id %u) call for non-creature (TypeIdSource: %u)(TypeIdTarget: %u), skipping.", step.script->id, source->GetTypeId(), target ? target->GetTypeId() : 0);
+                    sLog.outError("SCRIPT_COMMAND_SET_FACTION (script id %u) call for a NULL or non-creature source and target.", step.script->id);
                     break;
                 }
 
                 if (step.script->faction.factionId)
-                    pOwner->SetFactionTemporary(step.script->faction.factionId, step.script->faction.flags);
+                    pSource->SetFactionTemporary(step.script->faction.factionId, step.script->faction.flags);
                 else
-                    pOwner->ClearTemporaryFaction();
+                    pSource->ClearTemporaryFaction();
 
                 break;
             }
             case SCRIPT_COMMAND_MORPH_TO_ENTRY_OR_MODEL:
             {
-                if (!source)
-                {
-                    sLog.outError("SCRIPT_COMMAND_MORPH_TO_ENTRY_OR_MODEL (script id %u) call for NULL source.", step.script->id);
-                    break;
-                }
+                Creature* pSource = nullptr;
 
-                if (!source->isType(TYPEMASK_WORLDOBJECT))
+                if (source && source->GetTypeId() == TYPEID_UNIT)
+                    pSource = static_cast<Creature*>(source);
+                else if (target && target->GetTypeId() == TYPEID_UNIT)
+                    pSource = static_cast<Creature*>(target);
+                else
                 {
-                    sLog.outError("SCRIPT_COMMAND_MORPH_TO_ENTRY_OR_MODEL (script id %u) call for unsupported non-worldobject (TypeId: %u), skipping.", step.script->id, source->GetTypeId());
-                    break;
-                }
-
-                WorldObject* pSource = (WorldObject*)source;
-                Creature* pOwner = NULL;
-
-                // No buddy defined, so try use source (or target if source is not creature)
-                if (!step.script->morph.creatureEntry)
-                {
-                    if (pSource->GetTypeId() != TYPEID_UNIT)
-                    {
-                        // we can't be non-creature, so see if target is creature
-                        if (target && target->GetTypeId() == TYPEID_UNIT)
-                            pOwner = (Creature*)target;
-                    }
-                    else if (pSource->GetTypeId() == TYPEID_UNIT)
-                        pOwner = (Creature*)pSource;
-                }
-                else                                        // If step has a buddy entry defined, search for it
-                {
-                    MaNGOS::NearestCreatureEntryWithLiveStateInObjectRangeCheck u_check(*pSource, step.script->morph.creatureEntry, true, step.script->morph.searchRadius);
-                    MaNGOS::CreatureLastSearcher<MaNGOS::NearestCreatureEntryWithLiveStateInObjectRangeCheck> searcher(pOwner, u_check);
-
-                    Cell::VisitGridObjects(pSource, searcher, step.script->morph.searchRadius);
-                }
-
-                if (!pOwner)
-                {
-                    sLog.outError("SCRIPT_COMMAND_MORPH_TO_ENTRY_OR_MODEL (script id %u) call for non-creature (TypeIdSource: %u)(TypeIdTarget: %u), skipping.", step.script->id, source->GetTypeId(), target ? target->GetTypeId() : 0);
+                    sLog.outError("SCRIPT_COMMAND_MORPH_TO_ENTRY_OR_MODEL (script id %u) call for a NULL or non-creature source and target.", step.script->id);
                     break;
                 }
 
                 if (!step.script->morph.creatureOrModelEntry)
-                    pOwner->DeMorph();
-                else if (step.script->morph.flags & 0x01)
-                    pOwner->SetDisplayId(step.script->morph.creatureOrModelEntry);
+                    pSource->DeMorph();
+                else if (step.script->morph.isDisplayId)
+                    pSource->SetDisplayId(step.script->morph.creatureOrModelEntry);
                 else
                 {
                     CreatureInfo const* ci = ObjectMgr::GetCreatureTemplate(step.script->morph.creatureOrModelEntry);
                     uint32 display_id = Creature::ChooseDisplayId(ci);
 
-                    pOwner->SetDisplayId(display_id);
+                    pSource->SetDisplayId(display_id);
                 }
 
                 break;
             }
             case SCRIPT_COMMAND_MOUNT_TO_ENTRY_OR_MODEL:
             {
-                if (!source)
-                {
-                    sLog.outError("SCRIPT_COMMAND_MOUNT_TO_ENTRY_OR_MODEL (script id %u) call for NULL source.", step.script->id);
-                    break;
-                }
+                Creature* pSource = nullptr;
 
-                if (!source->isType(TYPEMASK_WORLDOBJECT))
+                if (source && source->GetTypeId() == TYPEID_UNIT)
+                    pSource = static_cast<Creature*>(source);
+                else if (target && target->GetTypeId() == TYPEID_UNIT)
+                    pSource = static_cast<Creature*>(target);
+                else
                 {
-                    sLog.outError("SCRIPT_COMMAND_MOUNT_TO_ENTRY_OR_MODEL (script id %u) call for unsupported non-worldobject (TypeId: %u), skipping.", step.script->id, source->GetTypeId());
-                    break;
-                }
-
-                WorldObject* pSource = (WorldObject*)source;
-                Creature* pOwner = NULL;
-
-                // No buddy defined, so try use source (or target if source is not creature)
-                if (!step.script->mount.creatureEntry)
-                {
-                    if (pSource->GetTypeId() != TYPEID_UNIT)
-                    {
-                        // we can't be non-creature, so see if target is creature
-                        if (target && target->GetTypeId() == TYPEID_UNIT)
-                            pOwner = (Creature*)target;
-                    }
-                    else if (pSource->GetTypeId() == TYPEID_UNIT)
-                        pOwner = (Creature*)pSource;
-                }
-                else                                        // If step has a buddy entry defined, search for it
-                {
-                    MaNGOS::NearestCreatureEntryWithLiveStateInObjectRangeCheck u_check(*pSource, step.script->mount.creatureEntry, true, step.script->mount.searchRadius);
-                    MaNGOS::CreatureLastSearcher<MaNGOS::NearestCreatureEntryWithLiveStateInObjectRangeCheck> searcher(pOwner, u_check);
-
-                    Cell::VisitGridObjects(pSource, searcher, step.script->mount.searchRadius);
-                }
-
-                if (!pOwner)
-                {
-                    sLog.outError("SCRIPT_COMMAND_MOUNT_TO_ENTRY_OR_MODEL (script id %u) call for non-creature (TypeIdSource: %u)(TypeIdTarget: %u), skipping.", step.script->id, source ? source->GetTypeId() : 0, target ? target->GetTypeId() : 0);
+                    sLog.outError("SCRIPT_COMMAND_MOUNT_TO_ENTRY_OR_MODEL (script id %u) call for a NULL or non-creature source and target.", step.script->id);
                     break;
                 }
 
                 if (!step.script->mount.creatureOrModelEntry)
-                    pOwner->Unmount();
-                else if (step.script->mount.flags & 0x01)
-                    pOwner->Mount(step.script->mount.creatureOrModelEntry);
+                    pSource->Unmount();
+                else if (step.script->mount.isDisplayId)
+                    pSource->Mount(step.script->mount.creatureOrModelEntry);
                 else
                 {
                     CreatureInfo const* ci = ObjectMgr::GetCreatureTemplate(step.script->mount.creatureOrModelEntry);
                     uint32 display_id = Creature::ChooseDisplayId(ci);
 
-                    pOwner->Mount(display_id);
+                    pSource->Mount(display_id);
                 }
 
                 break;
