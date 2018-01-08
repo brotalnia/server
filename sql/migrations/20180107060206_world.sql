@@ -145,56 +145,56 @@ UPDATE `gossip_scripts` SET `data_flags`=1, `datalong2`=0 WHERE `command`=14 && 
 -- SCRIPT_COMMAND_CAST_SPELL
 UPDATE `quest_end_scripts` SET `data_flags`=4 WHERE `command`=15 && (`datalong2` & 1) && NOT (`datalong2` & 2);
 UPDATE `quest_end_scripts` SET `data_flags`=5 WHERE `command`=15 && (`datalong2` & 2) && NOT (`datalong2` & 1);
-UPDATE `quest_end_scripts` SET `data_flags`=1 WHERE `command`=15 && (`datalong2` & 3);
+UPDATE `quest_end_scripts` SET `data_flags`=1 WHERE `command`=15 && (`datalong2` = 3);
 UPDATE `quest_end_scripts` SET `datalong3`=1 WHERE `command`=15 && (`datalong2` & 4);
 UPDATE `quest_end_scripts` SET `datalong3`=`datalong3`+2 WHERE `command`=15 && `datalong2` & 8;
 UPDATE `quest_end_scripts` SET `datalong2`=`datalong3` WHERE `command`=15;
 UPDATE `quest_end_scripts` SET `datalong3`=0 WHERE `command`=15;
 UPDATE `quest_start_scripts` SET `data_flags`=4 WHERE `command`=15 && (`datalong2` & 1) && NOT (`datalong2` & 2);
 UPDATE `quest_start_scripts` SET `data_flags`=5 WHERE `command`=15 && (`datalong2` & 2) && NOT (`datalong2` & 1);
-UPDATE `quest_start_scripts` SET `data_flags`=1 WHERE `command`=15 && (`datalong2` & 3);
+UPDATE `quest_start_scripts` SET `data_flags`=1 WHERE `command`=15 && (`datalong2` = 3);
 UPDATE `quest_start_scripts` SET `datalong3`=1 WHERE `command`=15 && (`datalong2` & 4);
 UPDATE `quest_start_scripts` SET `datalong3`=`datalong3`+2 WHERE `command`=15 && `datalong2` & 8;
 UPDATE `quest_start_scripts` SET `datalong2`=`datalong3` WHERE `command`=15;
 UPDATE `quest_start_scripts` SET `datalong3`=0 WHERE `command`=15;
 UPDATE `spell_scripts` SET `data_flags`=4 WHERE `command`=15 && (`datalong2` & 1) && NOT (`datalong2` & 2);
 UPDATE `spell_scripts` SET `data_flags`=5 WHERE `command`=15 && (`datalong2` & 2) && NOT (`datalong2` & 1);
-UPDATE `spell_scripts` SET `data_flags`=1 WHERE `command`=15 && (`datalong2` & 3);
+UPDATE `spell_scripts` SET `data_flags`=1 WHERE `command`=15 && (`datalong2` = 3);
 UPDATE `spell_scripts` SET `datalong3`=1 WHERE `command`=15 && (`datalong2` & 4);
 UPDATE `spell_scripts` SET `datalong3`=`datalong3`+2 WHERE `command`=15 && `datalong2` & 8;
 UPDATE `spell_scripts` SET `datalong2`=`datalong3` WHERE `command`=15;
 UPDATE `spell_scripts` SET `datalong3`=0 WHERE `command`=15;
 UPDATE `creature_spells_scripts` SET `data_flags`=4 WHERE `command`=15 && (`datalong2` & 1) && NOT (`datalong2` & 2);
 UPDATE `creature_spells_scripts` SET `data_flags`=5 WHERE `command`=15 && (`datalong2` & 2) && NOT (`datalong2` & 1);
-UPDATE `creature_spells_scripts` SET `data_flags`=1 WHERE `command`=15 && (`datalong2` & 3);
+UPDATE `creature_spells_scripts` SET `data_flags`=1 WHERE `command`=15 && (`datalong2` = 3);
 UPDATE `creature_spells_scripts` SET `datalong3`=1 WHERE `command`=15 && (`datalong2` & 4);
 UPDATE `creature_spells_scripts` SET `datalong3`=`datalong3`+2 WHERE `command`=15 && `datalong2` & 8;
 UPDATE `creature_spells_scripts` SET `datalong2`=`datalong3` WHERE `command`=15;
 UPDATE `creature_spells_scripts` SET `datalong3`=0 WHERE `command`=15;
 UPDATE `creature_movement_scripts` SET `data_flags`=4 WHERE `command`=15 && (`datalong2` & 1) && NOT (`datalong2` & 2);
 UPDATE `creature_movement_scripts` SET `data_flags`=5 WHERE `command`=15 && (`datalong2` & 2) && NOT (`datalong2` & 1);
-UPDATE `creature_movement_scripts` SET `data_flags`=1 WHERE `command`=15 && (`datalong2` & 3);
+UPDATE `creature_movement_scripts` SET `data_flags`=1 WHERE `command`=15 && (`datalong2` = 3);
 UPDATE `creature_movement_scripts` SET `datalong3`=1 WHERE `command`=15 && (`datalong2` & 4);
 UPDATE `creature_movement_scripts` SET `datalong3`=`datalong3`+2 WHERE `command`=15 && `datalong2` & 8;
 UPDATE `creature_movement_scripts` SET `datalong2`=`datalong3` WHERE `command`=15;
 UPDATE `creature_movement_scripts` SET `datalong3`=0 WHERE `command`=15;
 UPDATE `gameobject_scripts` SET `data_flags`=4 WHERE `command`=15 && (`datalong2` & 1) && NOT (`datalong2` & 2);
 UPDATE `gameobject_scripts` SET `data_flags`=5 WHERE `command`=15 && (`datalong2` & 2) && NOT (`datalong2` & 1);
-UPDATE `gameobject_scripts` SET `data_flags`=1 WHERE `command`=15 && (`datalong2` & 3);
+UPDATE `gameobject_scripts` SET `data_flags`=1 WHERE `command`=15 && (`datalong2` = 3);
 UPDATE `gameobject_scripts` SET `datalong3`=1 WHERE `command`=15 && (`datalong2` & 4);
 UPDATE `gameobject_scripts` SET `datalong3`=`datalong3`+2 WHERE `command`=15 && `datalong2` & 8;
 UPDATE `gameobject_scripts` SET `datalong2`=`datalong3` WHERE `command`=15;
 UPDATE `gameobject_scripts` SET `datalong3`=0 WHERE `command`=15;
 UPDATE `event_scripts` SET `data_flags`=4 WHERE `command`=15 && (`datalong2` & 1) && NOT (`datalong2` & 2);
 UPDATE `event_scripts` SET `data_flags`=5 WHERE `command`=15 && (`datalong2` & 2) && NOT (`datalong2` & 1);
-UPDATE `event_scripts` SET `data_flags`=1 WHERE `command`=15 && (`datalong2` & 3);
+UPDATE `event_scripts` SET `data_flags`=1 WHERE `command`=15 && (`datalong2` = 3);
 UPDATE `event_scripts` SET `datalong3`=1 WHERE `command`=15 && (`datalong2` & 4);
 UPDATE `event_scripts` SET `datalong3`=`datalong3`+2 WHERE `command`=15 && `datalong2` & 8;
 UPDATE `event_scripts` SET `datalong2`=`datalong3` WHERE `command`=15;
 UPDATE `event_scripts` SET `datalong3`=0 WHERE `command`=15;
 UPDATE `gossip_scripts` SET `data_flags`=4 WHERE `command`=15 && (`datalong2` & 1) && NOT (`datalong2` & 2);
 UPDATE `gossip_scripts` SET `data_flags`=5 WHERE `command`=15 && (`datalong2` & 2) && NOT (`datalong2` & 1);
-UPDATE `gossip_scripts` SET `data_flags`=1 WHERE `command`=15 && (`datalong2` & 3);
+UPDATE `gossip_scripts` SET `data_flags`=1 WHERE `command`=15 && (`datalong2` = 3);
 UPDATE `gossip_scripts` SET `datalong3`=1 WHERE `command`=15 && (`datalong2` & 4);
 UPDATE `gossip_scripts` SET `datalong3`=`datalong3`+2 WHERE `command`=15 && `datalong2` & 8;
 UPDATE `gossip_scripts` SET `datalong2`=`datalong3` WHERE `command`=15;
@@ -283,6 +283,120 @@ UPDATE `creature_movement_scripts` SET `datalong2`=`data_flags`, `data_flags`=0 
 UPDATE `gameobject_scripts` SET `datalong2`=`data_flags`, `data_flags`=0 WHERE `command`=24;
 UPDATE `event_scripts` SET `datalong2`=`data_flags`, `data_flags`=0 WHERE `command`=24;
 UPDATE `gossip_scripts` SET `datalong2`=`data_flags`, `data_flags`=0 WHERE `command`=24;
+
+-- SCRIPT_COMMAND_SET_RUN
+UPDATE `quest_end_scripts` SET `buddy_id`=`datalong2`, `buddy_radius`=`datalong3`, `datalong2`=0, `datalong3`=0 WHERE `command`=25 && `datalong2`>0;
+UPDATE `quest_start_scripts` SET `buddy_id`=`datalong2`, `buddy_radius`=`datalong3`, `datalong2`=0, `datalong3`=0 WHERE `command`=25 && `datalong2`>0;
+UPDATE `spell_scripts` SET `buddy_id`=`datalong2`, `buddy_radius`=`datalong3`, `datalong2`=0, `datalong3`=0 WHERE `command`=25 && `datalong2`>0;
+UPDATE `creature_spells_scripts` SET `buddy_id`=`datalong2`, `buddy_radius`=`datalong3`, `datalong2`=0, `datalong3`=0 WHERE `command`=25 && `datalong2`>0;
+UPDATE `creature_movement_scripts` SET `buddy_id`=`datalong2`, `buddy_radius`=`datalong3`, `datalong2`=0, `datalong3`=0 WHERE `command`=25 && `datalong2`>0;
+UPDATE `gameobject_scripts` SET `buddy_id`=`datalong2`, `buddy_radius`=`datalong3`, `datalong2`=0, `datalong3`=0 WHERE `command`=25 && `datalong2`>0;
+UPDATE `event_scripts` SET `buddy_id`=`datalong2`, `buddy_radius`=`datalong3`, `datalong2`=0, `datalong3`=0 WHERE `command`=25 && `datalong2`>0;
+UPDATE `gossip_scripts` SET `buddy_id`=`datalong2`, `buddy_radius`=`datalong3`, `datalong2`=0, `datalong3`=0 WHERE `command`=25 && `datalong2`>0;
+
+-- SCRIPT_COMMAND_ATTACK_START
+UPDATE `quest_end_scripts` SET `buddy_id`=`datalong2`, `buddy_radius`=`datalong3`, `datalong2`=0, `datalong3`=0 WHERE `command`=26 && `datalong2`>0;
+UPDATE `quest_start_scripts` SET `buddy_id`=`datalong2`, `buddy_radius`=`datalong3`, `datalong2`=0, `datalong3`=0 WHERE `command`=26 && `datalong2`>0;
+UPDATE `spell_scripts` SET `buddy_id`=`datalong2`, `buddy_radius`=`datalong3`, `datalong2`=0, `datalong3`=0 WHERE `command`=26 && `datalong2`>0;
+UPDATE `creature_spells_scripts` SET `buddy_id`=`datalong2`, `buddy_radius`=`datalong3`, `datalong2`=0, `datalong3`=0 WHERE `command`=26 && `datalong2`>0;
+UPDATE `creature_movement_scripts` SET `buddy_id`=`datalong2`, `buddy_radius`=`datalong3`, `datalong2`=0, `datalong3`=0 WHERE `command`=26 && `datalong2`>0;
+UPDATE `gameobject_scripts` SET `buddy_id`=`datalong2`, `buddy_radius`=`datalong3`, `datalong2`=0, `datalong3`=0 WHERE `command`=26 && `datalong2`>0;
+UPDATE `event_scripts` SET `buddy_id`=`datalong2`, `buddy_radius`=`datalong3`, `datalong2`=0, `datalong3`=0 WHERE `command`=26 && `datalong2`>0;
+UPDATE `gossip_scripts` SET `buddy_id`=`datalong2`, `buddy_radius`=`datalong3`, `datalong2`=0, `datalong3`=0 WHERE `command`=26 && `datalong2`>0;
+
+-- SCRIPT_COMMAND_GO_LOCK_STATE
+UPDATE `quest_end_scripts` SET `buddy_id`=`datalong2`, `buddy_radius`=`datalong3`, `buddy_type`=3, `datalong2`=0, `datalong3`=0 WHERE `command`=27 && `datalong2`>0;
+UPDATE `quest_start_scripts` SET `buddy_id`=`datalong2`, `buddy_radius`=`datalong3`, `buddy_type`=3, `datalong2`=0, `datalong3`=0 WHERE `command`=27 && `datalong2`>0;
+UPDATE `spell_scripts` SET `buddy_id`=`datalong2`, `buddy_radius`=`datalong3`, `buddy_type`=3, `datalong2`=0, `datalong3`=0 WHERE `command`=27 && `datalong2`>0;
+UPDATE `creature_spells_scripts` SET `buddy_id`=`datalong2`, `buddy_radius`=`datalong3`, `buddy_type`=3, `datalong2`=0, `datalong3`=0 WHERE `command`=27 && `datalong2`>0;
+UPDATE `creature_movement_scripts` SET `buddy_id`=`datalong2`, `buddy_radius`=`datalong3`, `buddy_type`=3, `datalong2`=0, `datalong3`=0 WHERE `command`=27 && `datalong2`>0;
+UPDATE `gameobject_scripts` SET `buddy_id`=`datalong2`, `buddy_radius`=`datalong3`, `buddy_type`=3, `datalong2`=0, `datalong3`=0 WHERE `command`=27 && `datalong2`>0;
+UPDATE `event_scripts` SET `buddy_id`=`datalong2`, `buddy_radius`=`datalong3`, `buddy_type`=3, `datalong2`=0, `datalong3`=0 WHERE `command`=27 && `datalong2`>0;
+UPDATE `gossip_scripts` SET `buddy_id`=`datalong2`, `buddy_radius`=`datalong3`, `buddy_type`=3, `datalong2`=0, `datalong3`=0 WHERE `command`=27 && `datalong2`>0;
+
+-- SCRIPT_COMMAND_STAND_STATE
+UPDATE `quest_end_scripts` SET `buddy_id`=`datalong2`, `buddy_radius`=`datalong3`, `datalong2`=0, `datalong3`=0 WHERE `command`=28 && `datalong2`>0;
+UPDATE `quest_start_scripts` SET `buddy_id`=`datalong2`, `buddy_radius`=`datalong3`, `datalong2`=0, `datalong3`=0 WHERE `command`=28 && `datalong2`>0;
+UPDATE `spell_scripts` SET `buddy_id`=`datalong2`, `buddy_radius`=`datalong3`, `datalong2`=0, `datalong3`=0 WHERE `command`=28 && `datalong2`>0;
+UPDATE `creature_spells_scripts` SET `buddy_id`=`datalong2`, `buddy_radius`=`datalong3`, `datalong2`=0, `datalong3`=0 WHERE `command`=28 && `datalong2`>0;
+UPDATE `creature_movement_scripts` SET `buddy_id`=`datalong2`, `buddy_radius`=`datalong3`, `datalong2`=0, `datalong3`=0 WHERE `command`=28 && `datalong2`>0;
+UPDATE `gameobject_scripts` SET `buddy_id`=`datalong2`, `buddy_radius`=`datalong3`, `datalong2`=0, `datalong3`=0 WHERE `command`=28 && `datalong2`>0;
+UPDATE `event_scripts` SET `buddy_id`=`datalong2`, `buddy_radius`=`datalong3`, `datalong2`=0, `datalong3`=0 WHERE `command`=28 && `datalong2`>0;
+UPDATE `gossip_scripts` SET `buddy_id`=`datalong2`, `buddy_radius`=`datalong3`, `datalong2`=0, `datalong3`=0 WHERE `command`=28 && `datalong2`>0;
+
+-- SCRIPT_COMMAND_MODIFY_NPC_FLAGS
+UPDATE `quest_end_scripts` SET `buddy_id`=`datalong3`, `buddy_radius`=`datalong4`, `datalong3`=0, `datalong4`=0 WHERE `command`=29 && `datalong3`>0;
+UPDATE `quest_start_scripts` SET `buddy_id`=`datalong3`, `buddy_radius`=`datalong4`, `datalong3`=0, `datalong4`=0 WHERE `command`=29 && `datalong3`>0;
+UPDATE `spell_scripts` SET `buddy_id`=`datalong3`, `buddy_radius`=`datalong4`, `datalong3`=0, `datalong4`=0 WHERE `command`=29 && `datalong3`>0;
+UPDATE `creature_spells_scripts` SET `buddy_id`=`datalong3`, `buddy_radius`=`datalong4`, `datalong3`=0, `datalong4`=0 WHERE `command`=29 && `datalong3`>0;
+UPDATE `creature_movement_scripts` SET `buddy_id`=`datalong3`, `buddy_radius`=`datalong4`, `datalong3`=0, `datalong4`=0 WHERE `command`=29 && `datalong3`>0;
+UPDATE `gameobject_scripts` SET `buddy_id`=`datalong3`, `buddy_radius`=`datalong4`, `datalong3`=0, `datalong4`=0 WHERE `command`=29 && `datalong3`>0;
+UPDATE `event_scripts` SET `buddy_id`=`datalong3`, `buddy_radius`=`datalong4`, `datalong3`=0, `datalong4`=0 WHERE `command`=29 && `datalong3`>0;
+UPDATE `gossip_scripts` SET `buddy_id`=`datalong3`, `buddy_radius`=`datalong4`, `datalong3`=0, `datalong4`=0 WHERE `command`=29 && `datalong3`>0;
+
+-- SCRIPT_COMMAND_TERMINATE_SCRIPT
+UPDATE `quest_end_scripts` SET `datalong3`=`data_flags`, `data_flags`=0 WHERE `command`=31 && `data_flags`>0;
+UPDATE `quest_start_scripts` SET `datalong3`=`data_flags`, `data_flags`=0 WHERE `command`=31 && `data_flags`>0;
+UPDATE `spell_scripts` SET `datalong3`=`data_flags`, `data_flags`=0 WHERE `command`=31 && `data_flags`>0;
+UPDATE `creature_spells_scripts` SET `datalong3`=`data_flags`, `data_flags`=0 WHERE `command`=31 && `data_flags`>0;
+UPDATE `creature_movement_scripts` SET `datalong3`=`data_flags`, `data_flags`=0 WHERE `command`=31 && `data_flags`>0;
+UPDATE `gameobject_scripts` SET `datalong3`=`data_flags`, `data_flags`=0 WHERE `command`=31 && `data_flags`>0;
+UPDATE `event_scripts` SET `datalong3`=`data_flags`, `data_flags`=0 WHERE `command`=31 && `data_flags`>0;
+UPDATE `gossip_scripts` SET `datalong3`=`data_flags`, `data_flags`=0 WHERE `command`=31 && `data_flags`>0;
+
+-- SCRIPT_COMMAND_ENTER_EVADE_MODE
+UPDATE `quest_end_scripts` SET `buddy_id`=`datalong`, `buddy_radius`=`datalong2`, `datalong`=0, `datalong2`=0 WHERE `command`=33 && `datalong`>0;
+UPDATE `quest_start_scripts` SET `buddy_id`=`datalong`, `buddy_radius`=`datalong2`, `datalong`=0, `datalong2`=0 WHERE `command`=33 && `datalong`>0;
+UPDATE `spell_scripts` SET `buddy_id`=`datalong`, `buddy_radius`=`datalong2`, `datalong`=0, `datalong2`=0 WHERE `command`=33 && `datalong`>0;
+UPDATE `creature_spells_scripts` SET `buddy_id`=`datalong`, `buddy_radius`=`datalong2`, `datalong`=0, `datalong2`=0 WHERE `command`=33 && `datalong`>0;
+UPDATE `creature_movement_scripts` SET `buddy_id`=`datalong`, `buddy_radius`=`datalong2`, `datalong`=0, `datalong2`=0 WHERE `command`=33 && `datalong`>0;
+UPDATE `gameobject_scripts` SET `buddy_id`=`datalong`, `buddy_radius`=`datalong2`, `datalong`=0, `datalong2`=0 WHERE `command`=33 && `datalong`>0;
+UPDATE `event_scripts` SET `buddy_id`=`datalong`, `buddy_radius`=`datalong2`, `datalong`=0, `datalong2`=0 WHERE `command`=33 && `datalong`>0;
+UPDATE `gossip_scripts` SET `buddy_id`=`datalong`, `buddy_radius`=`datalong2`, `datalong`=0, `datalong2`=0 WHERE `command`=33 && `datalong`>0;
+
+-- SCRIPT_COMMAND_TERMINATE_CONDITION
+UPDATE `quest_end_scripts` SET `command`=32, `datalong3`=`data_flags`, `data_flags`=0 WHERE `command`=34;
+UPDATE `quest_start_scripts` SET `command`=32, `datalong3`=`data_flags`, `data_flags`=0 WHERE `command`=34;
+UPDATE `spell_scripts` SET `command`=32, `datalong3`=`data_flags`, `data_flags`=0 WHERE `command`=34;
+UPDATE `creature_spells_scripts` SET `command`=32, `datalong3`=`data_flags`, `data_flags`=0 WHERE `command`=34;
+UPDATE `creature_movement_scripts` SET `command`=32, `datalong3`=`data_flags`, `data_flags`=0 WHERE `command`=34;
+UPDATE `gameobject_scripts` SET `command`=32, `datalong3`=`data_flags`, `data_flags`=0 WHERE `command`=34;
+UPDATE `event_scripts` SET `command`=32, `datalong3`=`data_flags`, `data_flags`=0 WHERE `command`=34;
+UPDATE `gossip_scripts` SET `command`=32, `datalong3`=`data_flags`, `data_flags`=0 WHERE `command`=34;
+
+-- SCRIPT_COMMAND_TURN_TO
+UPDATE `quest_end_scripts` SET `buddy_id`=`datalong3`, `buddy_radius`=`datalong4`, `datalong3`=0, `datalong4`=0 WHERE `command`=35 && `datalong3`>0;
+UPDATE `quest_start_scripts` SET `buddy_id`=`datalong3`, `buddy_radius`=`datalong4`, `datalong3`=0, `datalong4`=0 WHERE `command`=35 && `datalong3`>0;
+UPDATE `spell_scripts` SET `buddy_id`=`datalong3`, `buddy_radius`=`datalong4`, `datalong3`=0, `datalong4`=0 WHERE `command`=35 && `datalong3`>0;
+UPDATE `creature_spells_scripts` SET `buddy_id`=`datalong3`, `buddy_radius`=`datalong4`, `datalong3`=0, `datalong4`=0 WHERE `command`=35 && `datalong3`>0;
+UPDATE `creature_movement_scripts` SET `buddy_id`=`datalong3`, `buddy_radius`=`datalong4`, `datalong3`=0, `datalong4`=0 WHERE `command`=35 && `datalong3`>0;
+UPDATE `gameobject_scripts` SET `buddy_id`=`datalong3`, `buddy_radius`=`datalong4`, `datalong3`=0, `datalong4`=0 WHERE `command`=35 && `datalong3`>0;
+UPDATE `event_scripts` SET `buddy_id`=`datalong3`, `buddy_radius`=`datalong4`, `datalong3`=0, `datalong4`=0 WHERE `command`=35 && `datalong3`>0;
+UPDATE `gossip_scripts` SET `buddy_id`=`datalong3`, `buddy_radius`=`datalong4`, `datalong3`=0, `datalong4`=0 WHERE `command`=35 && `datalong3`>0;
+UPDATE `quest_end_scripts` SET `datalong`=0, `data_flags`=3 WHERE `command`=35 && `datalong`=2 && `datalong2`=0;
+UPDATE `quest_end_scripts` SET `datalong`=0, `data_flags`=1, `datalong2`=0 WHERE `command`=35 && `datalong`=2 && `datalong2`=1;
+UPDATE `quest_start_scripts` SET `datalong`=0, `data_flags`=3 WHERE `command`=35 && `datalong`=2 && `datalong2`=0;
+UPDATE `quest_start_scripts` SET `datalong`=0, `data_flags`=1, `datalong2`=0 WHERE `command`=35 && `datalong`=2 && `datalong2`=1;
+UPDATE `spell_scripts` SET `datalong`=0, `data_flags`=3 WHERE `command`=35 && `datalong`=2 && `datalong2`=0;
+UPDATE `spell_scripts` SET `datalong`=0, `data_flags`=1, `datalong2`=0 WHERE `command`=35 && `datalong`=2 && `datalong2`=1;
+UPDATE `creature_spells_scripts` SET `datalong`=0, `data_flags`=3 WHERE `command`=35 && `datalong`=2 && `datalong2`=0;
+UPDATE `creature_spells_scripts` SET `datalong`=0, `data_flags`=1, `datalong2`=0 WHERE `command`=35 && `datalong`=2 && `datalong2`=1;
+UPDATE `creature_movement_scripts` SET `datalong`=0, `data_flags`=3 WHERE `command`=35 && `datalong`=2 && `datalong2`=0;
+UPDATE `creature_movement_scripts` SET `datalong`=0, `data_flags`=1, `datalong2`=0 WHERE `command`=35 && `datalong`=2 && `datalong2`=1;
+UPDATE `gameobject_scripts` SET `datalong`=0, `data_flags`=3 WHERE `command`=35 && `datalong`=2 && `datalong2`=0;
+UPDATE `gameobject_scripts` SET `datalong`=0, `data_flags`=1, `datalong2`=0 WHERE `command`=35 && `datalong`=2 && `datalong2`=1;
+UPDATE `event_scripts` SET `datalong`=0, `data_flags`=3 WHERE `command`=35 && `datalong`=2 && `datalong2`=0;
+UPDATE `event_scripts` SET `datalong`=0, `data_flags`=1, `datalong2`=0 WHERE `command`=35 && `datalong`=2 && `datalong2`=1;
+UPDATE `gossip_scripts` SET `datalong`=0, `data_flags`=3 WHERE `command`=35 && `datalong`=2 && `datalong2`=0;
+UPDATE `gossip_scripts` SET `datalong`=0, `data_flags`=1, `datalong2`=0 WHERE `command`=35 && `datalong`=2 && `datalong2`=1;
+UPDATE `quest_end_scripts` SET `data_flags`=1, `datalong2`=0 WHERE `command`=35 && `datalong2`=1;
+UPDATE `quest_start_scripts` SET `data_flags`=1, `datalong2`=0 WHERE `command`=35 && `datalong2`=1;
+UPDATE `spell_scripts` SET `data_flags`=1, `datalong2`=0 WHERE `command`=35 && `datalong2`=1;
+UPDATE `creature_spells_scripts` SET `data_flags`=1, `datalong2`=0 WHERE `command`=35 && `datalong2`=1;
+UPDATE `creature_movement_scripts` SET `data_flags`=1, `datalong2`=0 WHERE `command`=35 && `datalong2`=1;
+UPDATE `gameobject_scripts` SET `data_flags`=1, `datalong2`=0 WHERE `command`=35 && `datalong2`=1;
+UPDATE `event_scripts` SET `data_flags`=1, `datalong2`=0 WHERE `command`=35 && `datalong2`=1;
+UPDATE `gossip_scripts` SET `data_flags`=1, `datalong2`=0 WHERE `command`=35 && `datalong2`=1;
 
 
 -- End of migration.

@@ -69,7 +69,7 @@ enum eScriptCommand
                                                             // datalong2 = time
                                                             // datalong3 = movement_options (see enum MoveOptions)
                                                             // datalong4 = eMoveToFlags
-                                                            // x/y/z = coordinates
+                                                            // x/y/z/o = coordinates
     SCRIPT_COMMAND_FLAG_SET                 = 4,            // source = Object
                                                             // datalong = field_id
                                                             // datalong2 = bitmask
@@ -79,7 +79,7 @@ enum eScriptCommand
     SCRIPT_COMMAND_TELEPORT_TO              = 6,            // source = Unit
                                                             // datalong = map_id (only used for players but still required)
                                                             // datalong2 = eTeleportToFlags
-                                                            // x/y/z = coordinates
+                                                            // x/y/z/o = coordinates
     SCRIPT_COMMAND_QUEST_EXPLORED           = 7,            // source = Player (from provided source or target)
                                                             // target = WorldObject (from provided source or target)
                                                             // datalong = quest_id
@@ -89,11 +89,11 @@ enum eScriptCommand
                                                             // datalong2 = bool (0=personal credit, 1=group credit)
     SCRIPT_COMMAND_RESPAWN_GAMEOBJECT       = 9,            // source = Map
                                                             // target = GameObject (from datalong, provided source or target)
-                                                            // datalong=db_guid
-                                                            // datalong2=despawn_delay
+                                                            // datalong = db_guid
+                                                            // datalong2 = despawn_delay
     SCRIPT_COMMAND_TEMP_SUMMON_CREATURE     = 10,           // source = WorldObject (from provided source or buddy)
                                                             // datalong = creature_entry
-                                                            // datalong2=despawn_delay
+                                                            // datalong2 = despawn_delay
                                                             // data_flags = eSummonCreatureFlags
                                                             // dataint = (bool) setRun; 0 = off (default), 1 = on
                                                             // dataint2 = eSummonCreatureFacingOptions
@@ -131,6 +131,8 @@ enum eScriptCommand
                                                             // datalong = see enum MovementGeneratorType (not all are supported)
                                                             // datalong2 = bool_param (meaning depends on the motion type)
                                                             // datalong3 = int_param (meaning depends on the motion type)
+                                                            // x = distance (only for some motion types)
+                                                            // o = angle (only for some motion types)
     SCRIPT_COMMAND_SET_ACTIVEOBJECT         = 21,           // source = Creature
                                                             // datalong = (bool) 0=off, 1=on
     SCRIPT_COMMAND_SET_FACTION              = 22,           // source = Creature
@@ -146,35 +148,30 @@ enum eScriptCommand
                                                             // datalong = (bool) 0 = off, 1 = on
     SCRIPT_COMMAND_ATTACK_START             = 26,           // source = Creature
                                                             // target = Player
-    SCRIPT_COMMAND_GO_LOCK_STATE            = 27,           // source or target must be WorldObject
-                                                            // datalong= 1=lock, 2=unlock, 4=set not-interactable, 8=set interactable
-                                                            // datalong2= go entry, datalong3= go search radius
-    SCRIPT_COMMAND_STAND_STATE              = 28,           // source = Unit (or WorldObject when creature entry defined), target = Unit (or none)
-                                                            // datalong = stand state (enum UnitStandStateType)
-                                                            // datalong2 = creature entry (searching for a buddy, closest to source), datalong3 = creature search radius
-                                                            // data_flags = flag_target_as_source           = 0x01
-    SCRIPT_COMMAND_MODIFY_NPC_FLAGS         = 29,           // source=any, target=creature
-                                                            // datalong=NPCFlags
-                                                            // datalong2:0x00=toggle, 0x01=add, 0x02=remove
-                                                            // datalong3 = creature entry (searching for a buddy, closest to source), datalong4 = creature search radius
-    SCRIPT_COMMAND_SEND_TAXI_PATH           = 30,           // source or target must be player
-                                                            // datalong = taxi path id
-    SCRIPT_COMMAND_TERMINATE_SCRIPT         = 31,           // source = any
-                                                            // datalong = search for npc entry if provided
-                                                            // datalong2= search distance
-                                                            // data_flags & 0x01: terminate steps of this script if npc found
-                                                            //              ELSE: terminate steps of this script if npc not found
-    SCRIPT_COMMAND_ENTER_EVADE_MODE         = 33,           // source = Unit (or WorldObject when creature entry defined), target = Unit (or none)
-                                                            // datalong = search for npc entry if provided
-                                                            // datalong2= search distance
-    SCRIPT_COMMAND_TERMINATE_COND           = 34,           // source = any
-                                                            // datalong = condition_id, datalong2 = if != 0 then quest_id of quest that will be failed for player's group if the script is terminated
-                                                            // data_flags & 0x01 terminate when condition is false ELSE terminate when condition is true
-    SCRIPT_COMMAND_TURN_TO                  = 35,           // source = Unit or any worldobject if datalong2 = 1, target = Unit
-                                                            // datalong: 0=face target (usually player), 1=set to orientation specified, 2=face a creature
-                                                            // datalong2 = 0, change source's orientation, ELSE change traget's orientation
-                                                            // datalong3 = search for npc entry if provided
-                                                            // datalong4 = search distance
+    SCRIPT_COMMAND_GO_LOCK_STATE            = 27,           // source = GameObject
+                                                            // datalong = eGoLockStateFlags
+    SCRIPT_COMMAND_STAND_STATE              = 28,           // source = Unit
+                                                            // datalong = stand_state (enum UnitStandStateType)
+    SCRIPT_COMMAND_MODIFY_NPC_FLAGS         = 29,           // source = Creature
+                                                            // datalong = see enum NPCFlags
+                                                            // datalong2 = eModifyNpcFlagOptions
+    SCRIPT_COMMAND_SEND_TAXI_PATH           = 30,           // source = Player
+                                                            // datalong = taxi_path_id
+    SCRIPT_COMMAND_TERMINATE_SCRIPT         = 31,           // source = Any
+                                                            // datalong = creature_entry
+                                                            // datalong2 = search_distance
+                                                            // datalong3 = eTerminateScriptOptions
+    SCRIPT_COMMAND_TERMINATE_CONDITION      = 32,           // source = Any
+                                                            // datalong = condition_id
+                                                            // datalong2 = failed_quest_id
+                                                            // datalong3 = eTerminateConditionFlags
+    SCRIPT_COMMAND_ENTER_EVADE_MODE         = 33,           // source = Creature
+    SCRIPT_COMMAND_SET_HOME_POSITION        = 34,           // source = Creature
+                                                            // datalong = (bool) use_current_position
+                                                            // x/y/z/o = coordinates
+    SCRIPT_COMMAND_TURN_TO                  = 35,           // source = Unit
+                                                            // target = WorldObject
+                                                            // datalong = eTurnToFacingOptions
     SCRIPT_COMMAND_MEETINGSTONE             = 36,           // datalong = area id
 
 };
@@ -185,15 +182,15 @@ static constexpr uint32 MAX_EMOTE_ID = 4;                   // used for SCRIPT_C
 // Flags used by SCRIPT_COMMAND_MOVE_TO
 enum eMoveToFlags
 {
-    SF_MOVE_TO_FORCED = 0x1,                                // No check if creature can move.
+    SF_MOVETO_FORCED = 0x1,                                // No check if creature can move.
 };
 
 // Possible datalong3 values for SCRIPT_COMMAND_MOVE_TO
 enum eMoveToCoordinateTypes
 {
-    MOVETO_COORDINATES_NORMAL               = 0,
-    MOVETO_COORDINATES_RELATIVE_TO_TARGET   = 1,            // Coordinates are added to that of target.
-    MOVETO_COORDINATES_DISTANCE_FROM_TARGET = 2,            // X is distance from target, others not used.
+    SO_MOVETO_COORDINATES_NORMAL               = 0,
+    SO_MOVETO_COORDINATES_RELATIVE_TO_TARGET   = 1,            // Coordinates are added to that of target.
+    SO_MOVETO_COORDINATES_DISTANCE_FROM_TARGET = 2,            // X is distance from target, others not used.
 
     MOVETO_COORDINATES_MAX
 };
@@ -202,30 +199,69 @@ enum eMoveToCoordinateTypes
 // Must start from 0x8 because of target selection flags.
 enum eSummonCreatureFlags
 {
-    SF_SUMMON_CREATURE_ACTIVE      = 0x08,                     // active creatures are always updated
-    SF_SUMMON_CREATURE_UNIQUE      = 0x10,                     // not actually unique, just checks for same entry in certain range
-    SF_SUMMON_CREATURE_UNIQUE_TEMP = 0x20                      // same as 0x10 but check for TempSummon only creatures
+    SF_SUMMONCREATURE_ACTIVE      = 0x08,                     // active creatures are always updated
+    SF_SUMMONCREATURE_UNIQUE      = 0x10,                     // not actually unique, just checks for same entry in certain range
+    SF_SUMMONCREATURE_UNIQUE_TEMP = 0x20                      // same as 0x10 but check for TempSummon only creatures
 };
 
 // Possible dataint2 values for SCRIPT_COMMAND_TEMP_SUMMON_CREATURE
 enum eSummonCreatureFacingOptions
 {
-    SUMMON_CREATURE_FACE_SUMMONER = 1,                         // Creature will face the summoner.
-    SUMMON_CREATURE_FACE_TARGET   = 2                          // Creature will face the provided target object.
+    SO_SUMMONCREATURE_FACE_SUMMONER = 1,                         // Creature will face the summoner.
+    SO_SUMMONCREATURE_FACE_TARGET   = 2                          // Creature will face the provided target object.
 };
 
 // Flags used by SCRIPT_COMMAND_CAST_SPELL
 enum eCastSpellFlags
 {
-    SF_CAST_SPELL_TRIGGERED          = 0x1,                    // Triggered spells skip checks.
-    SF_CAST_SPELL_INTERRUPT_PREVIOUS = 0x2                     // Will interrupt the current spell cast.
+    SF_CASTSPELL_TRIGGERED          = 0x1,                    // Triggered spells skip checks.
+    SF_CASTSPELL_INTERRUPT_PREVIOUS = 0x2                     // Will interrupt the current spell cast.
 };
 
 // Flags used by SCRIPT_COMMAND_PLAY_SOUND
 enum ePlaySoundFlags
 {
-    SF_PLAY_SOUND_ONLY_TO_TARGET     = 0x1,
-    SF_PLAY_SOUND_DISTANCE_DEPENDENT = 0x2
+    SF_PLAYSOUND_ONLY_TO_TARGET     = 0x1,
+    SF_PLAYSOUND_DISTANCE_DEPENDENT = 0x2
+};
+
+// Flags used by SCRIPT_COMMAND_GO_LOCK_STATE
+enum eGoLockStateFlags
+{
+    SF_GOLOCKSTATE_LOCK        = 0x1,
+    SF_GOLOCKSTATE_UNLOCK      = 0x2,
+    SF_GOLOCKSTATE_NO_INTERACT = 0x4,
+    SF_GOLOCKSTATE_INTERACT    = 0x8,
+
+    SF_GOLOCKSTATE_MAX         = 0x10
+};
+
+// Possible datalong2 values for SCRIPT_COMMAND_MODIFY_NPC_FLAGS
+enum eModifyNpcFlagOptions
+{
+    SO_NPCFLAG_SET    = 1,
+    SO_NPCFLAG_REMOVE = 2,
+    SO_NPCFLAG_TOGGLE = 3
+};
+
+// Possible datalong3 values for SCRIPT_COMMAND_TERMINATE_SCRIPT
+enum eTerminateScriptOptions
+{
+    SO_TERMINATESCRIPT_IF_NOT_FOUND = 0,
+    SO_TERMINATESCRIPT_IF_FOUND     = 1
+};
+
+// Flags used by SCRIPT_COMMAND_TERMINATE_CONDITION
+enum eTerminateConditionFlags
+{
+    SF_TERMINATECONDITION_WHEN_FALSE = 0x1
+};
+
+// Possible datalong values for SCRIPT_COMMAND_TURN_TO
+enum eTurnToFacingOptions
+{
+    SO_TURNTO_FACE_TARGET          = 0,
+    SO_TURNTO_PROVIDED_ORIENTATION = 1
 };
 
 // Values used in buddy_type column
@@ -426,25 +462,17 @@ struct ScriptInfo
         struct                                              // SCRIPT_COMMAND_GO_LOCK_STATE (27)
         {
             uint32 lockState;                               // datalong
-            uint32 goEntry;                                 // datalong2
-            uint32 searchRadius;                            // datalong3
         } goLockState;
 
         struct                                              // SCRIPT_COMMAND_STAND_STATE (28)
         {
             uint32 stand_state;                             // datalong
-            uint32 creatureEntry;                           // datalong2
-            uint32 searchRadius;                            // datalong3
-            uint32 unused1;                                 // datalong4
-            uint32 flags;                                   // data_flags
         } standState;
 
         struct                                              // SCRIPT_COMMAND_MODIFY_NPC_FLAGS (29)
         {
             uint32 flag;                                    // datalong
             uint32 change_flag;                             // datalong2
-            uint32 creatureEntry;                           // datalong3
-            uint32 searchRadius;                            // datalong4
         } npcFlag;
 
         struct                                              // SCRIPT_COMMAND_SEND_TAXI_PATH (30)
@@ -456,32 +484,26 @@ struct ScriptInfo
         {
             uint32 creatureEntry;                           // datalong
             uint32 searchRadius;                            // datalong2
-            uint32 unused1;                                 // datalong3
-            uint32 unused2;                                 // datalong4
-            uint32 flags;                                   // data_flags
+            uint32 flags;                                   // datalong3
         } terminateScript;
 
-        struct                                              // SCRIPT_COMMAND_ENTER_EVADE_MODE (33)
-        {
-            uint32 creatureEntry;                           // datalong
-            uint32 searchRadius;                            // datalong2
-        } enterEvadeMode;
-
-        struct                                              // SCRIPT_COMMAND_TERMINATE_COND (34)
+        struct                                              // SCRIPT_COMMAND_TERMINATE_CONDITION (32)
         {
             uint32 conditionId;                             // datalong
             uint32 failQuest;                               // datalong2
-            uint32 unused1;                                 // datalong3
-            uint32 unused2;                                 // datalong4
-            uint32 flags;                                   // data_flags
+            uint32 flags;                                   // datalong3
         } terminateCond;
+
+                                                            // SCRIPT_COMMAND_ENTER_EVADE_MODE (33)
+
+        struct                                              // SCRIPT_COMMAND_SET_HOME_POSITION (34)
+        {
+            uint32 useCurrent;                              // datalong
+        } setHome;
 
         struct                                              // SCRIPT_COMMAND_TURN_TO (35)
         {
             uint32 facingLogic;                             // datalong
-            uint32 isSourceTarget;                          // datalong2
-            uint32 creatureEntry;                           // datalong3
-            uint32 searchRadius;                            // datalong4
         } turnTo;
 
         struct                                              // SCRIPT_COMMAND_MEETINGSTONE (36)

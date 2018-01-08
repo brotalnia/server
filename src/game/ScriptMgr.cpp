@@ -178,7 +178,7 @@ void ScriptMgr::LoadScripts(ScriptMapMap& scripts, const char* tablename)
             }
         }
 
-        if (!tmp.buddy_id && (tmp.raw.data[4] & (SF_GENERAL_SWAP_INITIAL_TARGETS | SF_GENERAL_SWAP_FINAL_TARGETS)))
+        if (!tmp.buddy_id && (tmp.raw.data[4] & SF_GENERAL_SWAP_INITIAL_TARGETS) && (tmp.raw.data[4] & SF_GENERAL_SWAP_FINAL_TARGETS))
         {
             sLog.outErrorDb("Table `%s` has nonsensical flag combination (data_flags = %u) without a buddy for script id %u", tablename, tmp.moveTo.flags, tmp.id);
             continue;
@@ -542,24 +542,14 @@ void ScriptMgr::LoadScripts(ScriptMapMap& scripts, const char* tablename)
             }
             case SCRIPT_COMMAND_GO_LOCK_STATE:
             {
-                if (!ObjectMgr::GetGameObjectInfo(tmp.goLockState.goEntry))
-                {
-                    sLog.outErrorDb("Table `%s` has datalong2 = %u in SCRIPT_COMMAND_GO_LOCK_STATE for script id %u, but this gameobject_template does not exist.", tablename, tmp.goLockState.goEntry, tmp.id);
-                    continue;
-                }
-                if (!tmp.goLockState.searchRadius)
-                {
-                    sLog.outErrorDb("Table `%s` has invalid search radius (datalong3 = %u) in SCRIPT_COMMAND_GO_LOCK_STATE for script id %u.", tablename, tmp.goLockState.searchRadius, tmp.id);
-                    continue;
-                }
                 if (// lock(0x01) and unlock(0x02) together
-                    ((tmp.goLockState.lockState & 0x01) && (tmp.goLockState.lockState & 0x02)) ||
+                    ((tmp.goLockState.lockState & SF_GOLOCKSTATE_LOCK) && (tmp.goLockState.lockState & SF_GOLOCKSTATE_UNLOCK)) ||
                     // non-interact (0x4) and interact (0x08) together
-                    ((tmp.goLockState.lockState & 0x04) && (tmp.goLockState.lockState & 0x08)) ||
+                    ((tmp.goLockState.lockState & SF_GOLOCKSTATE_NO_INTERACT) && (tmp.goLockState.lockState & SF_GOLOCKSTATE_INTERACT)) ||
                     // no setting
                     !tmp.goLockState.lockState ||
                     // invalid number
-                    tmp.goLockState.lockState >= 0x10)
+                    tmp.goLockState.lockState >= SF_GOLOCKSTATE_MAX)
                 {
                     sLog.outErrorDb("Table `%s` has invalid lock state (datalong = %u) in SCRIPT_COMMAND_GO_LOCK_STATE for script id %u.", tablename, tmp.goLockState.lockState, tmp.id);
                     continue;
@@ -573,30 +563,10 @@ void ScriptMgr::LoadScripts(ScriptMapMap& scripts, const char* tablename)
                     sLog.outErrorDb("Table `%s` has invalid stand state (datalong = %u) in SCRIPT_COMMAND_STAND_STATE for script id %u", tablename, tmp.standState.stand_state, tmp.id);
                     continue;
                 }
-                if (tmp.standState.creatureEntry && !ObjectMgr::GetCreatureTemplate(tmp.standState.creatureEntry))
-                {
-                    sLog.outErrorDb("Table `%s` has datalong2 = %u in SCRIPT_COMMAND_STAND_STATE for script id %u, but this creature_template does not exist.", tablename, tmp.standState.creatureEntry, tmp.id);
-                    continue;
-                }
-                if (tmp.standState.creatureEntry && !tmp.standState.searchRadius)
-                {
-                    sLog.outErrorDb("Table `%s` has datalong2 = %u in SCRIPT_COMMAND_STAND_STATE for script id %u, but search radius is too small (datalong3 = %u).", tablename, tmp.standState.creatureEntry, tmp.id, tmp.standState.searchRadius);
-                    continue;
-                }
                 break;
             }
             case SCRIPT_COMMAND_MODIFY_NPC_FLAGS:
             {
-                if (tmp.npcFlag.creatureEntry && !ObjectMgr::GetCreatureTemplate(tmp.npcFlag.creatureEntry))
-                {
-                    sLog.outErrorDb("Table `%s` has datalong3 = %u in SCRIPT_COMMAND_MODIFY_NPC_FLAGS for script id %u, but this creature_template does not exist.", tablename, tmp.npcFlag.creatureEntry, tmp.id);
-                    continue;
-                }
-                if (tmp.npcFlag.creatureEntry && !tmp.npcFlag.searchRadius)
-                {
-                    sLog.outErrorDb("Table `%s` has datalong3 = %u in SCRIPT_COMMAND_MODIFY_NPC_FLAGS for script id %u, but search radius is too small (datalong4 = %u).", tablename, tmp.npcFlag.creatureEntry, tmp.id, tmp.npcFlag.searchRadius);
-                    continue;
-                }
                 break;
             }
             case SCRIPT_COMMAND_SEND_TAXI_PATH:
@@ -622,49 +592,33 @@ void ScriptMgr::LoadScripts(ScriptMapMap& scripts, const char* tablename)
                 }
                 break;
             }
-            case SCRIPT_COMMAND_ENTER_EVADE_MODE:
-            {
-                if (tmp.enterEvadeMode.creatureEntry && !ObjectMgr::GetCreatureTemplate(tmp.enterEvadeMode.creatureEntry))
-                {
-                    sLog.outErrorDb("Table `%s` has datalong = %u in SCRIPT_COMMAND_ENTER_EVADE_MODE for script id %u, but this creature_template does not exist.", tablename, tmp.enterEvadeMode.creatureEntry, tmp.id);
-                    continue;
-                }
-                if (tmp.enterEvadeMode.creatureEntry && !tmp.enterEvadeMode.searchRadius)
-                {
-                    sLog.outErrorDb("Table `%s` has datalong = %u in SCRIPT_COMMAND_ENTER_EVADE_MODE for script id %u, but search radius is too small (datalong2 = %u).", tablename, tmp.enterEvadeMode.creatureEntry, tmp.id, tmp.enterEvadeMode.searchRadius);
-                    continue;
-                }
-                break;
-            }
-            case SCRIPT_COMMAND_TERMINATE_COND:
+            case SCRIPT_COMMAND_TERMINATE_CONDITION:
             {
                 if (!sConditionStorage.LookupEntry<PlayerCondition>(tmp.terminateCond.conditionId))
                 {
-                    sLog.outErrorDb("Table `%s` has datalong = %u in SCRIPT_COMMAND_TERMINATE_COND for script id %u, but this condition_id does not exist.", tablename, tmp.terminateCond.conditionId, tmp.id);
+                    sLog.outErrorDb("Table `%s` has datalong = %u in SCRIPT_COMMAND_TERMINATE_CONDITION for script id %u, but this condition_id does not exist.", tablename, tmp.terminateCond.conditionId, tmp.id);
                     continue;
                 }
                 if (tmp.terminateCond.failQuest && !sObjectMgr.GetQuestTemplate(tmp.terminateCond.failQuest))
                 {
-                    sLog.outErrorDb("Table `%s` has datalong2 = %u in SCRIPT_COMMAND_TERMINATE_COND for script id %u, but this questId does not exist.", tablename, tmp.terminateCond.failQuest, tmp.id);
+                    sLog.outErrorDb("Table `%s` has datalong2 = %u in SCRIPT_COMMAND_TERMINATE_CONDITION for script id %u, but this questId does not exist.", tablename, tmp.terminateCond.failQuest, tmp.id);
                     continue;
                 }
                 break;
             }
+            case SCRIPT_COMMAND_ENTER_EVADE_MODE:
+            {
+                break;
+            }
+            case SCRIPT_COMMAND_SET_HOME_POSITION:
+            {
+                break;
+            }
             case SCRIPT_COMMAND_TURN_TO:
             {
-                if (tmp.turnTo.facingLogic > 2)
+                if (tmp.turnTo.facingLogic > 1)
                 {
                     sLog.outErrorDb("Table `%s` using unknown option in datalong (%u) in SCRIPT_COMMAND_TURN_TO for script id %u", tablename, tmp.turnTo.facingLogic, tmp.id);
-                    continue;
-                }
-                if (tmp.turnTo.creatureEntry && !ObjectMgr::GetCreatureTemplate(tmp.turnTo.creatureEntry))
-                {
-                    sLog.outErrorDb("Table `%s` has datalong3 = %u in SCRIPT_COMMAND_TURN_TO for script id %u, but this npc entry does not exist.", tablename, tmp.turnTo.creatureEntry, tmp.id);
-                    continue;
-                }
-                if (tmp.turnTo.creatureEntry && !tmp.turnTo.searchRadius)
-                {
-                    sLog.outErrorDb("Table `%s` has datalong3 = %u in  SCRIPT_COMMAND_TURN_TO for script id %u, but search radius is too small (datalong4 = %u).", tablename, tmp.turnTo.creatureEntry, tmp.id, tmp.turnTo.searchRadius);
                     continue;
                 }
                 break;

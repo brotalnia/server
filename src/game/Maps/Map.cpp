@@ -2215,6 +2215,23 @@ void Map::ScriptCommandStart(ScriptInfo const& script, uint32 delay, Object* sou
     m_scriptSchedule_lock.release();
 }
 
+// Removes all parts of script from the queue.
+void Map::TerminateScript(uint32 id, ObjectGuid sourceGuid, ObjectGuid targetGuid, ObjectGuid ownerGuid)
+{
+    for (ScriptScheduleMap::iterator rmItr = m_scriptSchedule.begin(); rmItr != m_scriptSchedule.end();)
+    {
+        if (rmItr->second.IsSameScript(id, sourceGuid, targetGuid, ownerGuid))
+        {
+            m_scriptSchedule.erase(rmItr++);
+            sScriptMgr.DecreaseScheduledScriptCount();
+        }
+        else
+        {
+            ++rmItr;
+        }
+    }
+}
+
 /// Process queued scripts
 void Map::ScriptsProcess()
 {
@@ -2526,7 +2543,7 @@ void Map::ScriptsProcess()
                         WorldObject* pTarget = static_cast<WorldObject*>(target);
                         switch (step.script->moveTo.coordinatesType)
                         {
-                            case MOVETO_COORDINATES_RELATIVE_TO_TARGET:
+                            case SO_MOVETO_COORDINATES_RELATIVE_TO_TARGET:
                             {
                                 // Coordinates are added to those of the target.
                                 x += pTarget->GetPositionX();
@@ -2534,7 +2551,7 @@ void Map::ScriptsProcess()
                                 z += pTarget->GetPositionZ();
                                 break;
                             }
-                            case MOVETO_COORDINATES_DISTANCE_FROM_TARGET:
+                            case SO_MOVETO_COORDINATES_DISTANCE_FROM_TARGET:
                             {
                                 // X is distance from the target.
                                 float distance = x;
@@ -2551,7 +2568,7 @@ void Map::ScriptsProcess()
                 }
 
                 // Only move if we can move.
-                if (pUnitSource->hasUnitState(UNIT_STAT_NOT_MOVE) && !(step.script->moveTo.flags & SF_MOVE_TO_FORCED))
+                if (pUnitSource->hasUnitState(UNIT_STAT_NOT_MOVE) && !(step.script->moveTo.flags & SF_MOVETO_FORCED))
                     break;
 
                 if (step.script->moveTo.travelTime != 0)
@@ -2775,7 +2792,7 @@ void Map::ScriptsProcess()
                 float z = step.script->z;
                 float o = step.script->o;
 
-                if (step.script->summonCreature.flags & SF_SUMMON_CREATURE_UNIQUE || step.script->summonCreature.flags & SF_SUMMON_CREATURE_UNIQUE_TEMP)
+                if (step.script->summonCreature.flags & SF_SUMMONCREATURE_UNIQUE || step.script->summonCreature.flags & SF_SUMMONCREATURE_UNIQUE_TEMP)
                 {
                     float dist = step.script->summonCreature.uniqueDistance ? step.script->summonCreature.uniqueDistance : (pSummoner->GetDistance(x, y, z) + 50.0f) * 2;
                     std::list<Creature*> foundCreatures;
@@ -2787,7 +2804,7 @@ void Map::ScriptsProcess()
                         uint32 exAmount = 0;
                         uint32 reqAmount = step.script->summonCreature.uniqueLimit ? step.script->summonCreature.uniqueLimit : 1;
 
-                        if (step.script->summonCreature.flags & SF_SUMMON_CREATURE_UNIQUE)
+                        if (step.script->summonCreature.flags & SF_SUMMONCREATURE_UNIQUE)
                             exAmount = foundCreatures.size();
                         else
                             exAmount = count_if(foundCreatures.begin(), foundCreatures.end(), [&](Creature* c) { return c->IsTemporarySummon(); });
@@ -2799,9 +2816,9 @@ void Map::ScriptsProcess()
 
                 float orientation = o;
                 
-                if ((step.script->summonCreature.facingLogic == SUMMON_CREATURE_FACE_SUMMONER) || (step.script->summonCreature.facingLogic == SUMMON_CREATURE_FACE_TARGET))
+                if ((step.script->summonCreature.facingLogic == SO_SUMMONCREATURE_FACE_SUMMONER) || (step.script->summonCreature.facingLogic == SO_SUMMONCREATURE_FACE_TARGET))
                 {
-                    WorldObject* facingTarget = ((step.script->summonCreature.facingLogic == SUMMON_CREATURE_FACE_TARGET) && target && target->isType(TYPEMASK_WORLDOBJECT)) ? static_cast<WorldObject*>(target) : pSummoner;
+                    WorldObject* facingTarget = ((step.script->summonCreature.facingLogic == SO_SUMMONCREATURE_FACE_TARGET) && target && target->isType(TYPEMASK_WORLDOBJECT)) ? static_cast<WorldObject*>(target) : pSummoner;
 
                     float dx = facingTarget->GetPositionX() - x;
                     float dy = facingTarget->GetPositionY() - y;
@@ -2811,7 +2828,7 @@ void Map::ScriptsProcess()
                 }
 
                 Creature* pCreature = pSummoner->SummonCreature(step.script->summonCreature.creatureEntry, x, y, z, orientation,
-                    TEMPSUMMON_TIMED_OR_DEAD_DESPAWN, step.script->summonCreature.despawnDelay, step.script->summonCreature.flags & SF_SUMMON_CREATURE_ACTIVE);
+                    TEMPSUMMON_TIMED_OR_DEAD_DESPAWN, step.script->summonCreature.despawnDelay, step.script->summonCreature.flags & SF_SUMMONCREATURE_ACTIVE);
 
                 if (!pCreature)
                 {
@@ -2983,11 +3000,11 @@ void Map::ScriptsProcess()
                 Unit* pUnitSource = static_cast<Unit*>(source);
                 Unit* pUnitTarget = static_cast<Unit*>(target);
 
-                if ((step.script->castSpell.flags & SF_CAST_SPELL_INTERRUPT_PREVIOUS) && pUnitSource->IsNonMeleeSpellCasted(false))
+                if ((step.script->castSpell.flags & SF_CASTSPELL_INTERRUPT_PREVIOUS) && pUnitSource->IsNonMeleeSpellCasted(false))
                     pUnitSource->InterruptNonMeleeSpells(false);
 
                 //TODO: when GO cast implemented, code below must be updated accordingly to also allow GO spell cast
-                pUnitSource->CastSpell(pUnitTarget, step.script->castSpell.spellId, (step.script->castSpell.flags & SF_CAST_SPELL_TRIGGERED) != 0);
+                pUnitSource->CastSpell(pUnitTarget, step.script->castSpell.spellId, (step.script->castSpell.flags & SF_CASTSPELL_TRIGGERED) != 0);
 
                 break;
             }
@@ -3009,7 +3026,7 @@ void Map::ScriptsProcess()
 
                 Player* pTarget = nullptr;
 
-                if (step.script->playSound.flags & SF_PLAY_SOUND_ONLY_TO_TARGET)
+                if (step.script->playSound.flags & SF_PLAYSOUND_ONLY_TO_TARGET)
                 {
                     if (!target)
                     {
@@ -3026,7 +3043,7 @@ void Map::ScriptsProcess()
                     pTarget = static_cast<Player*>(target);
                 }
 
-                if (step.script->playSound.flags & SF_PLAY_SOUND_DISTANCE_DEPENDENT)
+                if (step.script->playSound.flags & SF_PLAYSOUND_DISTANCE_DEPENDENT)
                     pSource->PlayDistanceSound(step.script->playSound.soundId, pTarget);
                 else
                     pSource->PlayDirectSound(step.script->playSound.soundId, pTarget);
@@ -3083,7 +3100,7 @@ void Map::ScriptsProcess()
                     break;
                 }
 
-                if (!source->GetTypeId() == TYPEID_UNIT)
+                if (source->GetTypeId() != TYPEID_UNIT)
                 {
                     sLog.outError("SCRIPT_COMMAND_DESPAWN_CREATURE (script id %u) call for a non-creature source (TypeId: %u), skipping.", step.script->id, source->GetTypeId());
                     break;
@@ -3328,155 +3345,84 @@ void Map::ScriptsProcess()
             }
             case SCRIPT_COMMAND_GO_LOCK_STATE:
             {
-                if ((!source || !source->isType(TYPEMASK_WORLDOBJECT)) && (!target || !target->isType(TYPEMASK_WORLDOBJECT)))
+                GameObject* pGo = nullptr;
+
+                if (source && source->GetTypeId() == TYPEID_GAMEOBJECT)
+                    pGo = static_cast<GameObject*>(source);
+                else if (target && target->GetTypeId() == TYPEID_GAMEOBJECT)
+                    pGo = static_cast<GameObject*>(target);
+                else
                 {
-                    sLog.outError("SCRIPT_COMMAND_GO_LOCK_STATE (script id %u) call for non-worldobject (TypeIdSource: %u)(TypeIdTarget: %u), skipping.", step.script->id, source ? source->GetTypeId() : 0, target ? target->GetTypeId() : 0);
+                    sLog.outError("SCRIPT_COMMAND_GO_LOCK_STATE (script id %u) call for a NULL or non-worldobject target and source, skipping.", step.script->id);
                     break;
                 }
 
-                WorldObject* pSearcher = source && source->isType(TYPEMASK_WORLDOBJECT) ? (WorldObject*)source : (WorldObject*)target;
-                GameObject* pGo = NULL;
+                // Lock or Unlock
+                if (step.script->goLockState.lockState & SF_GOLOCKSTATE_LOCK)
+                    pGo->SetFlag(GAMEOBJECT_FLAGS, GO_FLAG_LOCKED);
+                else if (step.script->goLockState.lockState & SF_GOLOCKSTATE_UNLOCK)
+                    pGo->RemoveFlag(GAMEOBJECT_FLAGS, GO_FLAG_LOCKED);
+                // Set Non Interactable or Set Interactable
+                if (step.script->goLockState.lockState & SF_GOLOCKSTATE_NO_INTERACT)
+                    pGo->SetFlag(GAMEOBJECT_FLAGS, GO_FLAG_NO_INTERACT);
+                else if (step.script->goLockState.lockState & SF_GOLOCKSTATE_INTERACT)
+                    pGo->RemoveFlag(GAMEOBJECT_FLAGS, GO_FLAG_NO_INTERACT);
 
-                MaNGOS::NearestGameObjectEntryInObjectRangeCheck u_check(*pSearcher, step.script->goLockState.goEntry, step.script->goLockState.searchRadius);
-                MaNGOS::GameObjectLastSearcher<MaNGOS::NearestGameObjectEntryInObjectRangeCheck> searcher(pGo, u_check);
-
-                Cell::VisitGridObjects(pSearcher, searcher, step.script->goLockState.searchRadius);
-
-                /* flag lockState
-                 * go_lock          0x01
-                 * go_unlock        0x02
-                 * go_nonInteract   0x04
-                 * go_Interact      0x08
-                 */
-                if (pGo)
-                {
-                    // Lock or Unlock
-                    if (step.script->goLockState.lockState & 0x01)
-                        pGo->SetFlag(GAMEOBJECT_FLAGS, GO_FLAG_LOCKED);
-                    else if (step.script->goLockState.lockState & 0x02)
-                        pGo->RemoveFlag(GAMEOBJECT_FLAGS, GO_FLAG_LOCKED);
-                    // Set Non Interactable or Set Interactable
-                    if (step.script->goLockState.lockState & 0x04)
-                        pGo->SetFlag(GAMEOBJECT_FLAGS, GO_FLAG_NO_INTERACT);
-                    else if (step.script->goLockState.lockState & 0x08)
-                        pGo->RemoveFlag(GAMEOBJECT_FLAGS, GO_FLAG_NO_INTERACT);
-                }
                 break;
             }
             case SCRIPT_COMMAND_STAND_STATE:
             {
                 if (!source)
                 {
-                    sLog.outError("SCRIPT_COMMAND_STAND_STATE (script id %u) call for NULL source.", step.script->id);
+                    sLog.outError("SCRIPT_COMMAND_STAND_STATE (script id %u) call for a NULL source.", step.script->id);
                     break;
                 }
 
-                if (!source->isType(TYPEMASK_WORLDOBJECT))
+                if (!source->isType(TYPEMASK_UNIT))
                 {
-                    sLog.outError("SCRIPT_COMMAND_STAND_STATE (script id %u) call for non-worldobject (TypeId: %u), skipping.", step.script->id, source->GetTypeId());
+                    sLog.outError("SCRIPT_COMMAND_STAND_STATE (script id %u) call for a non-worldobject (TypeId: %u), skipping.", step.script->id, source->GetTypeId());
                     break;
                 }
-                // When creatureEntry is not defined, GameObject can not be source
-                else if (!step.script->standState.creatureEntry)
-                {
-                    if (!source->isType(TYPEMASK_UNIT))
-                    {
-                        sLog.outError("SCRIPT_COMMAND_STAND_STATE (script id %u) are missing datalong2 (creature entry). Unsupported call for non-unit (TypeId: %u), skipping.", step.script->id, source->GetTypeId());
-                        break;
-                    }
-                }
 
-                WorldObject* pSource = (WorldObject*)source;
+                Unit* pSource = static_cast<Unit*>(source);
 
-                // flag_target_as_source            0x01
-
-                // If target is Unit* and should change it's stand state (or should be source of searcher below)
-                if (target && target->isType(TYPEMASK_UNIT) && step.script->standState.flags & 0x01)
-                    pSource = (WorldObject*)target;
-
-                // If step has a buddy entry defined, search for it.
-                if (step.script->standState.creatureEntry)
-                {
-                    Creature* pBuddy = NULL;
-                    MaNGOS::NearestCreatureEntryWithLiveStateInObjectRangeCheck u_check(*pSource, step.script->standState.creatureEntry, true, step.script->standState.searchRadius);
-                    MaNGOS::CreatureLastSearcher<MaNGOS::NearestCreatureEntryWithLiveStateInObjectRangeCheck> searcher(pBuddy, u_check);
-
-                    Cell::VisitGridObjects(pSource, searcher, step.script->standState.searchRadius);
-
-                    // If buddy found, then use it or break (break since we must assume pBuddy was defined for a reason)
-                    if (pBuddy)
-                        pSource = (WorldObject*)pBuddy;
-                    else
-                        break;
-                }
-
-                // Must be safe cast to Unit* here
-                ((Unit*)pSource)->SetStandState(step.script->standState.stand_state);
+                pSource->SetStandState(step.script->standState.stand_state);
                 break;
             }
             case SCRIPT_COMMAND_MODIFY_NPC_FLAGS:
             {
-                if (!source)
-                {
-                    sLog.outError("SCRIPT_COMMAND_MODIFY_NPC_FLAGS (script id %u) call for NULL source.", step.script->id);
-                    break;
-                }
+                Creature* pSource = nullptr;
 
-                if (!source->isType(TYPEMASK_WORLDOBJECT))
+                if (source && source->GetTypeId() == TYPEID_UNIT)
+                    pSource = static_cast<Creature*>(source);
+                else if (target && target->GetTypeId() == TYPEID_UNIT)
+                    pSource = static_cast<Creature*>(target);
+                else
                 {
-                    sLog.outError("SCRIPT_COMMAND_MODIFY_NPC_FLAGS (script id %u) call for unsupported non-worldobject (TypeId: %u), skipping.", step.script->id, source->GetTypeId());
-                    break;
-                }
-
-                WorldObject* pSource = (WorldObject*)source;
-                Creature* pOwner = NULL;
-
-                // No buddy defined, so try use source (or target if source is not creature)
-                if (!step.script->npcFlag.creatureEntry)
-                {
-                    if (pSource->GetTypeId() != TYPEID_UNIT)
-                    {
-                        // we can't be non-creature, so see if target is creature
-                        if (target && target->GetTypeId() == TYPEID_UNIT)
-                            pOwner = (Creature*)target;
-                    }
-                    else if (pSource->GetTypeId() == TYPEID_UNIT)
-                        pOwner = (Creature*)pSource;
-                }
-                else                                        // If step has a buddy entry defined, search for it
-                {
-                    MaNGOS::NearestCreatureEntryWithLiveStateInObjectRangeCheck u_check(*pSource, step.script->npcFlag.creatureEntry, true, step.script->npcFlag.searchRadius);
-                    MaNGOS::CreatureLastSearcher<MaNGOS::NearestCreatureEntryWithLiveStateInObjectRangeCheck> searcher(pOwner, u_check);
-
-                    Cell::VisitGridObjects(pSource, searcher, step.script->npcFlag.searchRadius);
-                }
-
-                if (!pOwner)
-                {
-                    sLog.outError("SCRIPT_COMMAND_MODIFY_NPC_FLAGS (script id %u) call for non-creature (TypeIdSource: %u)(TypeIdTarget: %u), skipping.", step.script->id, source->GetTypeId(), target ? target->GetTypeId() : 0);
+                    sLog.outError("SCRIPT_COMMAND_MODIFY_NPC_FLAGS (script id %u) call for NULL or non-creature source and target.", step.script->id);
                     break;
                 }
 
                 // Add Flags
-                if (step.script->npcFlag.change_flag & 0x01)
+                if (step.script->npcFlag.change_flag & SO_NPCFLAG_SET)
                 {
-                    pOwner->SetFlag(UNIT_NPC_FLAGS, step.script->npcFlag.flag);
+                    pSource->SetFlag(UNIT_NPC_FLAGS, step.script->npcFlag.flag);
                 }
                 // Remove Flags
-                else if (step.script->npcFlag.change_flag & 0x02)
+                else if (step.script->npcFlag.change_flag & SO_NPCFLAG_REMOVE)
                 {
-                    pOwner->RemoveFlag(UNIT_NPC_FLAGS, step.script->npcFlag.flag);
+                    pSource->RemoveFlag(UNIT_NPC_FLAGS, step.script->npcFlag.flag);
                 }
                 // Toggle Flags
                 else
                 {
-                    if (pOwner->HasFlag(UNIT_NPC_FLAGS, step.script->npcFlag.flag))
+                    if (pSource->HasFlag(UNIT_NPC_FLAGS, step.script->npcFlag.flag))
                     {
-                        pOwner->RemoveFlag(UNIT_NPC_FLAGS, step.script->npcFlag.flag);
+                        pSource->RemoveFlag(UNIT_NPC_FLAGS, step.script->npcFlag.flag);
                     }
                     else
                     {
-                        pOwner->SetFlag(UNIT_NPC_FLAGS, step.script->npcFlag.flag);
+                        pSource->SetFlag(UNIT_NPC_FLAGS, step.script->npcFlag.flag);
                     }
                 }
 
@@ -3487,14 +3433,12 @@ void Map::ScriptsProcess()
                 Player* pPlayer = nullptr;
 
                 if (target && target->IsPlayer())
-                    pPlayer = (Player*)target;
+                    pPlayer = static_cast<Player*>(target);
                 else if (source && source->IsPlayer())
-                    pPlayer = (Player*)source;
-                
-                // only Player
-                if (!pPlayer)
+                    pPlayer = static_cast<Player*>(source);
+                else
                 {
-                    sLog.outError("SCRIPT_COMMAND_SEND_TAXI_PATH (script id %u) call for non-player, skipping.", step.script->id);
+                    sLog.outError("SCRIPT_COMMAND_SEND_TAXI_PATH (script id %u) call for a non-player source and target, skipping.", step.script->id);
                     break;
                 }
                 
@@ -3507,27 +3451,25 @@ void Map::ScriptsProcess()
 
                 if (step.script->terminateScript.creatureEntry)
                 {
-                    if (!source && !target)
+                    WorldObject* pSearcher = nullptr;
+                    if (source && source->isType(TYPEMASK_WORLDOBJECT))
+                        pSearcher = static_cast<WorldObject*>(source);
+                    else if (target && target->isType(TYPEMASK_WORLDOBJECT))
+                        pSearcher = static_cast<WorldObject*>(target);
+                    else
                     {
-                        sLog.outError("SCRIPT_COMMAND_TERMINATE_SCRIPT (script id %u) call for NULL object, skipping.", step.script->id);
+                        sLog.outError("SCRIPT_COMMAND_TERMINATE_SCRIPT (script id %u) call for a NULL object, skipping.", step.script->id);
                         break;
                     }
 
-                    WorldObject* pSearcher = source ? (WorldObject*) source : (WorldObject*) target;
-                    if (pSearcher->GetTypeId() == TYPEID_PLAYER && target && target->GetTypeId() != TYPEID_PLAYER)
-                    {
-                        pSearcher = (WorldObject*) target;
-                    }
-
-
-                    Creature* pCreatureBuddy = NULL;
+                    Creature* pCreatureBuddy = nullptr;
                     MaNGOS::NearestCreatureEntryWithLiveStateInObjectRangeCheck u_check(*pSearcher, step.script->terminateScript.creatureEntry, true, step.script->terminateScript.searchRadius);
                     MaNGOS::CreatureLastSearcher<MaNGOS::NearestCreatureEntryWithLiveStateInObjectRangeCheck> searcher(pCreatureBuddy, u_check);
                     Cell::VisitGridObjects(pSearcher, searcher, step.script->terminateScript.searchRadius);
 
-                    if (!(step.script->terminateScript.flags & 0x01) && !pCreatureBuddy)
+                    if ((step.script->terminateScript.flags == SO_TERMINATESCRIPT_IF_NOT_FOUND) && !pCreatureBuddy)
                         result = true; // when npc was not found alive
-                    else if (step.script->terminateScript.flags & 0x01 && pCreatureBuddy)
+                    else if ((step.script->terminateScript.flags == SO_TERMINATESCRIPT_IF_FOUND) && pCreatureBuddy)
                         result = true; // when npc was found alive
                 }
                 else
@@ -3535,24 +3477,50 @@ void Map::ScriptsProcess()
 
                 if (result) // Terminate further steps of this script
                 {
-                    uint32 id = iter->second.script->id;
-                    ObjectGuid sourceGuid = iter->second.sourceGuid;
-                    ObjectGuid targetGuid = iter->second.targetGuid;
-                    ObjectGuid ownerGuid = iter->second.ownerGuid;
+                    TerminateScript(iter->second.script->id, iter->second.sourceGuid, iter->second.targetGuid, iter->second.ownerGuid);
+                    continue;
+                }
 
-                    for (ScriptScheduleMap::iterator rmItr = m_scriptSchedule.begin(); rmItr != m_scriptSchedule.end();)
-                    {
-                        if (rmItr->second.IsSameScript(id, sourceGuid, targetGuid, ownerGuid))
-                        {
-                            m_scriptSchedule.erase(rmItr++);
-                            sScriptMgr.DecreaseScheduledScriptCount();
-                        }
-                        else
-                        {
-                            ++rmItr;
-                        }
-                    }
-                    iter = m_scriptSchedule.begin();
+                break;
+            }
+            case SCRIPT_COMMAND_TERMINATE_CONDITION:
+            {
+                Player* pPlayer = nullptr;
+                WorldObject* pSecond = nullptr;
+
+                if (target && target->GetTypeId() == TYPEID_PLAYER)
+                {
+                    pPlayer = static_cast<Player*>(target);
+
+                    if (source && source->isType(TYPEMASK_WORLDOBJECT))
+                        pSecond = static_cast<WorldObject*>(source);
+                }
+                else if (source && source->GetTypeId() == TYPEID_PLAYER)
+                {
+                    pPlayer = static_cast<Player*>(source);
+
+                    if (target && target->isType(TYPEMASK_WORLDOBJECT))
+                        pSecond = static_cast<WorldObject*>(target);
+                }
+
+                if (!pPlayer && !pSecond)
+                {
+                    sLog.outError("SCRIPT_COMMAND_TERMINATE_CONDITION (script id %u) call for NULL object, skipping.", step.script->id);
+                    break;
+                }
+
+                bool terminateResult;
+                if (step.script->terminateCond.flags & SF_TERMINATECONDITION_WHEN_FALSE)
+                    terminateResult = !sObjectMgr.IsPlayerMeetToCondition(step.script->terminateCond.conditionId, pPlayer, pPlayer->GetMap(), pSecond, CONDITION_FROM_DBSCRIPTS);
+                else
+                    terminateResult = sObjectMgr.IsPlayerMeetToCondition(step.script->terminateCond.conditionId, pPlayer, pPlayer->GetMap(), pSecond, CONDITION_FROM_DBSCRIPTS);
+
+                if (pPlayer && terminateResult && step.script->terminateCond.failQuest)
+                    pPlayer->GroupEventFailHappens(step.script->terminateCond.failQuest);
+ 
+                if (terminateResult) // Terminate further steps of this script
+                {
+                    TerminateScript(iter->second.script->id, iter->second.sourceGuid, iter->second.targetGuid, iter->second.ownerGuid);
                     continue;
                 }
 
@@ -3560,110 +3528,41 @@ void Map::ScriptsProcess()
             }
             case SCRIPT_COMMAND_ENTER_EVADE_MODE:
             {
-                if (!source)
+                Creature* pSource = nullptr;
+
+                if (source && source->GetTypeId() == TYPEID_UNIT)
+                    pSource = static_cast<Creature*>(source);
+                else if (target && target->GetTypeId() == TYPEID_UNIT)
+                    pSource = static_cast<Creature*>(target);
+                else
                 {
-                    sLog.outError("SCRIPT_COMMAND_ENTER_EVADE_MODE (script id %u) call for NULL source.", step.script->id);
+                    sLog.outError("SCRIPT_COMMAND_ENTER_EVADE_MODE (script id %u) call for a NULL or non-creature source and target, skipping.", step.script->id);
                     break;
                 }
 
-                if (!source->isType(TYPEMASK_WORLDOBJECT))
-                {
-                    sLog.outError("SCRIPT_COMMAND_ENTER_EVADE_MODE (script id %u) call for unsupported non-worldobject (TypeId: %u), skipping.", step.script->id, source->GetTypeId());
-                    break;
-                }
-
-                WorldObject* pSource = (WorldObject*)source;
-                Creature* pOwner = NULL;
-
-                // No buddy defined, so try use source (or target if source is not creature)
-                if (!step.script->enterEvadeMode.creatureEntry)
-                {
-                    if (pSource->GetTypeId() != TYPEID_UNIT)
-                    {
-                        // we can't be non-creature, so see if target is creature
-                        if (target && target->GetTypeId() == TYPEID_UNIT)
-                            pOwner = (Creature*)target;
-                    }
-                    else if (pSource->GetTypeId() == TYPEID_UNIT)
-                        pOwner = (Creature*)pSource;
-                }
-                else                                        // If step has a buddy entry defined, search for it
-                {
-                    MaNGOS::NearestCreatureEntryWithLiveStateInObjectRangeCheck u_check(*pSource, step.script->enterEvadeMode.creatureEntry, true, step.script->enterEvadeMode.searchRadius);
-                    MaNGOS::CreatureLastSearcher<MaNGOS::NearestCreatureEntryWithLiveStateInObjectRangeCheck> searcher(pOwner, u_check);
-
-                    Cell::VisitGridObjects(pSource, searcher, step.script->enterEvadeMode.searchRadius);
-                }
-
-                if (!pOwner)
-                {
-                    sLog.outError("SCRIPT_COMMAND_ENTER_EVADE_MODE (script id %u) call for non-creature (TypeIdSource: %u)(TypeIdTarget: %u), skipping.", step.script->id, source->GetTypeId(), target ? target->GetTypeId() : 0);
-                    break;
-                }
-
-                if (pOwner->AI())
-                    pOwner->AI()->EnterEvadeMode();
+                if (pSource->AI())
+                    pSource->AI()->EnterEvadeMode();
 
                 break;
             }
-            case SCRIPT_COMMAND_TERMINATE_COND:
+            case SCRIPT_COMMAND_SET_HOME_POSITION:
             {
-                if (!target && !source)
+                Creature* pSource = nullptr;
+
+                if (source && source->GetTypeId() == TYPEID_UNIT)
+                    pSource = static_cast<Creature*>(source);
+                else if (target && target->GetTypeId() == TYPEID_UNIT)
+                    pSource = static_cast<Creature*>(target);
+                else
                 {
-                    sLog.outError("SCRIPT_COMMAND_TERMINATE_COND (script id %u) call for NULL object, skipping.", step.script->id);
+                    sLog.outError("SCRIPT_COMMAND_SET_HOME_POSITION (script id %u) call for a NULL or non-creature source and target, skipping.", step.script->id);
                     break;
                 }
 
-                Player* player = NULL;
-                WorldObject* second = (WorldObject*) source;
-                // First case: target is player
-                if (target && target->GetTypeId() == TYPEID_PLAYER)
-                {
-                    player = static_cast<Player*>(target);
-                }
-                // Second case: source is player
-                else if (source && source->GetTypeId() == TYPEID_PLAYER)
-                {
-                    player = static_cast<Player*>(source);
-                    second = (WorldObject*) target;
-                }
-
-                bool terminateResult;
-                if (step.script->terminateCond.flags & 0x01)
-                {
-                    terminateResult = !sObjectMgr.IsPlayerMeetToCondition(step.script->terminateCond.conditionId, player, player->GetMap(), second, CONDITION_FROM_DBSCRIPTS);
-                }
+                if (step.script->setHome.useCurrent)
+                    pSource->SaveHomePosition();
                 else
-                {
-                    terminateResult = sObjectMgr.IsPlayerMeetToCondition(step.script->terminateCond.conditionId, player, player->GetMap(), second, CONDITION_FROM_DBSCRIPTS);
-                }
-
-                if (player && terminateResult && step.script->terminateCond.failQuest)
-                {
-                    player->GroupEventFailHappens(step.script->terminateCond.failQuest);
-                }
-                if (terminateResult) // Terminate further steps of this script
-                {
-                    uint32 id = iter->second.script->id;
-                    ObjectGuid sourceGuid = iter->second.sourceGuid;
-                    ObjectGuid targetGuid = iter->second.targetGuid;
-                    ObjectGuid ownerGuid = iter->second.ownerGuid;
-
-                    for (ScriptScheduleMap::iterator rmItr = m_scriptSchedule.begin(); rmItr != m_scriptSchedule.end();)
-                    {
-                        if (rmItr->second.IsSameScript(id, sourceGuid, targetGuid, ownerGuid))
-                        {
-                            m_scriptSchedule.erase(rmItr++);
-                            sScriptMgr.DecreaseScheduledScriptCount();
-                        }
-                        else
-                        {
-                            ++rmItr;
-                        }
-                    }
-                    iter = m_scriptSchedule.begin();
-                    continue;
-                }
+                    pSource->SetHomePosition(step.script->x, step.script->y, step.script->z, step.script->o);
 
                 break;
             }
@@ -3671,161 +3570,36 @@ void Map::ScriptsProcess()
             {
                 if (!source)
                 {
-                    sLog.outError("SCRIPT_COMMAND_TURN_TO (script id %u) call for NULL source.", step.script->id);
+                    sLog.outError("SCRIPT_COMMAND_TURN_TO (script id %u) call for NULL source, skipping", step.script->id);
                     break;
                 }
 
-                if (!source->isType(TYPEMASK_WORLDOBJECT))
+                if (!source->isType(TYPEMASK_UNIT))
                 {
-                    sLog.outError("SCRIPT_COMMAND_TURN_TO (script id %u) call for unsupported non-worldobject (TypeId: %u), skipping.", step.script->id, source->GetTypeId());
+                    sLog.outError("SCRIPT_COMMAND_TURN_TO (script id %u) call for a non-unit source (TypeId: %u), skipping.", step.script->id, source->GetTypeId());
                     break;
                 }
 
-                WorldObject* pSource = (WorldObject*)source;
-                Creature* pCreatureTarget = nullptr;
+                Unit* pSource = static_cast<Unit*>(source);
 
-                if (step.script->turnTo.creatureEntry)
+                switch(step.script->turnTo.facingLogic)
                 {
-                    MaNGOS::NearestCreatureEntryWithLiveStateInObjectRangeCheck u_check(*pSource, step.script->turnTo.creatureEntry, true, step.script->turnTo.searchRadius);
-                    MaNGOS::CreatureLastSearcher<MaNGOS::NearestCreatureEntryWithLiveStateInObjectRangeCheck> searcher(pCreatureTarget, u_check);
-
-                    Cell::VisitGridObjects(pSource, searcher, step.script->turnTo.searchRadius);
-
-                    if (!pCreatureTarget)
-                        break;
-                }
-
-                if (step.script->turnTo.facingLogic == 0)
-                {
-                    if (step.script->turnTo.isSourceTarget)
+                    case SO_TURNTO_FACE_TARGET:
                     {
-                        if (target && (target->GetTypeId() == TYPEID_UNIT || target->GetTypeId() == TYPEID_PLAYER) && target->IsInWorld())
-                        {
-                            Unit* pTarget = target->ToUnit();
-
-                            if (!step.script->turnTo.creatureEntry)
-                            {
-                                // the target (probably player) faces the source of the script
-                                if (pSource && pTarget)
-                                    pTarget->SetFacingToObject(pSource);
-                            }
-                            else
-                            {
-                                // search for a creature and make the target (probably player) face it
-                                if (pTarget)
-                                    pTarget->SetFacingToObject(pCreatureTarget);
-                            }
-                        }
+                        if (target && target->isType(TYPEMASK_WORLDOBJECT))
+                            (static_cast<Unit*>(pSource))->SetFacingToObject(static_cast<WorldObject*>(target));
                         else
                         {
-                            sLog.outError("SCRIPT_COMMAND_TURN_TO (script id %u) call with datalong=0 and datalong2!=0 but script target is not Unit.", step.script->id);
-                            break;
+                            sLog.outError("SCRIPT_COMMAND_TURN_TO (script id %u) call with datalong=0 for non-unit source or non-worldobject target.", step.script->id);
+                            return;
                         }
-                    }
-                    else
-                    {
-                        if (target && target->isType(TYPEMASK_WORLDOBJECT) && target->IsInWorld())
-                        {
-                            WorldObject* pTarget = (WorldObject*)target;
-
-                            if (!step.script->turnTo.creatureEntry)
-                            {
-                                if (source->GetTypeId() != TYPEID_UNIT)
-                                {
-                                    sLog.outError("SCRIPT_COMMAND_TURN_TO (script id %u) call with datalong=0 and datalong2=0 but script source is not Unit.", step.script->id);
-                                    break;
-                                }
-
-                                // unit that is the source of the script faces the target (probably player)
-                                Unit* pUnitSource = source->ToUnit();
-
-                                if (pTarget && pUnitSource)
-                                    pUnitSource->SetFacingToObject(pTarget);
-                            }
-                            else
-                            {
-                                // search for a creature and make it face the target (probably player)
-                                if (pTarget)
-                                    pCreatureTarget->SetFacingToObject(pTarget);
-                            }
-                        }
-                        else
-                        {
-                            sLog.outError("SCRIPT_COMMAND_TURN_TO (script id %u) call with datalong=0 and datalong2=0 but script target is invalid.", step.script->id);
-                            break;
-                        }
-                    }
-                }
-                else if (step.script->turnTo.facingLogic == 1)
-                {
-                    if (step.script->turnTo.creatureEntry)
-                    {
-                        // search for a creature and set its facing to the orientation specified
-                        pCreatureTarget->SetFacingTo(step.script->o);
-                    }
-                    else if (step.script->turnTo.isSourceTarget)
-                    {
-                        // setting target's (probably player) facing to the orientation specified
-                        if (target && (target->GetTypeId() == TYPEID_UNIT || target->GetTypeId() == TYPEID_PLAYER) && target->IsInWorld())
-                        {
-                            Unit* pTarget = target->ToUnit();
-
-                            if (pTarget)
-                                pTarget->SetFacingTo(step.script->o);
-                        }
-                        else
-                        {
-                            sLog.outError("SCRIPT_COMMAND_TURN_TO (script id %u) call with datalong=1 and datalong2!=0 but script target is not Unit.", step.script->id);
-                            break;
-                        }
-                    }
-                    else if (source->GetTypeId() == TYPEID_UNIT)
-                    {
-                        // setting the script source's facing to the orientation specified
-                        Unit* pUnitSource = source->ToUnit();
-
-                        if (pUnitSource)
-                            pUnitSource->SetFacingTo(step.script->o);
-                    }
-                    else
-                    {
-                        sLog.outError("SCRIPT_COMMAND_TURN_TO (script id %u) call with datalong=1 and datalong2=0 but script source is not Unit.", step.script->id);
                         break;
                     }
-                }
-                else if (step.script->turnTo.facingLogic == 2)
-                {
-                    if (step.script->turnTo.creatureEntry)
+                    case SO_TURNTO_PROVIDED_ORIENTATION:
                     {
-                        if (step.script->turnTo.isSourceTarget)
-                        {
-                            // searches for a creature and makes it face the source of the script
-                            pCreatureTarget->SetFacingToObject(pSource);
-                        }
-                        else if (source->GetTypeId() == TYPEID_UNIT)
-                        {
-                            // searches for a creature and makes unit that is the source of the script face it
-                            Unit* pUnitSource = source->ToUnit();
-
-                            if (pUnitSource)
-                                pUnitSource->SetFacingToObject(pCreatureTarget);
-                        }
-                        else
-                        {
-                            sLog.outError("SCRIPT_COMMAND_TURN_TO (script id %u) call with datalong=2 and datalong2=0 but script source is not Unit.", step.script->id);
-                            break;
-                        }
-                    }
-                    else
-                    {
-                        sLog.outError("SCRIPT_COMMAND_TURN_TO (script id %u) call with datalong=2 but no creature entry specified.", step.script->id);
+                        pSource->SetFacingTo(step.script->o);
                         break;
                     }
-                }
-                else
-                {
-                    sLog.outError("SCRIPT_COMMAND_TURN_TO (script id %u) unsupported call with value datalong=%i.", step.script->id, step.script->turnTo.facingLogic);
-                    break;
                 }
                 break;
             }
@@ -3834,12 +3608,10 @@ void Map::ScriptsProcess()
                 Player* pPlayer = nullptr;
 
                 if (target && target->IsPlayer())
-                    pPlayer = (Player*)target;
+                    pPlayer = static_cast<Player*>(target);
                 else if (source && source->IsPlayer())
-                    pPlayer = (Player*)source;
-
-                // only Player
-                if (!pPlayer)
+                    pPlayer = static_cast<Player*>(source);
+                else
                 {
                     sLog.outError("SCRIPT_COMMAND_MEETINGSTONE (script id %u) call for non-player, skipping.", step.script->id);
                     break;
