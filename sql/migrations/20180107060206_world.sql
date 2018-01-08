@@ -123,14 +123,14 @@ UPDATE `event_scripts` SET `data_flags`=1 WHERE `command`=6;
 UPDATE `gossip_scripts` SET `data_flags`=1 WHERE `command`=6;
 
 -- SCRIPT_COMMAND_TEMP_SUMMON_CREATURE
-UPDATE `quest_end_scripts` SET `data_flags`=`data_flags`*8 WHERE `command`=10;
-UPDATE `quest_start_scripts` SET `data_flags`=`data_flags`*8 WHERE `command`=10;
-UPDATE `spell_scripts` SET `data_flags`=`data_flags`*8 WHERE `command`=10;
-UPDATE `creature_spells_scripts` SET `data_flags`=`data_flags`*8 WHERE `command`=10;
-UPDATE `creature_movement_scripts` SET `data_flags`=`data_flags`*8 WHERE `command`=10;
-UPDATE `gameobject_scripts` SET `data_flags`=`data_flags`*8 WHERE `command`=10;
-UPDATE `event_scripts` SET `data_flags`=`data_flags`*8 WHERE `command`=10;
-UPDATE `gossip_scripts` SET `data_flags`=`data_flags`*8 WHERE `command`=10;
+UPDATE `quest_end_scripts` SET `data_flags`=`data_flags`*16 WHERE `command`=10;
+UPDATE `quest_start_scripts` SET `data_flags`=`data_flags`*16 WHERE `command`=10;
+UPDATE `spell_scripts` SET `data_flags`=`data_flags`*16 WHERE `command`=10;
+UPDATE `creature_spells_scripts` SET `data_flags`=`data_flags`*16 WHERE `command`=10;
+UPDATE `creature_movement_scripts` SET `data_flags`=`data_flags`*16 WHERE `command`=10;
+UPDATE `gameobject_scripts` SET `data_flags`=`data_flags`*16 WHERE `command`=10;
+UPDATE `event_scripts` SET `data_flags`=`data_flags`*16 WHERE `command`=10;
+UPDATE `gossip_scripts` SET `data_flags`=`data_flags`*16 WHERE `command`=10;
 
 -- SCRIPT_COMMAND_REMOVE_AURA
 UPDATE `quest_end_scripts` SET `data_flags`=1, `datalong2`=0 WHERE `command`=14 && `datalong2`=1;

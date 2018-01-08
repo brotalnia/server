@@ -50,7 +50,9 @@ class WorldObject;
 
 // For example the talk command can be used by any WorldObject and the text will
 // be said by this object. If there is also a target provided of type Unit, then
-// any use of $n in the text will be replaced by that of the unit used as target.
+// any use of $n in the text will show the name of this unit.
+
+// Command functions are defined in Map.h and implemented in ScriptCommands.cpp!
 
 enum eScriptCommand
 {
@@ -172,7 +174,10 @@ enum eScriptCommand
     SCRIPT_COMMAND_TURN_TO                  = 35,           // source = Unit
                                                             // target = WorldObject
                                                             // datalong = eTurnToFacingOptions
-    SCRIPT_COMMAND_MEETINGSTONE             = 36,           // datalong = area id
+    SCRIPT_COMMAND_MEETINGSTONE             = 36,           // source = Player
+                                                            // datalong = area_id
+
+    SCRIPT_COMMAND_MAX
 
 };
 
@@ -199,9 +204,9 @@ enum eMoveToCoordinateTypes
 // Must start from 0x8 because of target selection flags.
 enum eSummonCreatureFlags
 {
-    SF_SUMMONCREATURE_ACTIVE      = 0x08,                     // active creatures are always updated
-    SF_SUMMONCREATURE_UNIQUE      = 0x10,                     // not actually unique, just checks for same entry in certain range
-    SF_SUMMONCREATURE_UNIQUE_TEMP = 0x20                      // same as 0x10 but check for TempSummon only creatures
+    SF_SUMMONCREATURE_ACTIVE      = 0x10,                     // active creatures are always updated
+    SF_SUMMONCREATURE_UNIQUE      = 0x20,                     // not actually unique, just checks for same entry in certain range
+    SF_SUMMONCREATURE_UNIQUE_TEMP = 0x40                      // same as 0x10 but check for TempSummon only creatures
 };
 
 // Possible dataint2 values for SCRIPT_COMMAND_TEMP_SUMMON_CREATURE
@@ -279,7 +284,8 @@ enum eDataFlags
 {
     SF_GENERAL_SWAP_INITIAL_TARGETS = 0x1,                  // Swaps the provided source and target, before buddy is checked.
     SF_GENERAL_SWAP_FINAL_TARGETS   = 0x2,                  // Swaps the local source and target, after buddy is assigned.
-    SF_GENERAL_TARGET_SELF          = 0x4                   // Replaces the provided target with the provided source.
+    SF_GENERAL_TARGET_SELF          = 0x4,                  // Replaces the provided target with the provided source.
+    SF_GENERAL_ABORT_ON_FAILURE     = 0x8                   // Terminates the script if the command fails.
 };
 
 struct ScriptInfo
