@@ -36,7 +36,6 @@ extern SQLStorage sItemStorage;
 extern SQLStorage sMapStorage;
 extern SQLStorage sConditionStorage;
 extern SQLStorage sAreaStorage;
-extern SQLStorage sSpellStore;
 
 extern SQLHashStorage sGOStorage;
 

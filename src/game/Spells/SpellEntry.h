@@ -102,14 +102,7 @@ struct DBSpellEntry
     uint32    SpellIconID;                                  // 117
     uint32    activeIconID;                                 // 118
     uint32    spellPriority;                                // 119
-    char*     SpellName1;                                 // 120-127
-    char*     SpellName2;                                 // 120-127
-    char*     SpellName3;                                 // 120-127
-    char*     SpellName4;                                 // 120-127
-    char*     SpellName5;                                 // 120-127
-    char*     SpellName6;                                 // 120-127
-    char*     SpellName7;                                 // 120-127
-    char*     SpellName8;                                 // 120-127
+    char*     SpellName[8];                                 // 120-127
     uint32    SpellNameFlag;                                // 128
     char*     Rank[8];                                      // 129-136
     uint32    RankFlags;                                    // 137

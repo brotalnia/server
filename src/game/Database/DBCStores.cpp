@@ -260,7 +260,7 @@ void LoadDBCStores(const std::string& dataPath)
     LoadDBC(availableDbcLocales, bar, bad_dbc_files, sSoundEntriesStore,        dbcPath, "SoundEntries.dbc");
     for (uint32 i = 1; i < sSpellStore.GetMaxEntry(); ++i)
     {
-        DBSpellEntry const * spell = sSpellStore.LookupEntry<DBSpellEntry>(i);
+        DBSpellEntry const * spell = sSpellStore.LookupEntry(i);
         if (spell && spell->Category)
             sSpellCategoryStore[spell->Category].insert(i);
     }
@@ -274,7 +274,7 @@ void LoadDBCStores(const std::string& dataPath)
         if (skillLine->learnOnGetSkill != ABILITY_LEARNED_ON_GET_RACE_OR_CLASS_SKILL)
             continue;
 
-        DBSpellEntry const* spellInfo = sSpellStore.LookupEntry<DBSpellEntry>(skillLine->spellId);
+        DBSpellEntry const* spellInfo = sSpellStore.LookupEntry(skillLine->spellId);
         if (!spellInfo || !(spellInfo->Attributes & SPELL_ATTR_PASSIVE))
             continue;
 
@@ -411,7 +411,7 @@ void LoadDBCStores(const std::string& dataPath)
     {
         std::set<uint32> spellPaths;
         for (uint32 i = 1; i < sSpellStore.GetMaxEntry(); ++i)
-            if (DBSpellEntry const* sInfo = sSpellStore.LookupEntry<DBSpellEntry>(i))
+            if (DBSpellEntry const* sInfo = sSpellStore.LookupEntry(i))
                 for (int j = 0; j < MAX_EFFECT_INDEX; ++j)
                     if (sInfo->Effect[j] == 123 /*SPELL_EFFECT_SEND_TAXI*/)
                         spellPaths.insert(sInfo->EffectMiscValue[j]);

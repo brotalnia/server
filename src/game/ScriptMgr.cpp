@@ -1903,7 +1903,7 @@ void ScriptMgr::FillSpellSummary()
         m_spellSummary[i].Effects = 0;
         m_spellSummary[i].Targets = 0;
 
-        pTempSpell = sSpellStore.LookupEntry<DBSpellEntry>(i);
+        pTempSpell = sSpellStore.LookupEntry(i);
         // This spell doesn't exist
         if (!pTempSpell)
             continue;
