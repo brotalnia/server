@@ -60,9 +60,9 @@
 
 bool ChatHandler::HandleDbcExportSpellCommand(char *args)
 {
-    DEBUG_LOG("Debut exportation des DBC");
+    /*DEBUG_LOG("Debut exportation des DBC");
 
-    /* Spell */
+
     std::string query = "";
     std::string table = "";
     std::stringstream  oss;
@@ -138,7 +138,7 @@ bool ChatHandler::HandleDbcExportSpellCommand(char *args)
         oss << spell->activeIconID << ",";
         if (count == 1) tblstruct << "`activeIconID` int(10) unsigned NOT NULL default '0',\n";
 
-        /* Anti Injection SQL*/
+        // Anti Injection SQL
         spellName = spell->SpellName[loc];
         spellRank = spell->Rank[loc];
 
@@ -195,19 +195,19 @@ bool ChatHandler::HandleDbcExportSpellCommand(char *args)
     fputs(query.c_str(), f);
     fclose(f);
     sLog.outString("%u sorts exportes en %u requetes.", count, nbQueries);
-    sLog.outString(table.c_str());
+    sLog.outString(table.c_str());*/
     return true;
 }
 
 bool ChatHandler::HandleDbcExportSpellEffectsCommand(char *args)
 {
-    sLog.outString("Debut exportation des DBC");
+    /*sLog.outString("Debut exportation des DBC");
     uint32 uiExportOnlySpell = 0;
     char* sSpellId = strtok((char*)args, " ");
     if (sSpellId)
         uiExportOnlySpell = uint32(atoi(sSpellId));
 
-    /* Spell */
+    // Spell
     std::string query = "";
     std::string table = "";
     std::stringstream  oss;
@@ -287,7 +287,7 @@ bool ChatHandler::HandleDbcExportSpellEffectsCommand(char *args)
         if (!spell)
             continue;
 
-        /* Spell Effects */
+        // Spell Effects
         for (uint8 eff = 0; eff < MAX_SPELL_EFFECTS; ++eff)
         {
             if (!uiExportOnlySpell && spell->Effect[eff] == 0)
@@ -374,7 +374,7 @@ bool ChatHandler::HandleDbcExportSpellEffectsCommand(char *args)
     fputs(query.c_str(), f);
     fclose(f);
     sLog.outString("%u effets exportes en %u requetes.", count, nbQueries);
-    sLog.outString(table.c_str());
+    sLog.outString(table.c_str());*/
     return true;
 }
 
@@ -1742,7 +1742,7 @@ bool ChatHandler::HandleSpellInfosCommand(char *args)
     PSendSysMessage("Attributes0x%x:Ex[0x%x:0x%x:0x%x:0x%x]", pSpell->Attributes, pSpell->AttributesEx, pSpell->AttributesEx2, pSpell->AttributesEx3, pSpell->AttributesEx4);
     PSendSysMessage("RequiresSpellFocus%u:StackAmount%u", pSpell->RequiresSpellFocus, pSpell->StackAmount);
     PSendSysMessage("SpellIconID%u:SpellVisual%u:activeIconID%u", pSpell->SpellIconID, pSpell->SpellVisual, pSpell->activeIconID);
-    PSendSysMessage("SpellFamilyName%u:SpellFamilyFlags0x%llx", pSpell->SpellFamilyName, pSpell->SpellFamilyFlags.Flags);
+    PSendSysMessage("SpellFamilyName%u:SpellFamilyFlags0x%llx", pSpell->SpellFamilyName, pSpell->SpellFamilyFlags);
     PSendSysMessage("MaxTargetLevel%u:DmgClass%u:rangeIndex%u", pSpell->MaxTargetLevel, pSpell->DmgClass, pSpell->rangeIndex);
     PSendSysMessage("procChance%u:procFlags0x%x:procCharges%u", pSpell->procChance, pSpell->procFlags, pSpell->procCharges);
     PSendSysMessage("InterruptFlags0x%x:AuraInterruptFlags0x%x:PreventionType%x:spellLevel%u", pSpell->InterruptFlags, pSpell->AuraInterruptFlags, pSpell->PreventionType, pSpell->spellLevel);
@@ -1765,7 +1765,7 @@ bool ChatHandler::HandleSpellSearchCommand(char *args)
     PSendSysMessage("* Results for SpellFamilyName %u and SpellFamilyFlags & 0x%x", familyName, familyFlags);
     LocaleConstant loc = GetSessionDbcLocale();
     SpellEntry const* pSpell = NULL;
-    for (uint32 id = 0; id < sSpellStore.GetNumRows(); ++id)
+    for (uint32 id = 0; id < sSpellStore.GetMaxEntry(); ++id)
     {
         pSpell = sSpellMgr.GetSpellEntry(id);
         if (!pSpell)

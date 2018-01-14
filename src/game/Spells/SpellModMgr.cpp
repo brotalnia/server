@@ -80,7 +80,7 @@ void SpellModMgr::LoadSpellMods()
         }
     }
     OUT_LOG();
-    OUT_LOG(">> Reseted %u spell", sSpellStore.GetNumRows());
+    OUT_LOG(">> Reseted %u spell", sSpellStore.GetRecordCount());
 
     // 2 : Table spell_mod
     QueryResult* result = WorldDatabase.Query(
@@ -116,8 +116,8 @@ void SpellModMgr::LoadSpellMods()
                 }
                 else
                 {
-                    DBCSpellEntry* loader = new DBCSpellEntry;
-                    memset(loader, 0, sizeof(DBCSpellEntry));
+                    DBSpellEntry* loader = new DBSpellEntry;
+                    memset(loader, 0, sizeof(DBSpellEntry));
                     // Certaines valeurs sont a -1 par defaut.
                     loader->EquippedItemClass = -1;
                     for (uint32 i = 0; i < 8; ++i)
@@ -203,7 +203,7 @@ void SpellModMgr::LoadSpellMods()
             ModUInt32ValueIfExplicit(fields[33], spell->SpellFamilyName);
             uint64 flags = fields[34].GetUInt64();
             if (flags)
-                spell->SpellFamilyFlags.Flags = flags;
+                spell->SpellFamilyFlags = flags;
             ModUInt32ValueIfExplicit(fields[35], spell->Mechanic);
             ModInt32ValueIfExplicit(fields[36], spell->EquippedItemClass);
 

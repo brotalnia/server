@@ -1437,7 +1437,7 @@ void SpellMgr::LoadSpellProcEvents()
         spe.spellFamilyName = fields[2].GetUInt32();
 
         for (int i = 0; i < MAX_EFFECT_INDEX; ++i)
-            spe.spellFamilyMask[i] = ClassFamilyMask(fields[3 + i].GetUInt64());
+            spe.spellFamilyMask[i] = fields[3 + i].GetUInt64();
 
         spe.procFlags       = fields[6].GetUInt32();
         spe.procEx          = fields[7].GetUInt32();
@@ -3087,8 +3087,8 @@ void SpellMgr::LoadSpellLearnSkills()
 
     // search auto-learned skills and add its to map also for use in unlearn spells/talents
     uint32 dbc_count = 0;
-    BarGoLink bar(sSpellStore.GetNumRows());
-    for (uint32 spell = 0; spell < sSpellStore.GetNumRows(); ++spell)
+    BarGoLink bar(sSpellStore.GetMaxEntry());
+    for (uint32 spell = 0; spell < sSpellStore.GetMaxEntry(); ++spell)
     {
         bar.step();
         SpellEntry const* entry = sSpellMgr.GetSpellEntry(spell);
@@ -3180,7 +3180,7 @@ void SpellMgr::LoadSpellLearnSpells()
 
     // search auto-learned spells and add its to map also for use in unlearn spells/talents
     uint32 dbc_count = 0;
-    for (uint32 spell = 0; spell < sSpellStore.GetNumRows(); ++spell)
+    for (uint32 spell = 0; spell < sSpellStore.GetMaxEntry(); ++spell)
     {
         SpellEntry const* entry = sSpellMgr.GetSpellEntry(spell);
 
@@ -4056,7 +4056,7 @@ void SpellMgr::CheckUsedSpells(char const* table)
             ++countMasks;
 
             bool found = false;
-            for (uint32 spellId = 1; spellId < sSpellStore.GetNumRows(); ++spellId)
+            for (uint32 spellId = 1; spellId < sSpellStore.GetMaxEntry(); ++spellId)
             {
                 SpellEntry const* spellEntry = sSpellMgr.GetSpellEntry(spellId);
                 if (!spellEntry)
@@ -4261,7 +4261,7 @@ void SpellMgr::LoadSpellAffects()
     sLog.outString();
     sLog.outString(">> Loaded %u spell affect definitions", count);
 
-    for (uint32 id = 0; id < sSpellStore.GetNumRows(); ++id)
+    for (uint32 id = 0; id < sSpellStore.GetMaxEntry(); ++id)
     {
         SpellEntry const* spellInfo = sSpellMgr.GetSpellEntry(id);
         if (!spellInfo)
@@ -4333,13 +4333,19 @@ void SpellMgr::LoadFacingCasterFlags()
 
 void SpellMgr::LoadSpells()
 {
+    // Load spell_template table.
+    sSpellStore.Load();
+}
+
+void SpellMgr::LoadSpellOverride()
+{
     uint32 oldMSTime = WorldTimer::getMSTime();
     sLog.outString("Loading spells ...");
-    mSpellEntryMap.resize(sSpellStore.GetNumRows(), nullptr);
+    mSpellEntryMap.resize(sSpellStore.GetMaxEntry(), nullptr);
 
-    for (uint32 i = 0; i < sSpellStore.GetNumRows(); ++i)
+    for (uint32 i = 0; i < sSpellStore.GetMaxEntry(); ++i)
     {
-        if (DBCSpellEntry const* spellEntry = sSpellStore.LookupEntry(i))
+        if (DBSpellEntry const* spellEntry = sSpellStore.LookupEntry<DBSpellEntry>(i))
         {
             SpellEntry* newSpell = new SpellEntry();
             if (!newSpell->Load(spellEntry))

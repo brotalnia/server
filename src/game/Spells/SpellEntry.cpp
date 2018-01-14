@@ -14,7 +14,7 @@ SpellEntry::~SpellEntry()
     }
 }
 
-bool SpellEntry::Load(DBCSpellEntry const* dbcEntry)
+bool SpellEntry::Load(DBSpellEntry const* dbcEntry)
 {
     if (!dbcEntry)
         return false;
