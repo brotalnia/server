@@ -1894,16 +1894,16 @@ void ScriptMgr::FillSpellSummary()
 {
     delete[] m_spellSummary;
 
-    m_spellSummary = new TSpellSummary[sSpellStore.GetMaxEntry()];
+    m_spellSummary = new TSpellSummary[sSpellMgr.GetMaxSpellId()];
 
-    DBSpellEntry const* pTempSpell;
+    SpellEntry const* pTempSpell;
 
-    for (uint32 i = 0; i < sSpellStore.GetMaxEntry(); ++i)
+    for (uint32 i = 0; i < sSpellMgr.GetMaxSpellId(); ++i)
     {
         m_spellSummary[i].Effects = 0;
         m_spellSummary[i].Targets = 0;
 
-        pTempSpell = sSpellStore.LookupEntry(i);
+        pTempSpell = sSpellMgr.GetSpellEntry(i);
         // This spell doesn't exist
         if (!pTempSpell)
             continue;

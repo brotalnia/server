@@ -23,7 +23,6 @@
 #define _SPELLMGR_H
 
 // For static or at-server-startup loaded spell data
-// For more high level function for sSpellStore data
 
 #include "Common.h"
 #include "SharedDefines.h"
@@ -917,27 +916,6 @@ inline bool IsProfessionOrRidingSkill(uint32 skill)
 
 typedef std::map<uint32, uint32> SpellFacingFlagMap;
 typedef std::vector<SpellEntry*> SpellEntryMap;
-
-typedef std::vector<DBSpellEntry*> DBSpellEntryMap;
-class SpellStore
-{
-public:
-    SpellStore();
-    ~SpellStore();
-    static SpellStore& Instance();
-
-    uint32 GetMaxEntry() const { return m_maxEntry; };
-    uint32 GetRecordCount() const { return m_recordCount; };
-    DBSpellEntry const* LookupEntry(uint32 spellId) const { return spellId < GetMaxEntry() ? m_DBSpellEntryMap[spellId] : nullptr; }
-
-    void Load();
-private:
-    uint32 m_recordCount;
-    uint32 m_maxEntry;
-    DBSpellEntryMap m_DBSpellEntryMap;
-};
-
-#define sSpellStore SpellStore::Instance()
 
 class SpellMgr
 {

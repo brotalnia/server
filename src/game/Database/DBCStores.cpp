@@ -258,9 +258,9 @@ void LoadDBCStores(const std::string& dataPath)
     LoadDBC(availableDbcLocales, bar, bad_dbc_files, sSkillLineAbilityStore,    dbcPath, "SkillLineAbility.dbc");
     LoadDBC(availableDbcLocales, bar, bad_dbc_files, sSkillRaceClassInfoStore,  dbcPath, "SkillRaceClassInfo.dbc");
     LoadDBC(availableDbcLocales, bar, bad_dbc_files, sSoundEntriesStore,        dbcPath, "SoundEntries.dbc");
-    for (uint32 i = 1; i < sSpellStore.GetMaxEntry(); ++i)
+    for (uint32 i = 1; i < sSpellMgr.GetMaxSpellId(); ++i)
     {
-        DBSpellEntry const * spell = sSpellStore.LookupEntry(i);
+        SpellEntry const * spell = sSpellMgr.GetSpellEntry(i);
         if (spell && spell->Category)
             sSpellCategoryStore[spell->Category].insert(i);
     }
@@ -274,7 +274,7 @@ void LoadDBCStores(const std::string& dataPath)
         if (skillLine->learnOnGetSkill != ABILITY_LEARNED_ON_GET_RACE_OR_CLASS_SKILL)
             continue;
 
-        DBSpellEntry const* spellInfo = sSpellStore.LookupEntry(skillLine->spellId);
+        SpellEntry const* spellInfo = sSpellMgr.GetSpellEntry(skillLine->spellId);
         if (!spellInfo || !(spellInfo->Attributes & SPELL_ATTR_PASSIVE))
             continue;
 
@@ -410,8 +410,8 @@ void LoadDBCStores(const std::string& dataPath)
     // include existing nodes that have at least single not spell base (scripted) path
     {
         std::set<uint32> spellPaths;
-        for (uint32 i = 1; i < sSpellStore.GetMaxEntry(); ++i)
-            if (DBSpellEntry const* sInfo = sSpellStore.LookupEntry(i))
+        for (uint32 i = 1; i < sSpellMgr.GetMaxSpellId(); ++i)
+            if (SpellEntry const* sInfo = sSpellMgr.GetSpellEntry(i))
                 for (int j = 0; j < MAX_EFFECT_INDEX; ++j)
                     if (sInfo->Effect[j] == 123 /*SPELL_EFFECT_SEND_TAXI*/)
                         spellPaths.insert(sInfo->EffectMiscValue[j]);
