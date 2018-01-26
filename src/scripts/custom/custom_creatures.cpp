@@ -1065,26 +1065,23 @@ void AddSC_custom_creatures()
     newscript->pGossipHello = &GossipHello_TeleportNPC;
     newscript->pGossipSelect = &GossipSelect_TeleportNPC;
     newscript->RegisterSelf(false);
-    /*
-    Commented out to prevent startup error about unused script.
-
+    
     newscript = new Script;
     newscript->Name = "custom_EnchantNPC";
     newscript->pGossipHello = &GossipHello_EnchantNPC;
     newscript->pGossipSelect = &GossipSelect_EnchantNPC;
-    newscript->RegisterSelf(true);
+    newscript->RegisterSelf(false);
 
     newscript = new Script;
     newscript->Name = "custom_ProfessionsNPC";
     newscript->pGossipHello = &GossipHello_ProfessionNPC;
     newscript->pGossipSelect = &GossipSelect_ProfessionNPC;
-    newscript->RegisterSelf(true);
+    newscript->RegisterSelf(false);
 
     newscript = new Script;
     newscript->Name = "npc_training_dummy";
     newscript->GetAI = &GetAI_npc_training_dummy;
-    newscript->RegisterSelf();
-    */
+    newscript->RegisterSelf(false);
 
     newscript = new Script;
     newscript->Name = "custom_npc_summon_debugAI";
