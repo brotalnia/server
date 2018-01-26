@@ -284,7 +284,7 @@ float CalculateDefaultCoefficient(SpellEntry const *spellProto, DamageEffectType
 }
 
 
-float CalculateCustomCoefficient(SpellEntry const *spellProto, Unit const* caster, DamageEffectType const damageType, float coeff, Spell* spell)
+float CalculateCustomCoefficient(SpellEntry const *spellProto, Unit const* caster, DamageEffectType const damageType, float coeff, Spell* spell, bool donePart)
 {
     if (!caster)
         return coeff;
@@ -313,6 +313,11 @@ float CalculateCustomCoefficient(SpellEntry const *spellProto, Unit const* caste
                     speed /= 1000.0f;
 
                     return speed * coeff;
+                }
+                // Seal of Command
+                if (spellProto->Id == 20424)
+                {
+                    return donePart ? 0.20f : 0.29f;
                 }
             }
             case SPELLFAMILY_SHAMAN:
@@ -714,8 +719,6 @@ bool IsPositiveEffect(SpellEntry const *spellproto, SpellEffectIndex effIndex, U
             // some explicitly required dummy effect sets
             switch (spellproto->Id)
             {
-                case 28441:                                 // AB Effect 000
-                    return false;
                 case 10258:                                 // Awaken Vault Warder
                 case 18153:                                 // Kodo Kombobulator
                     return true;
@@ -740,8 +743,12 @@ bool IsPositiveEffect(SpellEntry const *spellproto, SpellEffectIndex effIndex, U
         // Dispel can be positive or negative depending on the target
         case SPELL_EFFECT_DISPEL:
             if (caster && victim)
+            {
+                if (CharmInfo *charm = victim->GetCharmInfo())
+                    if (FactionTemplateEntry const* ft = charm->GetOriginalFactionTemplate())
+                        return ft->IsFriendlyTo(*caster->getFactionTemplateEntry());
                 return caster->IsFriendlyTo(victim);
-
+            }
         // non-positive aura use
         case SPELL_EFFECT_APPLY_AURA:
         {
@@ -827,8 +834,11 @@ bool IsPositiveEffect(SpellEntry const *spellproto, SpellEffectIndex effIndex, U
                     if (spellproto->Id == 24740)            // Wisp Costume
                         return true;
                     return false;
-                case SPELL_AURA_MOD_ROOT:
                 case SPELL_AURA_MOD_SILENCE:
+                    if (spellproto->Id == 24732)            // Bat Costume
+                        return true;
+                    return false;
+                case SPELL_AURA_MOD_ROOT:
                 case SPELL_AURA_GHOST:
                 case SPELL_AURA_PERIODIC_LEECH:
                 case SPELL_AURA_MOD_STALKED:
@@ -1716,7 +1726,7 @@ bool SpellMgr::IsSpellProcEventCanTriggeredBy(SpellProcEventEntry const * spellP
         if (procEvent_procEx & PROC_EX_EX_TRIGGER_ALWAYS)
             return true;
         // Exist req for PROC_EX_NO_PERIODIC
-        if ((procEvent_procEx & PROC_EX_NO_PERIODIC) && (procFlags & (PROC_FLAG_ON_DO_PERIODIC | PROC_FLAG_ON_TAKE_PERIODIC)))
+        if ((procEvent_procEx & PROC_EX_NO_PERIODIC) && (procFlags & (PROC_FLAG_ON_DO_PERIODIC | PROC_FLAG_ON_TAKE_PERIODIC | PROC_FLAG_SUCCESSFUL_PERIODIC_SPELL_HIT | PROC_FLAG_TAKEN_PERIODIC_SPELL_HIT)))
             return false;
         // Check Extra Requirement like (hit/crit/miss/resist/parry/dodge/block/immune/reflect/absorb and other)
         if (procEvent_procEx & procExtra)
@@ -1852,8 +1862,8 @@ void SpellMgr::LoadSpellGroupStackRules()
 
 bool SpellMgr::ListMorePowerfullSpells(uint32 spellId, std::list<uint32>& list) const
 {
-    // Trouver le groupid du sort.
-    SpellGroup spellGroupId = SPELL_GROUP_NULL;
+    std::vector<uint32> spellGroupIds;
+    std::vector<uint32>::iterator spellGroupIdsIt;
     // first = groupid, second = spellId
     for (SpellGroupSpellMap::const_iterator itr = mSpellGroupSpell.begin(); itr != mSpellGroupSpell.end(); ++itr)
     {
@@ -1867,34 +1877,36 @@ bool SpellMgr::ListMorePowerfullSpells(uint32 spellId, std::list<uint32>& list) 
             SpellGroupStackRule stackRule = found->second;
             if (stackRule == SPELL_GROUP_STACK_RULE_POWERFULL_CHAIN)
             {
-                spellGroupId = itr->first;
-                break;
+                spellGroupIds.push_back(itr->first);
             }
         }
     }
-    if (spellGroupId == SPELL_GROUP_NULL)
+    if (spellGroupIds.size() == 0)
         return false;
-    bool spellPassed = false;
-    for (SpellGroupSpellMap::const_iterator itr = mSpellGroupSpell.begin(); itr != mSpellGroupSpell.end(); ++itr)
+    for (spellGroupIdsIt = spellGroupIds.begin(); spellGroupIdsIt != spellGroupIds.end(); ++spellGroupIdsIt)
     {
-        if (itr->first != spellGroupId)
-            continue;
-        if (!spellPassed)
+        bool spellPassed = false;
+        for (SpellGroupSpellMap::const_iterator itr = mSpellGroupSpell.begin(); itr != mSpellGroupSpell.end(); ++itr)
         {
-            if (itr->second == spellId)
-                spellPassed = true;
-            continue;
+            if (itr->first != *(spellGroupIdsIt))
+                continue;
+            if (!spellPassed)
+            {
+                if (itr->second == spellId)
+                    spellPassed = true;
+                continue;
+            }
+            list.push_back(itr->second);
         }
-        list.push_back(itr->second);
+        MANGOS_ASSERT(spellPassed == true);
     }
-    MANGOS_ASSERT(spellPassed == true);
     return !list.empty();
 }
 
 bool SpellMgr::ListLessPowerfullSpells(uint32 spellId, std::list<uint32>& list) const
 {
-    // Trouver le groupid du sort.
-    SpellGroup spellGroupId = SPELL_GROUP_NULL;
+    std::vector<uint32> spellGroupIds;
+    std::vector<uint32>::iterator spellGroupIdsIt;
     // first = groupid, second = spellId
     for (SpellGroupSpellMap::const_iterator itr = mSpellGroupSpell.begin(); itr != mSpellGroupSpell.end(); ++itr)
     {
@@ -1908,20 +1920,22 @@ bool SpellMgr::ListLessPowerfullSpells(uint32 spellId, std::list<uint32>& list) 
             SpellGroupStackRule stackRule = found->second;
             if (stackRule == SPELL_GROUP_STACK_RULE_POWERFULL_CHAIN)
             {
-                spellGroupId = itr->first;
-                break;
+                spellGroupIds.push_back(itr->first);
             }
         }
     }
-    if (spellGroupId == SPELL_GROUP_NULL)
+    if (spellGroupIds.size() == 0)
         return false;
-    for (SpellGroupSpellMap::const_iterator itr = mSpellGroupSpell.begin(); itr != mSpellGroupSpell.end(); ++itr)
+    for (spellGroupIdsIt = spellGroupIds.begin(); spellGroupIdsIt != spellGroupIds.end(); ++spellGroupIdsIt)
     {
-        if (itr->first != spellGroupId)
-            continue;
-        if (itr->second == spellId)
-            break;
-        list.push_back(itr->second);
+        for (SpellGroupSpellMap::const_iterator itr = mSpellGroupSpell.begin(); itr != mSpellGroupSpell.end(); ++itr)
+        {
+            if (itr->first != *(spellGroupIdsIt))
+                continue;
+            if (itr->second == spellId)
+                break;
+            list.push_back(itr->second);
+        }
     }
     return !list.empty();
 }

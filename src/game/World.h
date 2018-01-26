@@ -261,8 +261,8 @@ enum eConfigUInt32Values
     CONFIG_UINT32_RESPEC_MULTIPLICATIVE_COST,
     CONFIG_UINT32_RESPEC_MIN_MULTIPLIER,
     CONFIG_UINT32_RESPEC_MAX_MULTIPLIER,
-    CONFIG_UINT32_UPDATE_STEADY_BUFFER,
     CONFIG_UINT32_BATTLEGROUND_GROUP_LIMIT,
+    CONFIG_UINT32_CREATURE_SUMMON_LIMIT,
     CONFIG_UINT32_VALUE_COUNT
 };
 
@@ -376,6 +376,7 @@ enum eConfigFloatValues
     CONFIG_FLOAT_THREAT_RADIUS,
     CONFIG_FLOAT_GHOST_RUN_SPEED_WORLD,
     CONFIG_FLOAT_GHOST_RUN_SPEED_BG,
+    CONFIG_FLOAT_RATE_WAR_EFFORT_RESOURCE,
     CONFIG_FLOAT_VALUE_COUNT
 };
 
@@ -733,6 +734,8 @@ class World
         static float GetRelocationLowerLimitSq()            { return m_relocation_lower_limit_sq; }
         static uint32 GetRelocationAINotifyDelay()          { return m_relocation_ai_notify_delay; }
 
+        static uint32 GetCreatureSummonCountLimit()         { return m_creatureSummonCountLimit; }
+
         void ProcessCliCommands();
         void QueueCliCommand(CliCommandHolder* commandHolder) { cliCmdQueue.add(commandHolder); }
 
@@ -780,6 +783,23 @@ class World
         };
         uint32 InsertLog(std::string const& message, AccountTypes sec);
         ArchivedLogMessage* GetLog(uint32 logId, AccountTypes my_sec);
+
+        /**
+        * \brief: force all client to request player data
+        * \param: ObjectGuid guid : guid of the specified player
+        * \returns: void
+        *
+        * Description: InvalidatePlayerDataToAllClient force all connected clients to clear specified player cache
+        * FullName: World::InvalidatePlayerDataToAllClient
+        * Access: public
+        **/
+        void InvalidatePlayerDataToAllClient(ObjectGuid guid);
+
+        // Manually override timer update secs to force a faster update
+        void SetWorldUpdateTimer(WorldTimers timer, uint32 current);
+        time_t GetWorldUpdateTimer(WorldTimers timer);
+        time_t GetWorldUpdateTimerInterval(WorldTimers timer);
+
     protected:
         void _UpdateGameTime();
         // callback for UpdateRealmCharacters
@@ -853,6 +873,8 @@ class World
 
         static float  m_relocation_lower_limit_sq;
         static uint32 m_relocation_ai_notify_delay;
+
+        static uint32 m_creatureSummonCountLimit;
 
         // CLI command holder to be thread safe
         ACE_Based::LockedQueue<CliCommandHolder*,ACE_Thread_Mutex> cliCmdQueue;

@@ -110,7 +110,7 @@ public:
 private:
     void do_helper(WorldPacket& data, char const* text)
     {
-        //copyied from BuildMonsterChat
+        //copyied from BuildWorldObjectChat
         data << uint8(CHAT_MSG_MONSTER_YELL);
         data << uint32(i_language);
         data << ObjectGuid(i_source->GetObjectGuid());
@@ -174,7 +174,7 @@ public:
 
         char str [2048];
         snprintf(str, 2048, text, arg1str, arg2str);
-        //copyied from BuildMonsterChat
+        //copyied from BuildWorldObjectChat
         data << uint8(CHAT_MSG_MONSTER_YELL);
         data << uint32(i_language);
         data << ObjectGuid(i_source->GetObjectGuid());
@@ -321,7 +321,7 @@ void BattleGround::Update(uint32 diff)
     /*********************************************************/
 
     // if less then minimum players are in on one side, then start premature finish timer
-    if (GetStatus() == STATUS_IN_PROGRESS && sBattleGroundMgr.GetPrematureFinishTime() && (GetPlayersCountByTeam(ALLIANCE) < GetMinPlayersPerTeam() || GetPlayersCountByTeam(HORDE) < GetMinPlayersPerTeam()))
+    if (GetTypeID() != BATTLEGROUND_AV && GetStatus() == STATUS_IN_PROGRESS && sBattleGroundMgr.GetPrematureFinishTime() && (GetPlayersCountByTeam(ALLIANCE) < GetMinPlayersPerTeam() || GetPlayersCountByTeam(HORDE) < GetMinPlayersPerTeam()))
     {
         if (!m_PrematureCountDown)
         {
@@ -755,33 +755,17 @@ uint32 BattleGround::GetBattlemasterEntry() const
 
 void BattleGround::RewardMark(Player *plr, uint32 count)
 {
-    switch (GetTypeID())
-    {
-        case BATTLEGROUND_AV:
-            if (count == ITEM_WINNER_COUNT)
-                RewardSpellCast(plr, SPELL_AV_MARK_WINNER);
-            else
-                RewardSpellCast(plr, SPELL_AV_MARK_LOSER);
-            break;
-        case BATTLEGROUND_WS:
-            if (count == ITEM_WINNER_COUNT)
-                RewardSpellCast(plr, SPELL_WS_MARK_WINNER);
-            else
-                RewardSpellCast(plr, SPELL_WS_MARK_LOSER);
-            break;
-        case BATTLEGROUND_AB:
-            if (count == ITEM_WINNER_COUNT)
-                RewardSpellCast(plr, SPELL_AB_MARK_WINNER);
-            else
-                RewardSpellCast(plr, SPELL_AB_MARK_LOSER);
-            break;
-        default:
-            break;
-    }
+    if (count == ITEM_WINNER_COUNT)
+        RewardSpellCast(plr, plr->GetTeamId() ? GetHordeWinSpell() : GetAllianceWinSpell());
+    else
+        RewardSpellCast(plr, plr->GetTeamId() ? GetHordeLoseSpell() : GetAllianceLoseSpell());
 }
 
 void BattleGround::RewardSpellCast(Player *plr, uint32 spell_id)
 {
+    if (!spell_id)
+        return;
+
     SpellEntry const *spellInfo = sSpellMgr.GetSpellEntry(spell_id);
     if (!spellInfo)
     {

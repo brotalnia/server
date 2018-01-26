@@ -105,9 +105,9 @@ void MasterPlayer::CleanupChannels()
     while (!m_channels.empty())
     {
         Channel* ch = *m_channels.begin();
-        m_channels.erase(m_channels.begin());               // remove from player's channel list
-        ch->Leave(GetObjectGuid(), false);                  // not send to client, not remove from player's channel list
+        m_channels.erase(m_channels.begin());                      // remove from player's channel list
+        ch->Leave(GetObjectGuid(), ch->GetName().c_str(), false);  // not send to client, not remove from player's channel list
         if (ChannelMgr* cMgr = channelMgr(GetTeam()))
-            cMgr->LeftChannel(ch->GetName());               // deleted channel if empty
+            cMgr->LeftChannel(ch->GetName(), sObjectAccessor.FindPlayerPointer(GetObjectGuid())); // deleted channel if empty
     }
 }

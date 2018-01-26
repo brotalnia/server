@@ -31,7 +31,6 @@
 #include "ObjectMgr.h"
 #include "ZoneScriptMgr.h"
 #include "Map.h"
-#include "MoveMap.h"
 
 typedef MaNGOS::ClassLevelLockable<MapManager, ACE_Recursive_Thread_Mutex> MapManagerLock;
 INSTANTIATE_SINGLETON_2(MapManager, MapManagerLock);
@@ -42,7 +41,8 @@ MapManager::MapManager()
     i_MaxInstanceId(RESERVED_INSTANCES_LAST),
     i_GridStateErrorCount(0),
     i_continentUpdateFinished(NULL),
-    i_maxContinentThread(0)
+    i_maxContinentThread(0),
+    asyncMapUpdating(false)
 {
     i_timer.SetInterval(sWorld.getConfig(CONFIG_UINT32_INTERVAL_MAPUPDATE));
 }
@@ -205,7 +205,7 @@ bool MapManager::CanPlayerEnter(uint32 mapid, Player* player)
         if (!player->CheckInstanceCount(instanceId))
         {
             DEBUG_LOG("MAP: Player '%s' can't enter instance %u on map %u. Has already entered too many instances.", player->GetName(), instanceId, mapid);
-            player->SendTransferAborted(mapid, TRANSFER_ABORT_TOO_MANY_INSTANCES, 0);
+            player->SendTransferAborted(TRANSFER_ABORT_TOO_MANY_INSTANCES);
             return false;
         }
 
@@ -213,7 +213,7 @@ bool MapManager::CanPlayerEnter(uint32 mapid, Player* player)
         /*if(i_data && i_data->IsEncounterInProgress())
         {
             DEBUG_LOG("MAP: Player '%s' can't enter instance '%s' while an encounter is in progress.", player->GetName(), GetMapName());
-            player->SendTransferAborted(GetId(), TRANSFER_ABORT_ZONE_IN_COMBAT);
+            player->SendTransferAborted(TRANSFER_ABORT_ZONE_IN_COMBAT);
             return(false);
         }*/
     }
@@ -263,8 +263,6 @@ public:
             ++loops;
         }
         while (!(*updateFinished));
-
-        MMAP::MMapFactory::createOrGetMMapManager()->CleanUpCurrentThreadNavQuery();
         WorldDatabase.ThreadEnd();
     }
     std::vector<Map*> maps;
@@ -284,8 +282,6 @@ public:
     {
         WorldDatabase.ThreadStart();
         map->DoUpdate(diff);
-
-        MMAP::MMapFactory::createOrGetMMapManager()->CleanUpCurrentThreadNavQuery();
         WorldDatabase.ThreadEnd();
     }
     Map* map;
@@ -298,8 +294,13 @@ void MapManager::Update(uint32 diff)
     if (!i_timer.Passed())
         return;
 
+    // Execute any teleports scheduled in the main thread prior to map update
+    // eg. area triggers, world port acks
+    ExecuteDelayedPlayerTeleports();
+
     uint32 mapsDiff = (uint32)i_timer.GetCurrent();
     bool updateFinished = false;
+    asyncMapUpdating = true;
     std::vector<MapAsyncUpdater*> instanceUpdaters(sWorld.getConfig(CONFIG_UINT32_MAPUPDATE_INSTANCED_UPDATE_THREADS));
     std::vector<ContinentAsyncUpdater*> continentsUpdaters;
     for (int i = 0; i < instanceUpdaters.size(); ++i)
@@ -352,8 +353,6 @@ void MapManager::Update(uint32 diff)
     for (int tid = instanceUpdaters.size(); tid < asyncUpdateThreads.size(); ++tid)
     {
         asyncUpdateThreads[tid]->wait();
-        // Thread has finished. Remove any nav mesh queries from the MMapManager
-        //MMAP::MMapFactory::createOrGetMMapManager()->CleanUpNavQuery(asyncUpdateThreads[tid]->currentId());
         delete asyncUpdateThreads[tid];
     }
 
@@ -368,6 +367,10 @@ void MapManager::Update(uint32 diff)
     }
     delete[] i_continentUpdateFinished;
     i_continentUpdateFinished = NULL;
+    asyncMapUpdating = false;
+
+    // Execute far teleports after all map updates have finished
+    ExecuteDelayedPlayerTeleports();
 
     MapMapType::iterator crashedMapsIter = i_maps.begin();
     while (crashedMapsIter != i_maps.end())
@@ -428,6 +431,10 @@ void MapManager::UnloadAll()
 {
     for (MapMapType::iterator iter = i_maps.begin(); iter != i_maps.end(); ++iter)
         iter->second->UnloadAll(true);
+
+    // Execute any delayed teleports scheduled during unloading. Must be done before
+    // the maps are deleted
+    ExecuteDelayedPlayerTeleports();
 
     while (!i_maps.empty())
     {
@@ -820,6 +827,76 @@ uint32 MapManager::GetContinentInstanceId(uint32 mapId, float x, float y, bool* 
         }
     }
     return 0;
+}
+
+void MapManager::ScheduleFarTeleport(Player *player, ScheduledTeleportData *data)
+{
+    // If we're not in the middle of an async update, it's safe to execute the
+    // teleport immediately.
+    if (!asyncMapUpdating)
+    {
+        player->ExecuteTeleportFar(data);
+        delete data;
+    }
+    else
+    {
+        ACE_Guard<ACE_Thread_Mutex> guard(m_scheduledFarTeleportsLock);
+        player->SetPendingFarTeleport(true);
+        m_scheduledFarTeleports[player] = data;
+    }
+}
+
+// Execute all delayed teleports at the end of a map update
+void MapManager::ExecuteDelayedPlayerTeleports()
+{
+    ScheduledTeleportMap::iterator iter;
+    for (iter = m_scheduledFarTeleports.begin(); iter != m_scheduledFarTeleports.end(); ++iter)
+    {
+        ExecuteSingleDelayedTeleport(iter);
+    }
+
+    m_scheduledFarTeleports.clear();
+}
+
+// Execute a single delayed teleport for the given player (if there are any). It should
+// only be necessary to call this in teleports performed outside of an update (i.e.
+// player logout and login).
+void MapManager::ExecuteSingleDelayedTeleport(Player *player)
+{
+    ACE_Guard<ACE_Thread_Mutex> guard(m_scheduledFarTeleportsLock);
+    ScheduledTeleportMap::iterator iter = m_scheduledFarTeleports.find(player);
+
+    if (iter != m_scheduledFarTeleports.end())
+    {
+        ExecuteSingleDelayedTeleport(iter);
+
+        m_scheduledFarTeleports.erase(iter);
+    }
+}
+
+void MapManager::ExecuteSingleDelayedTeleport(ScheduledTeleportMap::iterator iter)
+{
+    // Execute the teleport. If it fails, clear the semaphore
+    if (!iter->first->ExecuteTeleportFar(iter->second))
+        iter->first->SetSemaphoreTeleportFar(false);
+
+    iter->first->SetPendingFarTeleport(false);
+
+    delete iter->second; // don't leak tele data
+}
+
+void MapManager::CancelDelayedPlayerTeleport(Player *player)
+{
+    ACE_Guard<ACE_Thread_Mutex> guard(m_scheduledFarTeleportsLock);
+    ScheduledTeleportMap::iterator iter = m_scheduledFarTeleports.find(player);
+
+    if (iter != m_scheduledFarTeleports.end())
+    {
+        iter->first->SetPendingFarTeleport(false);
+        delete iter->second;
+
+        m_scheduledFarTeleports.erase(iter);
+    }
 }
 
 void MapManager::ScheduleInstanceSwitch(Player* player, uint16 newInstance)

@@ -129,7 +129,7 @@ void MasterPlayer::SaveMails()
                     stmt.PExecute(itr2->item_guid);
             }
 
-            if (m->itemTextId)
+            if (m->itemTextId && m->stationery != MAIL_STATIONERY_DEFAULT)
             {
                 SqlStatement stmt = CharacterDatabase.CreateStatement(deleteItemText, "DELETE FROM item_text WHERE id = ?");
                 stmt.PExecute(m->itemTextId);
@@ -211,7 +211,7 @@ void MasterPlayer::UpdateNextMailTimeAndUnreads()
             if (!m_nextMailDelivereTime || m_nextMailDelivereTime > (*itr)->deliver_time)
                 m_nextMailDelivereTime = (*itr)->deliver_time;
         }
-        else if (((*itr)->checked & MAIL_CHECK_MASK_READ) == 0)
+        else if (((*itr)->checked & MAIL_CHECK_MASK_READ) == 0 && cTime < (*itr)->expire_time)
             ++unReadMails;
     }
 }

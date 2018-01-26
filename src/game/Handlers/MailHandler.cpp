@@ -346,7 +346,7 @@ void WorldSession::HandleSendMailCallback(WorldSession::AsyncMailSendRequest* re
             }
 
             loadedPlayer->MoveItemFromInventory(item->GetBagSlot(), item->GetSlot(), true);
-            CharacterDatabase.BeginTransaction();
+            CharacterDatabase.BeginTransaction(loadedPlayer->GetGUIDLow());
             item->DeleteFromInventoryDB();                  // deletes item from character's inventory
             item->SaveToDB();                               // recursive and not have transaction guard into self, item not in inventory and can be save standalone
             // owner in data will set at mail receive and item extracting
@@ -380,7 +380,7 @@ void WorldSession::HandleSendMailCallback(WorldSession::AsyncMailSendRequest* re
     .SetCOD(req->COD)
     .SendMailTo(MailReceiver(req->receiverPtr, req->receiver), loadedPlayer, req->body.empty() ? MAIL_CHECK_MASK_COPIED : MAIL_CHECK_MASK_HAS_BODY, deliver_delay);
 
-    CharacterDatabase.BeginTransaction();
+    CharacterDatabase.BeginTransaction(loadedPlayer->GetGUIDLow());
     loadedPlayer->SaveInventoryAndGoldToDB();
     CharacterDatabase.CommitTransaction();
 }
@@ -420,6 +420,7 @@ void WorldSession::HandleMailMarkAsRead(WorldPacket & recv_data)
         m->checked = m->checked | MAIL_CHECK_MASK_READ;
         pl->MarkMailsUpdated();
         m->state = MAIL_STATE_CHANGED;
+        m->expire_time = time(NULL) + (3 * DAY);
     }
 }
 
@@ -640,7 +641,7 @@ void WorldSession::HandleMailTakeItem(WorldPacket & recv_data)
         it->SetState(ITEM_UNCHANGED);                       // need to set this state, otherwise item cannot be removed later, if necessary
         loadedPlayer->MoveItemToInventory(dest, it, true);
 
-        CharacterDatabase.BeginTransaction();
+        CharacterDatabase.BeginTransaction(loadedPlayer->GetGUIDLow());
         loadedPlayer->SaveInventoryAndGoldToDB();
         pl->SaveMails();
         CharacterDatabase.CommitTransaction();
@@ -722,7 +723,7 @@ void WorldSession::HandleGetMailList(WorldPacket & recv_data)
             break;
 
         // skip deleted or not delivered (deliver delay not expired) mails
-        if ((*itr)->state == MAIL_STATE_DELETED || cur_time < (*itr)->deliver_time)
+        if ((*itr)->state == MAIL_STATE_DELETED || cur_time < (*itr)->deliver_time || cur_time > (*itr)->expire_time)
             continue;
 
         /*[-ZERO] TODO recheck this
@@ -756,19 +757,23 @@ void WorldSession::HandleGetMailList(WorldPacket & recv_data)
 
         // 1.12.1 can have only single item
         Item *item = (*itr)->items.size() > 0 ? pl->GetMItem((*itr)->items[0].item_guid) : NULL;
-        data << uint32(item ? item->GetEntry() : 0);        // entry
-        // permanent enchantment
-        data << uint32(item ? item->GetEnchantmentId((EnchantmentSlot)PERM_ENCHANTMENT_SLOT) : 0);
-        // can be negative
-        data << uint32(item ? item->GetItemRandomPropertyId() : 0);
-        // unk
-        data << uint32(item ? item->GetItemSuffixFactor() : 0);
-        data << uint8(item ? item->GetCount() : 0);         // stack count
-        data << uint32(item ? item->GetSpellCharges() : 0); // charges
-        // durability
-        data << uint32(item ? item->GetUInt32Value(ITEM_FIELD_MAXDURABILITY) : 0);
-        // durability
-        data << uint32(item ? item->GetUInt32Value(ITEM_FIELD_DURABILITY) : 0);
+
+        if (item)
+        {
+            data << uint32(item->GetEntry());
+            data << uint32(item->GetEnchantmentId((EnchantmentSlot)PERM_ENCHANTMENT_SLOT)); // permanent enchantment
+            data << uint32(item->GetItemRandomPropertyId());                                // can be negative
+            data << uint32(item->GetItemSuffixFactor());                                    // unk
+            data << uint8(item->GetCount());                                                // stack count
+            data << uint32(item->GetSpellCharges());                                        // charges
+            data << uint32(item->GetUInt32Value(ITEM_FIELD_MAXDURABILITY));                 // durability max
+            data << uint32(item->GetUInt32Value(ITEM_FIELD_DURABILITY));                    // durability current
+        }
+        else
+        {
+            data << uint32(0) << uint32(0) << uint32(0) << uint32(0) << uint8(0) << uint32(0) << uint32(0) << uint32(0);
+        }
+
         data << uint32((*itr)->money);                      // copper
         data << uint32((*itr)->COD);                        // Cash on delivery
         data << uint32((*itr)->checked);                    // flags

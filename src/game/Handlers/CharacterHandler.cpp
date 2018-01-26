@@ -61,7 +61,7 @@ private:
     ObjectGuid m_guid;
 public:
     LoginQueryHolder(uint32 accountId, ObjectGuid guid)
-        : m_accountId(accountId), m_guid(guid) { }
+        : SqlQueryHolder(guid.GetCounter()), m_accountId(accountId), m_guid(guid) { }
     ~LoginQueryHolder()
     {
         // Queries should NOT be deleted by user
@@ -384,7 +384,7 @@ void WorldSession::HandleCharDeleteOpcode(WorldPacket & recv_data)
     if (sGuildMgr.GetGuildByLeader(guid))
     {
         WorldPacket data(SMSG_CHAR_DELETE, 1);
-        data << (uint8)CHAR_DELETE_FAILED_GUILD_LEADER;
+        data << (uint8)CHAR_DELETE_FAILED;
         SendPacket(&data);
         return;
     }
@@ -474,10 +474,10 @@ void WorldSession::HandlePlayerLogin(LoginQueryHolder *holder)
     ASSERT(playerGuid.IsPlayer());
 
     // If the character is online (ALT-F4 logout for example)
-    Player *pCurrChar = sObjectAccessor.FindPlayerNotInWorld(playerGuid);
+    Player *pCurrChar = sObjectAccessor.FindPlayer(playerGuid);
     MasterPlayer* pCurrMasterPlayer = sObjectAccessor.FindMasterPlayer(playerGuid);
     bool alreadyOnline = false;
-    if (pCurrChar && (pCurrChar->IsInWorld() || pCurrChar->IsBeingTeleportedFar()))
+    if (pCurrChar)
     {
         // Hacking attempt
         if (pCurrChar->GetSession()->GetAccountId() != GetAccountId())
@@ -651,11 +651,13 @@ void WorldSession::HandlePlayerLogin(LoginQueryHolder *holder)
             pCurrChar->TeleportTo(at->target_mapId, at->target_X, at->target_Y, at->target_Z, pCurrChar->GetOrientation());
         else
             pCurrChar->TeleportToHomebind();
+
+        sMapMgr.ExecuteSingleDelayedTeleport(pCurrChar);
     }
 
-    if (alreadyOnline && pCurrChar->FindMap())
+    if (alreadyOnline)
         pCurrChar->GetMap()->ExistingPlayerLogin(pCurrChar); // SendInitSelf ...
-    else if (!alreadyOnline)
+    else
         sObjectAccessor.AddObject(pCurrChar);
 
     //DEBUG_LOG("Player %s added to Map.",pCurrChar->GetName());
@@ -787,15 +789,6 @@ void WorldSession::HandleSetFactionAtWarOpcode(WorldPacket & recv_data)
     recv_data >> flag;
 
     GetPlayer()->GetReputationMgr().SetAtWar(repListID, flag);
-}
-
-void WorldSession::HandleMeetingStoneInfoOpcode(WorldPacket & /*recv_data*/)
-{
-    DEBUG_LOG("WORLD: Received CMSG_MEETING_STONE_INFO");
-
-    WorldPacket data(SMSG_MEETINGSTONE_SETQUEUE, 5);
-    data << uint32(0) << uint8(6);
-    SendPacket(&data);
 }
 
 void WorldSession::HandleTutorialFlagOpcode(WorldPacket & recv_data)
@@ -943,4 +936,5 @@ void WorldSession::HandleChangePlayerNameOpcodeCallBack(QueryResult *result, uin
     session->SendPacket(&data);
 
     sObjectMgr.ChangePlayerNameInCache(guidLow, oldname, newname);
+    sWorld.InvalidatePlayerDataToAllClient(guid);
 }

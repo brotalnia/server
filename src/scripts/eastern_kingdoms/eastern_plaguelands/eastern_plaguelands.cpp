@@ -30,32 +30,6 @@ EndContentData */
 
 #include "scriptPCH.h"
 
-//id8530 - cannibal ghoul
-//id8531 - gibbering ghoul
-//id8532 - diseased flayer
-
-struct mobs_ghoul_flayerAI : public ScriptedAI
-{
-    mobs_ghoul_flayerAI(Creature* pCreature) : ScriptedAI(pCreature)
-    {
-        Reset();
-    }
-
-    void Reset() { }
-
-    void JustDied(Unit* Killer)
-    {
-        if (Killer->GetTypeId() == TYPEID_PLAYER)
-            m_creature->SummonCreature(11064, 0.0f, 0.0f, 0.0f, 0.0f, TEMPSUMMON_TIMED_DESPAWN, 60000);
-    }
-
-};
-
-CreatureAI* GetAI_mobs_ghoul_flayer(Creature* pCreature)
-{
-    return new mobs_ghoul_flayerAI(pCreature);
-}
-
 /*######
 ## npc_augustus_the_touched
 ######*/
@@ -243,6 +217,7 @@ struct npc_eris_havenfireAI : public ScriptedAI
     {
         Reset();
         m_creature->CastSpell(m_creature, SPELL_FUFU, true);
+        m_creature->SetCreatureSummonLimit(200);
     }
 
     uint32 Vague;
@@ -1058,14 +1033,6 @@ struct npc_nathanosAI : public ScriptedAI
         else
             Backhand_Timer -= diff;
 
-        if (MultiShot_Timer < diff)
-        {
-            if (DoCastSpellIfCan(m_creature->getVictim(), SPELL_MULTI_SHOT) == CAST_OK)
-                MultiShot_Timer = urand(8000, 15000);
-        }
-        else
-            MultiShot_Timer -= diff;
-
         if (PsychicScream_Timer < diff)
         {
             if (DoCastSpellIfCan(m_creature, SPELL_PSYCHIC_SCREAM) == CAST_OK)
@@ -1074,10 +1041,26 @@ struct npc_nathanosAI : public ScriptedAI
         else
             PsychicScream_Timer -= diff;
 
+        if (MultiShot_Timer < diff)
+        {
+            if (DoCastSpellIfCan(m_creature->getVictim(), SPELL_MULTI_SHOT) == CAST_OK)
+            {
+                MultiShot_Timer = urand(8000, 15000);
+                Shoot_Timer = std::max(Shoot_Timer, 1500u);
+                ShadowShoot_Timer = std::max(ShadowShoot_Timer, 1500u);
+            }
+        }
+        else
+            MultiShot_Timer -= diff;
+
         if (ShadowShoot_Timer < diff)
         {
             if (DoCastSpellIfCan(m_creature->getVictim(), SPELL_SHADOW_SHOOT) == CAST_OK)
+            {
                 ShadowShoot_Timer = urand(8000, 15000);
+                Shoot_Timer = std::max(Shoot_Timer, 1500u);
+                MultiShot_Timer = std::max(MultiShot_Timer, 1500u);
+            }
         }
         else
             ShadowShoot_Timer -= diff;
@@ -1085,7 +1068,11 @@ struct npc_nathanosAI : public ScriptedAI
         if (Shoot_Timer < diff)
         {
             if (DoCastSpellIfCan(m_creature->getVictim(), SPELL_SHOOT) == CAST_OK)
+            {
                 Shoot_Timer = urand(4000, 6000);
+                MultiShot_Timer = std::max(MultiShot_Timer, 1500u);
+                ShadowShoot_Timer = std::max(ShadowShoot_Timer, 1500u);
+            }
         }
         else
             Shoot_Timer -= diff;
@@ -1116,8 +1103,8 @@ bool QuestAccept_npc_nathanos(Player* pPlayer, Creature* pCreature, const Quest*
 {
     if (pQuest->GetQuestId() == QUEST_THE_SCARLET_ORACLE_DEMETRIA)
     {
-        Creature* demetria = pCreature->SummonCreature(NPC_DEMETRIA, 1629.34f, -5492.59f, 100.728f, 1.08793f, TEMPSUMMON_CORPSE_DESPAWN, 0);
-        demetria->SetActiveObjectState(true);
+        if (Creature* demetria = pCreature->SummonCreature(NPC_DEMETRIA, 1629.34f, -5492.59f, 100.728f, 1.08793f, TEMPSUMMON_CORPSE_DESPAWN, 0, true))
+            demetria->SetActiveObjectState(true);
     }
     return true;
 }
@@ -1375,6 +1362,7 @@ struct npc_darrowshire_triggerAI : public ScriptedAI
     {
         DefenderFaction = 113;  // Faction Escortee : heal possible mais... n'attaque pas à vue malgré les bons flags :/
         Reset();
+        m_creature->SetCreatureSummonLimit(200);
     }
 
     uint32 PhaseStep;
@@ -2113,11 +2101,6 @@ bool EffectDummyGameObj_go_mark_of_detonation(Unit* pCaster, uint32 uiSpellId, S
 void AddSC_eastern_plaguelands()
 {
     Script *newscript;
-
-    newscript = new Script;
-    newscript->Name = "mobs_ghoul_flayer";
-    newscript->GetAI = &GetAI_mobs_ghoul_flayer;
-    newscript->RegisterSelf();
 
     newscript = new Script;
     newscript->Name = "npc_augustus_the_touched";

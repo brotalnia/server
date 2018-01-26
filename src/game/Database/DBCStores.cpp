@@ -48,6 +48,8 @@ struct WMOAreaTableTripple
 
 typedef std::map<WMOAreaTableTripple, WMOAreaTableEntry const *> WMOAreaInfoByTripple;
 
+DBCStorage <AreaTableEntry> sAreaStore(AreaTableEntryfmt);
+
 static WMOAreaInfoByTripple sWMOAreaInfoByTripple;
 
 DBCStorage <AreaTriggerEntry> sAreaTriggerStore(AreaTriggerEntryfmt);
@@ -60,6 +62,7 @@ DBCStorage <ChrRacesEntry> sChrRacesStore(ChrRacesEntryfmt);
 DBCStorage <CinematicSequencesEntry> sCinematicSequencesStore(CinematicSequencesEntryfmt);
 DBCStorage <CreatureDisplayInfoEntry> sCreatureDisplayInfoStore(CreatureDisplayInfofmt);
 DBCStorage <CreatureDisplayInfoExtraEntry> sCreatureDisplayInfoExtraStore(CreatureDisplayInfoExtrafmt);
+DBCStorage <CreatureModelDataEntry> sCreatureModelDataStore(CreatureModelDatafmt);
 DBCStorage <CreatureFamilyEntry> sCreatureFamilyStore(CreatureFamilyfmt);
 DBCStorage <CreatureSpellDataEntry> sCreatureSpellDataStore(CreatureSpellDatafmt);
 DBCStorage <CreatureTypeEntry> sCreatureTypeStore(CreatureTypefmt);
@@ -203,7 +206,7 @@ void LoadDBCStores(const std::string& dataPath)
 {
     std::string dbcPath = dataPath + "dbc/";
 
-    const uint32 DBCFilesCount = 47;
+    const uint32 DBCFilesCount = 48;
 
     BarGoLink bar(DBCFilesCount);
 
@@ -212,6 +215,7 @@ void LoadDBCStores(const std::string& dataPath)
     // bitmask for index of fullLocaleNameList
     uint32 availableDbcLocales = 0xFFFFFFFF;
 
+    LoadDBC(availableDbcLocales, bar, bad_dbc_files, sAreaStore,                dbcPath, "AreaTable.dbc");
     LoadDBC(availableDbcLocales, bar, bad_dbc_files, sAreaTriggerStore,         dbcPath, "AreaTrigger.dbc");
     LoadDBC(availableDbcLocales, bar, bad_dbc_files, sAuctionHouseStore,        dbcPath, "AuctionHouse.dbc");
     LoadDBC(availableDbcLocales, bar, bad_dbc_files, sBankBagSlotPricesStore,   dbcPath, "BankBagSlotPrices.dbc");
@@ -223,6 +227,7 @@ void LoadDBCStores(const std::string& dataPath)
     LoadDBC(availableDbcLocales, bar, bad_dbc_files, sCinematicSequencesStore,  dbcPath, "CinematicSequences.dbc");
     LoadDBC(availableDbcLocales, bar, bad_dbc_files, sCreatureDisplayInfoStore, dbcPath, "CreatureDisplayInfo.dbc");
     LoadDBC(availableDbcLocales, bar, bad_dbc_files, sCreatureDisplayInfoExtraStore, dbcPath, "CreatureDisplayInfoExtra.dbc");
+    LoadDBC(availableDbcLocales, bar, bad_dbc_files, sCreatureModelDataStore,   dbcPath, "CreatureModelData.dbc");
     LoadDBC(availableDbcLocales, bar, bad_dbc_files, sCreatureFamilyStore,      dbcPath, "CreatureFamily.dbc");
     LoadDBC(availableDbcLocales, bar, bad_dbc_files, sCreatureSpellDataStore,   dbcPath, "CreatureSpellData.dbc");
     LoadDBC(availableDbcLocales, bar, bad_dbc_files, sCreatureTypeStore,        dbcPath, "CreatureType.dbc");
@@ -540,6 +545,35 @@ uint32 GetTalentSpellCost(uint32 spellId)
     return GetTalentSpellCost(GetTalentSpellPos(spellId));
 }
 
+int32 GetAreaFlagByAreaID(uint32 area_id)
+{
+    AreaTableEntry const* AreaEntry = sAreaStore.LookupEntry(area_id);
+    if (!AreaEntry)
+        return -1;
+
+    return AreaEntry->exploreFlag;
+}
+
+uint32 GetAreaIdByLocalizedName(const std::string& name) // Channel name provided
+{
+    AreaTableEntry const* aEntry = NULL;
+    for (uint32 i = 0; i <= sAreaStore.GetNumRows(); i++)
+    {
+        if (AreaTableEntry const* AreaEntry = sAreaStore.LookupEntry(i))
+        {
+            for (uint32 i = 0; i < MAX_DBC_LOCALE; ++i)
+            {
+                std::string area_name(AreaEntry->area_name[i]);
+                if (area_name.size() > 0 && name.find(" - " + area_name) != std::string::npos)
+                {
+                    return AreaEntry->ID;
+                }
+            }
+        }
+    }
+    return 0;
+}
+
 WMOAreaTableEntry const* GetWMOAreaTableEntryByTripple(int32 rootid, int32 adtid, int32 groupid)
 {
     WMOAreaInfoByTripple::iterator i = sWMOAreaInfoByTripple.find(WMOAreaTableTripple(rootid, adtid, groupid));
@@ -573,11 +607,11 @@ ChatChannelsEntry const* GetChannelEntryFor(const std::string& name)
             for (int loc = 0; loc < MAX_DBC_LOCALE; ++loc)
             {
                 std::string entryName(ch->pattern[loc]);
-                std::size_t removeString = entryName.find("%s");
                 // Not loaded locale
                 if (!entryName.size())
                     continue;
 
+                std::size_t removeString = entryName.find("%s");
                 if (removeString != std::string::npos)
                     entryName.replace(removeString, 2, "");
 
@@ -586,7 +620,7 @@ ChatChannelsEntry const* GetChannelEntryFor(const std::string& name)
             }
         }
     }
-    return NULL;
+    return nullptr;
 }
 /*[-ZERO]
 bool IsTotemCategoryCompatiableWith(uint32 itemTotemCategoryId, uint32 requiredTotemCategoryId)

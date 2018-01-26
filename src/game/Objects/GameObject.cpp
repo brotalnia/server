@@ -190,6 +190,7 @@ bool GameObject::Create(uint32 guidlow, uint32 name_id, Map *map, float x, float
     SetGoType(GameobjectTypes(goinfo->type));
 
     SetGoAnimProgress(animprogress);
+    SetName(goinfo->name);
 
     //Notify the map's instance data.
     //Only works if you create the object in it, not if it is moves to that map.
@@ -274,7 +275,7 @@ void GameObject::Update(uint32 update_diff, uint32 /*p_time*/)
 
 			    // Play splash sound
 			    PlayDistanceSound(3355);
-                            SendGameObjectCustomAnim(GetObjectGuid());
+                            SendGameObjectCustomAnim();
                         }
 
                         m_lootState = GO_READY;             // can be successfully open with some chance
@@ -333,9 +334,7 @@ void GameObject::Update(uint32 update_diff, uint32 /*p_time*/)
                                 m_respawnDelayTime = -1; //spawn animation
                                 GetMap()->Add(this);
                                 m_respawnDelayTime = 0;
-                                WorldPacket data(SMSG_GAMEOBJECT_RESET_STATE, 8);
-                                data << GetObjectGuid();
-                                SendObjectMessageToSet(&data,true);
+                                SendGameObjectReset();
                             }
                             else
                                 GetMap()->Add(this);
@@ -443,7 +442,8 @@ void GameObject::Update(uint32 update_diff, uint32 /*p_time*/)
                             case 4472:
                             case 4491:
                             case 6785:
-                                SendGameObjectCustomAnim(GetObjectGuid());
+                            case 6747: //sapphiron birth
+                                SendGameObjectCustomAnim();
                                 break;
                         }
                     }
@@ -736,6 +736,10 @@ void GameObject::getFishLoot(Loot *fishloot, Player* loot_owner)
     uint32 zone, subzone;
     GetZoneAndAreaId(zone, subzone);
 
+    // Don't allow fishing in hidden wetlands lake
+    if (subzone == 11 && loot_owner->IsWithinDist2d(-4074.74f, -1315.79f, 100.0f))
+        return;
+
     // if subzone loot exist use it
     if (!fishloot->FillLoot(subzone, LootTemplates_Fishing, loot_owner, true, (subzone != zone)) && subzone != zone)
         // else use zone loot (if zone diff. from subzone, must exist in like case)
@@ -796,10 +800,11 @@ void GameObject::SaveToDB(uint32 mapid)
        << GetFloatValue(GAMEOBJECT_ROTATION + 1) << ", "
        << GetFloatValue(GAMEOBJECT_ROTATION + 2) << ", "
        << GetFloatValue(GAMEOBJECT_ROTATION + 3) << ", "
-       << m_respawnDelayTime << ", "
+       << data.spawntimesecs << ", " // PRESERVE SPAWNED BY DEFAULT
        << uint32(GetGoAnimProgress()) << ", "
        << uint32(GetGoState()) << ","
-       << m_isActiveObject << ")";
+       << m_isActiveObject << ","
+       << m_visibilityModifier << ")";
 
     WorldDatabase.BeginTransaction();
     WorldDatabase.PExecuteLog("DELETE FROM gameobject WHERE guid = '%u'", GetGUIDLow());
@@ -870,6 +875,8 @@ bool GameObject::LoadFromDB(uint32 guid, Map *map)
     }
 
     m_isActiveObject = (data->spawnFlags & SPAWN_FLAG_ACTIVE);
+    m_visibilityModifier = data->visibilityModifier;
+
     return true;
 }
 
@@ -1001,7 +1008,7 @@ bool GameObject::isVisibleForInState(Player const* u, WorldObject const* viewPoi
 
     // check distance
     return IsWithinDistInMap(viewPoint, GetMap()->GetVisibilityDistance() +
-                             (inVisibleList ? World::GetVisibleObjectGreyDistance() : 0.0f), false);
+                             (inVisibleList ? World::GetVisibleObjectGreyDistance() : 0.0f) + GetVisibilityModifier(), false);
 }
 
 void GameObject::Respawn()
@@ -1422,7 +1429,7 @@ void GameObject::Use(Unit* user)
 
             // this appear to be ok, however others exist in addition to this that should have custom (ex: 190510, 188692, 187389)
             if (time_to_restore && info->goober.customAnim)
-                SendGameObjectCustomAnim(GetObjectGuid());
+                SendGameObjectCustomAnim();
             else
                 SetGoState(GO_STATE_ACTIVE);
 
@@ -2153,8 +2160,10 @@ struct SpawnGameObjectInMapsWorker
                 delete pGameobject;
             else
             {
-                if (pGameobject->isSpawnedByDefault())
+                //if (pGameobject->isSpawnedByDefault())
                     map->Add(pGameobject);
+                //else
+                //    delete pGameobject;
             }
         }
     }
@@ -2214,11 +2223,36 @@ GameObjectData const * GameObject::GetGOData() const
     return sObjectMgr.GetGOData(GetGUIDLow());
 }
 
+void GameObject::SendGameObjectCustomAnim(uint32 animId /*= 0*/)
+{
+    WorldPacket data(SMSG_GAMEOBJECT_CUSTOM_ANIM, 8 + 4);
+    data << GetObjectGuid();
+    data << uint32(animId);
+    SendMessageToSet(&data, true);
+}
+
+void GameObject::SendGameObjectReset()
+{
+    WorldPacket data(SMSG_GAMEOBJECT_RESET_STATE, 8);
+    data << GetObjectGuid();
+    SendMessageToSet(&data, true);
+}
+
 void GameObject::Despawn()
 {
     SendObjectDeSpawnAnim(GetObjectGuid());
     if (GameObjectData const* data = GetGOData())
-        SetRespawnTime(data->spawntimesecs);
+    {
+        if (m_spawnedByDefault)
+        {
+            SetRespawnTime(data->spawntimesecs);
+        }
+        else
+        {
+            m_respawnTime = 0;
+            m_respawnDelayTime = data->spawntimesecs < 0 ? -data->spawntimesecs : data->spawntimesecs;
+        }
+    }
     else
         AddObjectToRemoveList();
 }

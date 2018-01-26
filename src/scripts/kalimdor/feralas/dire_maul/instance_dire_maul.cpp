@@ -1352,9 +1352,7 @@ enum
     GOSSIP_ITEM_FENGUS                      = -3100011,
     
     GOSSIP_MENU_SLIPKIK_1                   = 6905,
-    GOSSIP_MENU_SLIPKIK_2                   = 6906, 
-    GOSSIP_MENU_SLIPKIK_ALT_1               = 6941,
-    GOSSIP_MENU_SLIPKIK_ALT_2               = 6942,
+    GOSSIP_MENU_SLIPKIK_2                   = 6906,
     GOSSIP_ITEM_SLIPKIK                     = -3100012
 };
 
@@ -1374,7 +1372,7 @@ bool GossipHello_boss_guards(Player* pPlayer, Creature * pCreature)
                 break;
             case NPC_GUARD_SLIPKIK:
                 pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, GOSSIP_ITEM_SLIPKIK, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 1);
-                pPlayer->SEND_GOSSIP_MENU(pCreature->HasAura(SPELL_ICE_LOCK) ? GOSSIP_MENU_SLIPKIK_1 : GOSSIP_MENU_SLIPKIK_ALT_1, pCreature->GetObjectGuid());
+                pPlayer->SEND_GOSSIP_MENU(GOSSIP_MENU_SLIPKIK_1, pCreature->GetObjectGuid());
                 break;
         }
         return true;
@@ -1398,7 +1396,7 @@ bool GossipSelect_boss_guards(Player* pPlayer, Creature* pCreature, uint32 uiSen
                 pCreature->CastSpell(pPlayer, SPELL_FENGUS_FEROCITY, true);
                 break;
             case NPC_GUARD_SLIPKIK:
-                pPlayer->SEND_GOSSIP_MENU(pCreature->HasAura(SPELL_ICE_LOCK) ? GOSSIP_MENU_SLIPKIK_2 : GOSSIP_MENU_SLIPKIK_ALT_2, pCreature->GetObjectGuid());
+                pPlayer->SEND_GOSSIP_MENU(GOSSIP_MENU_SLIPKIK_2, pCreature->GetObjectGuid());
                 pCreature->CastSpell(pPlayer, SPELL_SLIPKIKS_SAVVY, true);
                 break;
         }
@@ -1437,7 +1435,7 @@ struct go_fixed_trap : public GameObjectAI
                 pSlipkik->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
                 pSlipkik->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_OOC_NOT_ATTACKABLE);
                 pSlipkik->CastSpell(pSlipkik, SPELL_ICE_LOCK, true, NULL);
-                me->SendGameObjectCustomAnim(me->GetObjectGuid());
+                me->SendGameObjectCustomAnim();
                 me->Delete();
             }
         }

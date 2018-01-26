@@ -130,7 +130,7 @@ inline void MaNGOS::DynamicObjectUpdater::VisitHelper(Unit* target)
     if (!target->isAlive() || target->IsTaxiFlying() )
         return;
 
-    if (target->GetTypeId() == TYPEID_UNIT && ((Creature*)target)->IsTotem())
+    if (target->GetTypeId() == TYPEID_UNIT && ((Creature*)target)->IsImmuneToAoe())
         return;
 
     if (!i_dynobject.IsWithinDistInMap(target, i_dynobject.GetRadius()))
@@ -142,6 +142,11 @@ inline void MaNGOS::DynamicObjectUpdater::VisitHelper(Unit* target)
 
     // Evade target
     if (target->GetTypeId()==TYPEID_UNIT && ((Creature*)target)->IsInEvadeMode())
+        return;
+
+    // Must check LoS with the target to prevent casting through objects by targeting
+    // the floor
+    if (!i_dynobject.IsWithinLOSInMap(target))
         return;
 
     //Check player targets and remove if in GM mode or GM invisibility (for not self casting case)
@@ -210,8 +215,11 @@ inline void MaNGOS::DynamicObjectUpdater::VisitHelper(Unit* target)
         holder = CreateSpellAuraHolder(spellInfo, target, i_dynobject.GetCaster());
         PersistentAreaAura* Aur = new PersistentAreaAura(spellInfo, eff_index, NULL, holder, target, i_dynobject.GetCaster());
         holder->AddAura(Aur, eff_index);
-            
-        target->AddSpellAuraHolder(holder);
+
+        // Debuff slots may be full, in which case holder is deleted or holder is not able to
+        // be added for some reason
+        if (!target->AddSpellAuraHolder(holder))
+            holder = nullptr;
     }
 
     if (holder && holder->IsChanneled())

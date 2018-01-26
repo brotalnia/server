@@ -40,6 +40,8 @@
 #define DEFAULT_VISIBILITY_DISTANCE 90.0f       // default visible distance, 90 yards on continents
 #define DEFAULT_VISIBILITY_INSTANCE 120.0f      // default visible distance in instances, 120 yards
 #define DEFAULT_VISIBILITY_BG       180.0f      // default visible distance in BG, 180 yards
+#define DEFAULT_VISIBILITY_MODIFIER 0.0f        // default visibility modifier on some units that should be seen beyond normal visibility distances
+#define DEFAULT_CREATURE_SUMMON_LIMIT  100      // default maximum number of creatures an object can have summoned at once
 
 #define DEFAULT_WORLD_OBJECT_SIZE   0.388999998569489f      // currently used (correctly?) for any non Unit world objects. This is actually the bounding_radius, like player/creature from creature_model_data
 #define DEFAULT_OBJECT_SCALE        1.0f                    // player/item scale as default, npc/go from database, pets from dbc
@@ -730,6 +732,7 @@ m_obj->m_updateTracker.Reset();
         void SetName(const std::string& newname) { m_name=newname; }
 
         virtual const char* GetNameForLocaleIdx(int32 /*locale_idx*/) const { return GetName(); }
+        virtual uint8 getGender() const { return 0; } // used in chat builder
 
         float GetExactDistance( const WorldObject* obj ) const;
         float GetExactDistance(float x, float y, float z) const;
@@ -739,10 +742,7 @@ m_obj->m_updateTracker.Reset();
         float GetDistance2d(float x, float y) const;
         float GetDistanceZ(const WorldObject* obj) const;
         float GetDistanceSqr(float x, float y, float z) const;
-        bool IsInMap(const WorldObject* obj) const
-        {
-            return IsInWorld() && obj->IsInWorld() && (GetMap() == obj->GetMap());
-        }
+        bool IsInMap(const WorldObject* obj) const;
         bool IsWithinDist3d(float x, float y, float z, float dist2compare) const;
         bool IsWithinDist2d(float x, float y, float dist2compare) const;
         bool _IsWithinDist(WorldObject const* obj, float dist2compare, bool is3D) const;
@@ -816,6 +816,10 @@ m_obj->m_updateTracker.Reset();
         void SendMessageToSetExcept(WorldPacket *data, Player const* skipped_receiver);
         void DirectSendPublicValueUpdate(uint32 index);
 
+        void PlayDistanceSound(uint32 sound_id, Player* target = nullptr);
+        void PlayDirectSound(uint32 sound_id, Player* target = nullptr);
+        void PlayDirectMusic(uint32 music_id, Player* target = nullptr);
+
         void PMonsterSay(const char* text, ...);
         void PMonsterSay(int32 text, ...) const;
         void PMonsterYell(const char* text, ...);
@@ -831,14 +835,9 @@ m_obj->m_updateTracker.Reset();
         void MonsterWhisper(int32 textId, Unit* receiver, bool IsBossWhisper = false) const;
         void MonsterYellToZone(int32 textId, uint32 language = 0, Unit* target = nullptr) const;
         void MonsterScriptToZone(int32 textId, ChatMsg type, uint32 language = 0, Unit* target = nullptr) const;
-        static void BuildMonsterChat(WorldPacket *data, ObjectGuid senderGuid, uint8 msgtype, char const* text, uint32 language, char const* name, ObjectGuid targetGuid);
-
-        void PlayDistanceSound(uint32 sound_id, Player* target = nullptr);
-        void PlayDirectSound(uint32 sound_id, Player* target = nullptr);
-        void PlayDirectMusic(uint32 music_id, Player* target = nullptr);
+        static void BuildWorldObjectChat(WorldPacket *data, ObjectGuid senderGuid, uint8 msgtype, char const* text, uint32 language, char const* name, ObjectGuid targetGuid);
 
         void SendObjectDeSpawnAnim(ObjectGuid guid);
-        void SendGameObjectCustomAnim(ObjectGuid guid, uint32 animId = 0);
 
         virtual bool IsHostileTo(Unit const* unit) const =0;
         virtual bool IsFriendlyTo(Unit const* unit) const =0;
@@ -860,7 +859,7 @@ m_obj->m_updateTracker.Reset();
         virtual bool isVisibleForInState(Player const* u, WorldObject const* viewPoint, bool inVisibleList) const = 0;
 
         void SetMap(Map * map);
-        Map * GetMap() const { MANGOS_ASSERT(m_currMap); return m_currMap; }
+        Map * GetMap() const;
         Map * FindMap() const { return m_currMap; }
 
         //used to check all object's GetMap() calls when object is not in world!
@@ -876,7 +875,7 @@ m_obj->m_updateTracker.Reset();
         void RemoveFromClientUpdateList() override;
         void BuildUpdateData(UpdateDataMapType &) override;
 
-        Creature* SummonCreature(uint32 id, float x, float y, float z, float ang,TempSummonType spwtype = TEMPSUMMON_DEAD_DESPAWN,uint32 despwtime = 25000, bool asActiveObject = false);
+        Creature* SummonCreature(uint32 id, float x, float y, float z, float ang,TempSummonType spwtype = TEMPSUMMON_DEAD_DESPAWN,uint32 despwtime = 25000, bool asActiveObject = false, uint32 pacifiedTimer = 0);
         GameObject* SummonGameObject(uint32 entry, float x, float y, float z, float ang, float rotation0 = 0.0f, float rotation1 = 0.0f, float rotation2 = 0.0f, float rotation3 = 0.0f, uint32 respawnTime = 25000, bool attach = true);
 
         // Recherche par entry
@@ -917,12 +916,25 @@ m_obj->m_updateTracker.Reset();
         // if player should be eligible for loot and XP from this object.
         void SetLootAndXPModDist(float val);
 
+        float GetVisibilityModifier() const;
+        void SetVisibilityModifier(float f);
+
+        uint32 GetCreatureSummonCount() { return m_creatureSummonCount; }
+        void DecrementSummonCounter();
+
+        uint32 GetCreatureSummonLimit() const { return m_creatureSummonLimit; }
+        void SetCreatureSummonLimit(uint32 limit);
+
     protected:
         explicit WorldObject();
 
         std::string m_name;
         ZoneScript* m_zoneScript;
         bool m_isActiveObject;
+        // Extra visibility distance for this unit, only used if it is an active object.
+        // c.f. GetVisibilityModifier(). Be very conservative using this - a large
+        // draw distance can be expensive for updates with lots of players
+        float m_visibilityModifier;
 
         Map * m_currMap;                                    //current object's Map location
 
@@ -936,6 +948,10 @@ m_obj->m_updateTracker.Reset();
         WorldUpdateCounter m_updateTracker;
         
         float m_lootAndXPRangeModifier;
+
+        uint32 m_creatureSummonCount;   // Current summon count
+        uint32 m_creatureSummonLimit;   // Hard limit on creature summons
+        uint32 m_summonLimitAlert;      // Timer to alert GMs if a creature is at the summon limit
 };
 
 #endif

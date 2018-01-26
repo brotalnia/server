@@ -49,6 +49,10 @@
 #include "MovementBroadcaster.h"
 #include "PlayerBroadcaster.h"
 #include "GridSearchers.h"
+#include "AuraRemovalMgr.h"
+#include "GameEventMgr.h"
+#include "world/world_event_wareffort.h"
+#include "LFGMgr.h"
 
 #define MAX_GRID_LOAD_TIME      50
 
@@ -92,9 +96,9 @@ Map::Map(uint32 id, time_t expiry, uint32 InstanceId)
       i_data(NULL), i_script_id(0), m_unloading(false), m_crashed(false),
       _processingSendObjUpdates(false), _processingUnitsRelocation(false),
       m_updateFinished(false), m_updateDiffMod(0), m_GridActivationDistance(DEFAULT_VISIBILITY_DISTANCE),
-      _lastPlayersUpdate(WorldTimer::getMSTime()), _lastMapUpdate(0),
+      _lastPlayersUpdate(WorldTimer::getMSTime()), _lastMapUpdate(WorldTimer::getMSTime()),
       _lastCellsUpdate(WorldTimer::getMSTime()), _inactivePlayersSkippedUpdates(0),
-      _objUpdatesThreads(0), _unitRelocationThreads(0), _lastPlayerLeftTime(0), m_diffBuffer(0),
+      _objUpdatesThreads(0), _unitRelocationThreads(0), _lastPlayerLeftTime(0),
       m_lastMvtSpellsUpdate(0)
 {
     m_CreatureGuids.Set(sObjectMgr.GetFirstTemporaryCreatureLowGuid());
@@ -367,6 +371,9 @@ bool Map::Add(Player *player)
 
     if (i_data)
         i_data->OnPlayerEnter(player);
+
+    // Remove any buffs defined in instance_aura_removal for the new map
+    sAuraRemovalMgr.PlayerEnterMap(i_id, player);
 
     player->GetSession()->ClearIncomingPacketsByType(PACKET_PROCESS_MOVEMENT);
     player->m_broadcaster->SetInstanceId(GetInstanceId());
@@ -657,8 +664,6 @@ public:
     virtual void run()
     {
         map->UpdateActiveCellsCallback(diff, now, threadIdx, nThreads, step);
-
-        MMAP::MMapFactory::createOrGetMMapManager()->CleanUpCurrentThreadNavQuery();
     }
     int threadIdx;
     int nThreads;
@@ -843,19 +848,9 @@ void Map::UpdatePlayers()
 void Map::DoUpdate(uint32 maxDiff)
 {
     uint32 now = WorldTimer::getMSTime();
-    uint32 diff = _lastMapUpdate?WorldTimer::getMSTimeDiff(_lastMapUpdate, now):maxDiff;
+    uint32 diff = WorldTimer::getMSTimeDiff(_lastMapUpdate, now);
     if (diff > maxDiff)
-    {
-        m_diffBuffer = std::min<uint32>(sWorld.getConfig(CONFIG_UINT32_UPDATE_STEADY_BUFFER), m_diffBuffer + diff - maxDiff);
         diff = maxDiff;
-    }
-    else if (m_diffBuffer)
-    {
-        uint32 ddiff = std::min(maxDiff - diff, m_diffBuffer);
-        diff += ddiff;
-        m_diffBuffer -= ddiff;
-    }
-
     _lastMapUpdate = now;
     if (HavePlayers())
         _lastPlayerLeftTime = now;
@@ -1361,10 +1356,59 @@ const char* Map::GetMapName() const
 
 void Map::UpdateObjectVisibility(WorldObject* obj, Cell cell, CellPair cellpair)
 {
+    // Update visibility of objects in cells within draw distance
     cell.SetNoCreate();
     MaNGOS::VisibleChangesNotifier notifier(*obj);
     TypeContainerVisitor<MaNGOS::VisibleChangesNotifier, WorldTypeMapContainer > player_notifier(notifier);
     cell.Visit(cellpair, player_notifier, *this, *obj, GetVisibilityDistance());
+
+    // Update visibility of active objects within the map.
+    // Important performance note: if continents are not instantiated
+    // the list of active objects can be large (~360 total in the world)
+    if (Player *player = obj->ToPlayer())
+        UpdateActiveObjectVisibility(player);
+}
+
+void Map::UpdateActiveObjectVisibility(Player *player)
+{
+    // Params for compressed data set - will only be compressed if packet size > 100 (multiple units)
+    ObjectGuidSet guids;
+    UpdateData data;
+    std::set<WorldObject*> visibleNow;
+
+    UpdateActiveObjectVisibility(player, guids, data, visibleNow);
+
+    if (data.HasData())
+        data.Send(player->GetSession());
+}
+
+// Not compressed
+void Map::UpdateActiveObjectVisibility(Player *player, ObjectGuidSet &visibleGuids)
+{
+    for (auto iter = m_activeNonPlayers.cbegin(); iter != m_activeNonPlayers.cend(); ++iter)
+    {
+        WorldObject *obj = *iter;
+        if (obj->IsInWorld())
+        {
+            player->UpdateVisibilityOf(player->GetCamera().GetBody(), obj);
+            visibleGuids.erase(obj->GetObjectGuid());
+        }
+    }
+}
+
+// Support for compressed data packet
+void Map::UpdateActiveObjectVisibility(Player *player, ObjectGuidSet &visibleGuids, UpdateData &data, std::set<WorldObject*> &visibleNow)
+{
+    for (auto iter = m_activeNonPlayers.cbegin(); iter != m_activeNonPlayers.cend(); ++iter)
+    {
+        WorldObject *obj = *iter;
+        if (obj->IsInWorld())
+        {
+            // TODO: Why is this templated? Why not just base class WorldObject for the target...?
+            player->UpdateVisibilityOf(player->GetCamera().GetBody(), obj, data, visibleNow);
+            visibleGuids.erase(obj->GetObjectGuid());
+        }
+    }
 }
 
 void Map::SendInitSelf(Player * player)
@@ -1739,7 +1783,7 @@ bool DungeonMap::CanEnter(Player *player)
     if (!player->isGameMaster() && GetPlayersCountExceptGMs() >= maxPlayers)
     {
         DETAIL_LOG("MAP: Instance '%u' of map '%s' cannot have more than '%u' players. Player '%s' rejected", GetInstanceId(), GetMapName(), maxPlayers, player->GetName());
-        player->SendTransferAborted(GetId(), TRANSFER_ABORT_MAX_PLAYERS);
+        player->SendTransferAborted(TRANSFER_ABORT_MAX_PLAYERS);
         return false;
     }
 
@@ -1753,12 +1797,23 @@ bool DungeonMap::CanEnter(Player *player)
     Group *pGroup = player->GetGroup();
     if (pGroup && pGroup->InCombatToInstance(GetInstanceId()) && player->isAlive() && player->GetMapId() != GetId())
     {
-        if (GetId() == 249 || GetId() == 531)        // Hack : Ustaag <Nostalrius> : concerne uniquement Onyxia's Lair
+		
+        if (GetId() == 249 || GetId() == 531 || GetId() == 533)        // Hack : Ustaag <Nostalrius> : concerne uniquement Onyxia's Lair
         {
-            player->SendTransferAborted(GetId(), TRANSFER_ABORT_ZONE_IN_COMBAT);
+            player->SendTransferAborted(TRANSFER_ABORT_ZONE_IN_COMBAT);
             return false;
         }
     }
+
+    if (GetId() == 509 || GetId() == 531)
+    {
+        if (sGameEventMgr.IsActiveEvent(EVENT_AQ_GATE))
+        {
+            player->SendTransferAborted(TRANSFER_ABORT_SILENTLY);
+            return false;
+        }
+    }
+
 
     return Map::CanEnter(player);
 }
@@ -1976,6 +2031,7 @@ void DungeonMap::UnloadAll(bool pForce)
             Player* plr = itr->getSource();
             ASSERT(plr->GetHomeBindMap() != GetId());
             plr->TeleportToHomebind();
+            plr->GetMapRef().unlink();
             itr = m_mapRefManager.begin();
         }
     }
@@ -2095,9 +2151,8 @@ void BattleGroundMap::UnloadAll(bool pForce)
         if (Player * plr = m_mapRefManager.getFirst()->getSource())
         {
             plr->TeleportTo(plr->GetBattleGroundEntryPoint());
-            // TeleportTo removes the player from this map (if the map exists) -> calls BattleGroundMap::Remove -> invalidates the iterator.
-            // just in case, remove the player from the list explicitly here as well to prevent a possible infinite loop
-            // note that this remove is not needed if the code works well in other places
+            // Far teleports may be delayed until the next map update. Remove the player from
+            // the list explicitly here to prevent an infinite loop
             plr->GetMapRef().unlink();
         }
     }
@@ -2298,7 +2353,7 @@ void Map::ScriptsProcess()
                             pSource = (WorldObject*)pBuddy;
                     }
                 }
-
+                
                 // If we should talk to the original source instead of target
                 if (step.script->talk.flags & 0x02)
                     target = source;
@@ -2320,42 +2375,21 @@ void Map::ScriptsProcess()
                     textId = step.script->talk.textId[rand() % i];
                 }
 
-                switch (step.script->talk.chatType)
+                if (step.script->talk.gameobjectGuid)
                 {
-                    case CHAT_TYPE_SAY:
-                        pSource->MonsterSay(textId, step.script->talk.language, unitTarget);
-                        break;
-                    case CHAT_TYPE_YELL:
-                        pSource->MonsterYell(textId, step.script->talk.language, unitTarget);
-                        break;
-                    case CHAT_TYPE_TEXT_EMOTE:
-                        pSource->MonsterTextEmote(textId, unitTarget);
-                        break;
-                    case CHAT_TYPE_BOSS_EMOTE:
-                        pSource->MonsterTextEmote(textId, unitTarget, true);
-                        break;
-                    case CHAT_TYPE_WHISPER:
-                        if (!unitTarget || unitTarget->GetTypeId() != TYPEID_PLAYER)
-                        {
-                            sLog.outError("SCRIPT_COMMAND_TALK (script id %u) attempt to whisper (%u) to %s, skipping.", step.script->id, step.script->talk.chatType, unitTarget ? unitTarget->GetGuidStr().c_str() : "<no target>");
-                            break;
-                        }
-                        pSource->MonsterWhisper(textId, unitTarget);
-                        break;
-                    case CHAT_TYPE_BOSS_WHISPER:
-                        if (!unitTarget || unitTarget->GetTypeId() != TYPEID_PLAYER)
-                        {
-                            sLog.outError("SCRIPT_COMMAND_TALK (script id %u) attempt to whisper (%u) to %s, skipping.", step.script->id, step.script->talk.chatType, unitTarget ? unitTarget->GetGuidStr().c_str() : "<no target>");
-                            break;
-                        }
-                        pSource->MonsterWhisper(textId, unitTarget, true);
-                        break;
-                    case CHAT_TYPE_ZONE_YELL:
-                        pSource->MonsterYellToZone(textId, step.script->talk.language, unitTarget);
-                        break;
-                    default:
-                        break;                              // must be already checked at load
+                    uint32 guidlow = step.script->talk.gameobjectGuid;
+                    GameObjectData const* goData = sObjectMgr.GetGOData(guidlow);
+                    if (!goData)
+                        break;                                  // checked at load
+
+                    GameObject *go = pSource->GetMap()->GetGameObject(ObjectGuid(HIGHGUID_GAMEOBJECT, goData->id, guidlow));
+
+                    if (go)
+                        pSource = go;
                 }
+
+                DoScriptText(textId, pSource, unitTarget, step.script->talk.chatType);
+                
                 break;
             }
             case SCRIPT_COMMAND_EMOTE:
@@ -2382,15 +2416,26 @@ void Map::ScriptsProcess()
                 }
 
                 WorldObject* pSource = (WorldObject*)source;
-
+                
                 // flag_target_as_source            0x01
 
                 // If target is Unit* and should do the emote (or should be source of searcher below)
                 if (target && target->isType(TYPEMASK_UNIT) && step.script->emote.flags & 0x01)
+                {
                     pSource = (WorldObject*)target;
-
-                // If step has a buddy entry defined, search for it.
-                if (step.script->emote.creatureEntry)
+                }
+                // Step has flag SCRIPT_FLAG_BUDDY_BY_GUID, so we look for the creature with guid as defined in searchRadius
+                else if (step.script->emote.flags & 0x10) 
+                {
+                    pSource = pSource->GetMap()->GetCreature(ObjectGuid(HIGHGUID_UNIT, step.script->emote.creatureEntry, step.script->emote.searchRadius));
+                    if (!pSource)
+                    {
+                        sLog.outError("SCRIPT_COMMAND_EMOTE (script id %u) had flag SCRIPT_FLAG_BUDDY_BY_GUID, but could not find buddy with entry %u, guid %u", step.script->id, step.script->emote.creatureEntry, step.script->emote.searchRadius);
+                        break;
+                    }
+                }
+                // If step has a buddy entry defined, but not flag SCRIPT_FLAG_BUDDY_BY_GUID, search for it.
+                else if (step.script->emote.creatureEntry)
                 {
                     Creature* pBuddy = NULL;
                     MaNGOS::NearestCreatureEntryWithLiveStateInObjectRangeCheck u_check(*pSource, step.script->emote.creatureEntry, true, step.script->emote.searchRadius);
@@ -2404,9 +2449,19 @@ void Map::ScriptsProcess()
                     else
                         break;
                 }
+                
+                // find the emote
+                std::vector<uint32> emotes;
+                emotes.push_back(step.script->emote.emoteId);
+                for (int i = 0; i < MAX_EMOTE_ID; ++i)
+                {
+                    if (!step.script->emote.randomEmotes[i])
+                        continue;
+                    emotes.push_back(uint32(step.script->emote.randomEmotes[i]));
+                }
 
                 // Must be safe cast to Unit*
-                ((Unit*)pSource)->HandleEmote(step.script->emote.emoteId);
+                ((Unit*)pSource)->HandleEmote(emotes[urand(0, emotes.size() - 1)]);
                 break;
             }
             case SCRIPT_COMMAND_FIELD_SET:
@@ -2440,13 +2495,27 @@ void Map::ScriptsProcess()
                 }
 
                 Unit * unit = (Unit*)source;
+                float x = step.script->x;
+                float y = step.script->y;
+                float z = step.script->z;
+
+                if (step.script->moveTo.relativeToTarget && target && target->isType(TYPEMASK_WORLDOBJECT))
+                {
+                    if (WorldObject* pTarget = (WorldObject*)target)
+                    {
+                        x += pTarget->GetPositionX();
+                        y += pTarget->GetPositionY();
+                        z += pTarget->GetPositionZ();
+                    }
+                }
+
                 if (step.script->moveTo.travelTime != 0)
                 {
-                    float speed = unit->GetDistance(step.script->x, step.script->y, step.script->z) / ((float)step.script->moveTo.travelTime * 0.001f);
-                    unit->MonsterMoveWithSpeed(step.script->x, step.script->y, step.script->z, speed);
+                    float speed = unit->GetDistance(x, y, z) / ((float)step.script->moveTo.travelTime * 0.001f);
+                    unit->MonsterMoveWithSpeed(x, y, z, speed);
                 }
                 else
-                    unit->GetMotionMaster()->MovePoint(0, step.script->x, step.script->y, step.script->z, MOVE_PATHFINDING);
+                    unit->GetMotionMaster()->MovePoint(0, x, y, z, MOVE_PATHFINDING, 0.0f, step.script->o ? step.script->o : -10.0f);
                 break;
             }
             case SCRIPT_COMMAND_FLAG_SET:
@@ -3923,6 +3992,26 @@ void Map::ScriptsProcess()
                 }
                 break;
             }
+            case SCRIPT_COMMAND_MEETINGSTONE:
+            {
+                Player* pPlayer = nullptr;
+
+                if (target && target->IsPlayer())
+                    pPlayer = (Player*)target;
+                else if (source && source->IsPlayer())
+                    pPlayer = (Player*)source;
+
+                // only Player
+                if (!pPlayer)
+                {
+                    sLog.outError("SCRIPT_COMMAND_MEETINGSTONE (script id %u) call for non-player, skipping.", step.script->id);
+                    break;
+                }
+
+                if (!sLFGMgr.IsPlayerInQueue(pPlayer->GetObjectGuid()))
+                    sLFGMgr.AddToQueue(pPlayer, step.script->meetingstone.areaId);
+                break;
+            }
             default:
                 sLog.outError("Unknown SCRIPT_COMMAND_ %u called for script id %u.", step.script->command, step.script->id);
                 break;
@@ -4317,7 +4406,7 @@ public:
     }
     void operator()(WorldPacket& data, int32 loc_idx)
     {
-        char const* text = sObjectMgr.GetMangosString(i_textId, loc_idx);
+        char const* text = i_textId > 0 ? sObjectMgr.GetBroadcastText(i_textId, loc_idx) : sObjectMgr.GetMangosString(i_textId, loc_idx);
 
         std::string nameForLocale = "";
         if (loc_idx >= 0)
@@ -4333,7 +4422,7 @@ public:
         if (nameForLocale.empty())
             nameForLocale = i_cInfo->Name;
 
-        WorldObject::BuildMonsterChat(&data, i_senderGuid, i_msgtype, text, i_language, nameForLocale.c_str(), i_target ? i_target->GetObjectGuid() : ObjectGuid());
+        WorldObject::BuildWorldObjectChat(&data, i_senderGuid, i_msgtype, text, i_language, nameForLocale.c_str(), i_target ? i_target->GetObjectGuid() : ObjectGuid());
     }
 
 private:

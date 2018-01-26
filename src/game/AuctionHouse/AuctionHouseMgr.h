@@ -57,6 +57,13 @@ enum AuctionAction
     AUCTION_BID_PLACED  = 2                                 // ERR_AUCTION_BID_PLACED
 };
 
+enum AuctionClientQueryType
+{
+    AUCTION_QUERY_LIST,
+    AUCTION_QUERY_LIST_OWNER,
+    AUCTION_QUERY_LIST_BIDDER
+};
+
 struct AuctionEntry
 {
     uint32 Id;
@@ -81,6 +88,7 @@ struct AuctionEntry
     bool BuildAuctionInfo(WorldPacket & data) const;
     void DeleteFromDB() const;
     void SaveToDB() const;
+    bool IsAvailableFor(std::string const& ip);
 };
 
 struct AuctionHouseClientQuery
@@ -91,6 +99,8 @@ struct AuctionHouseClientQuery
     uint8 levelmax;
     uint8 usable;
     uint32 listfrom, auctionSlotID, auctionMainCategory, auctionSubCategory, quality;
+    uint32 outbiddedCount;
+    std::vector<uint32> outbiddedAuctionIds;
 };
 
 //this class is used as auctionhouse instance

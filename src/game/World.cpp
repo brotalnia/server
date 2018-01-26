@@ -64,7 +64,7 @@
 #include "GMTicketMgr.h"
 #include "Util.h"
 #include "CharacterDatabaseCleaner.h"
-
+#include "LFGMgr.h"
 #include "AutoBroadCastMgr.h"
 #include "AuctionHouseBotMgr.h"
 #include "AutoTesting/AutoTestingMgr.h"
@@ -81,6 +81,8 @@
 #include "MovementBroadcaster.h"
 #include "HonorMgr.h"
 #include "Anticheat/Anticheat.h"
+#include "AuraRemovalMgr.h"
+#include "InstanceStatistics.h"
 
 #include <chrono>
 
@@ -100,6 +102,8 @@ float World::m_VisibleObjectGreyDistance      = 0;
 
 float  World::m_relocation_lower_limit_sq     = 10.f * 10.f;
 uint32 World::m_relocation_ai_notify_delay    = 1000u;
+
+uint32 World::m_creatureSummonCountLimit      = DEFAULT_CREATURE_SUMMON_LIMIT;
 
 void LoadGameObjectModelList();
 
@@ -485,9 +489,11 @@ void World::LoadConfigSettings(bool reload)
         }
     }
 
+    m_wowPatch = sConfig.GetIntDefault("WowPatch", WOW_PATCH_102);
+
     ///- Read the player limit and the Message of the day from the config file
     SetPlayerLimit(sConfig.GetIntDefault("PlayerLimit", DEFAULT_PLAYER_LIMIT), true);
-    SetMotd(sConfig.GetStringDefault("Motd", "Welcome to the Massive Network Game Object Server."));
+    SetMotd(sConfig.GetStringDefault("Motd", "Welcome to the Massive Network Game Object Server.") + std::string("\n") + std::string(ObjectMgr::GetPatchName()) + std::string(" is now live!"));
 
     ///- Read all rates from the config file
     setConfigPos(CONFIG_FLOAT_RATE_HEALTH, "Rate.Health", 1.0f);
@@ -902,10 +908,8 @@ void World::LoadConfigSettings(bool reload)
     setConfig(CONFIG_FLOAT_MAX_CREATURES_STEALTH_DETECT_RANGE,      "MaxCreaturesStealthDetectRange", 15.0f);
 
     setConfig(CONFIG_BOOL_IS_MAPSERVER,                             "IsMapServer", false);
-    setConfig(CONFIG_UINT32_UPDATE_STEADY_BUFFER,                   "MapUpdateSteadyBuffer", 0);
 
     m_timeZoneOffset = sConfig.GetIntDefault("TimeZoneOffset", 0) * HOUR;
-    m_wowPatch = sConfig.GetIntDefault("WowPatch", WOW_PATCH_102);
 
     LoadNostalriusConfig(reload);
 
@@ -913,6 +917,10 @@ void World::LoadConfigSettings(bool reload)
     setConfig(CONFIG_BOOL_ACCURATE_PVP_EQUIP_REQUIREMENTS, "PvP.AccurateEquipRequirements", false);
     setConfig(CONFIG_BOOL_ACCURATE_PVP_PURCHASE_REQUIREMENTS, "PvP.AccuratePurchaseRequirements", false);
     setConfig(CONFIG_BOOL_ACCURATE_PVP_ZONE_REQUIREMENTS, "PvP.AccurateZoneRequirements", false);
+
+    setConfig(CONFIG_UINT32_CREATURE_SUMMON_LIMIT, "MaxCreatureSummonLimit", DEFAULT_CREATURE_SUMMON_LIMIT);
+
+    m_creatureSummonCountLimit = getConfig(CONFIG_UINT32_CREATURE_SUMMON_LIMIT);
 
     // Smartlog data
     sLog.InitSmartlogEntries(sConfig.GetStringDefault("Smartlog.ExtraEntries", ""));
@@ -1044,6 +1052,8 @@ void World::LoadNostalriusConfig(bool reload)
     setConfig(CONFIG_UINT32_RESPEC_MIN_MULTIPLIER,                      "Rate.RespecMinMultiplier",      2);
     setConfig(CONFIG_UINT32_RESPEC_MAX_MULTIPLIER,                      "Rate.RespecMaxMultiplier",      10);
 
+    setConfig(CONFIG_FLOAT_RATE_WAR_EFFORT_RESOURCE,                    "Rate.WarEffortResourceComplete", 0.0f);
+
     if (getConfig(CONFIG_BOOL_ALLOW_TWO_SIDE_INTERACTION_CHAT))
         setConfig(CONFIG_BOOL_GM_JOIN_OPPOSITE_FACTION_CHANNELS, false);
 
@@ -1116,9 +1126,13 @@ void World::SetInitialWorldSettings()
         exit(1);                                            // Error message displayed in function already
     }
 
+    sLog.outString("Loading Instance Statistics...");
+    sInstanceStatistics.LoadFromDB();
+
     ///- Chargements des variables (necessaire pour le OutdoorJcJ)
     sLog.outString("Loading saved variables ...");
     sObjectMgr.LoadSavedVariable();
+
 
     ///- Update the realm entry in the database with the realm type from the config file
     //No SQL injection as values are treated as integers
@@ -1182,6 +1196,9 @@ void World::SetInitialWorldSettings()
     sObjectMgr.SetHighestGuids();                           // must be after packing instances
     sLog.outString();
 
+    sLog.outString("Loading Broadcast Texts...");
+    sObjectMgr.LoadBroadcastTexts();
+
     sLog.outString("Loading Page Texts...");
     sObjectMgr.LoadPageTexts();
 
@@ -1222,7 +1239,7 @@ void World::SetInitialWorldSettings()
     sSpellMgr.LoadSpellThreats();
 
     sLog.outString("Loading NPC Texts...");
-    sObjectMgr.LoadGossipText();
+    sObjectMgr.LoadNPCText();
 
     sLog.outString("Loading Item Random Enchantments Table...");
     LoadRandomEnchantmentsTable();
@@ -1281,6 +1298,9 @@ void World::SetInitialWorldSettings()
     sLog.outString("Loading Gameobject Requirements...");
     sObjectMgr.LoadGameobjectsRequirements();
 
+    sLog.outString("Loading CreatureLinking Data...");      // must be after Creatures
+    sCreatureLinkingMgr.LoadFromDB();
+
     sLog.outString("Loading Objects Pooling Data...");
     sPoolMgr.LoadFromDB();
 
@@ -1300,7 +1320,7 @@ void World::SetInitialWorldSettings()
     sObjectMgr.LoadQuestGreetings();
     sLog.outString();
 
-    sLog.outString("Loading Game Event Data...");           // must be after sPoolMgr.LoadFromDB and quests to properly load pool events and quests for events
+    sLog.outString("Loading Game Event Data...");           // must be after sPoolMgr.LoadFromDB and quests to properly load pool events and quests for events, but before area trigger teleports
     sLog.outString();
     sGameEventMgr.LoadFromDB();
     sLog.outString(">>> Game Event Data loaded");
@@ -1397,7 +1417,7 @@ void World::SetInitialWorldSettings()
     sObjectMgr.LoadFishingBaseSkillLevel();
 
     sLog.outString("Loading Npc Text Id...");
-    sObjectMgr.LoadNpcGossips();                            // must be after load Creature and LoadGossipText
+    sObjectMgr.LoadNpcGossips();                            // must be after load Creature and LoadNPCText
 
     sLog.outString("Loading Gossip scripts...");
     sScriptMgr.LoadGossipScripts();                         // must be before gossip menu options
@@ -1425,11 +1445,11 @@ void World::SetInitialWorldSettings()
 
     ///- Loading localization data
     sLog.outString("Loading Localization strings...");
+    sObjectMgr.LoadBroadcastTextLocales();
     sObjectMgr.LoadCreatureLocales();                       // must be after CreatureInfo loading
     sObjectMgr.LoadGameObjectLocales();                     // must be after GameobjectInfo loading
     sObjectMgr.LoadItemLocales();                           // must be after ItemPrototypes loading
     sObjectMgr.LoadQuestLocales();                          // must be after QuestTemplates loading
-    sObjectMgr.LoadGossipTextLocales();                     // must be after LoadGossipText
     sObjectMgr.LoadPageTextLocales();                       // must be after PageText loading
     sObjectMgr.LoadGossipMenuItemsLocales();                // must be after gossip menu items loading
     sObjectMgr.LoadPointOfInterestLocales();                // must be after POI loading
@@ -1506,6 +1526,9 @@ void World::SetInitialWorldSettings()
     sLog.outString("Initializing Scripts...");
     sScriptMgr.Initialize();
     sLog.outString();
+
+    sLog.outString("Loading aura removal on map change definitions");
+    sAuraRemovalMgr.LoadFromDB();
 
     ///- Initialize game time and timers
     sLog.outString("DEBUG:: Initialize game time and timers");
@@ -1617,6 +1640,9 @@ void World::SetInitialWorldSettings()
     sLog.outString("Loading spell group stack rules ...");
     sSpellMgr.LoadSpellGroupStackRules();
 
+    sLog.outString("Restoring deleted items to players ...");
+    sObjectMgr.RestoreDeletedItems();
+
     sAutoTestingMgr->Load();
 
     m_broadcaster =
@@ -1626,7 +1652,13 @@ void World::SetInitialWorldSettings()
     if (!isMapServer)
         m_charDbWorkerThread = new ACE_Based::Thread(new CharactersDatabaseWorkerThread());
 
-    sLog.outString("%s initialized", isMapServer ? "Node" : "World");
+    sLog.outString();
+    sLog.outString("==========================================================");
+    sLog.outString("Current content is set to %s.", ObjectMgr::GetPatchName());
+    sLog.outString("==========================================================");
+    sLog.outString();
+
+    sLog.outString("%s initialized.", isMapServer ? "Node" : "World");
 
     uint32 uStartInterval = WorldTimer::getMSTimeDiff(uStartTime, WorldTimer::getMSTime());
     sLog.outString("SERVER STARTUP TIME: %i minutes %i seconds", uStartInterval / 60000, (uStartInterval % 60000) / 1000);
@@ -1758,10 +1790,11 @@ void World::Update(uint32 diff)
     if (m_timers[WUPDATE_UPTIME].Passed())
     {
         uint32 tmpDiff = uint32(m_gameTime - m_startTime);
+        uint32 onlineClientsNum = GetActiveSessionCount();
         uint32 maxClientsNum = GetMaxActiveSessionCount();
 
         m_timers[WUPDATE_UPTIME].Reset();
-        LoginDatabase.PExecute("UPDATE uptime SET uptime = %u, maxplayers = %u WHERE realmid = %u AND starttime = " UI64FMTD, tmpDiff, maxClientsNum, realmID, uint64(m_startTime));
+        LoginDatabase.PExecute("UPDATE uptime SET uptime = %u, onlineplayers = %u, maxplayers = %u WHERE realmid = %u AND starttime = " UI64FMTD, tmpDiff, onlineClientsNum, maxClientsNum, realmID, uint64(m_startTime));
     }
 
     ///- Update objects (maps, transport, creatures,...)
@@ -1773,6 +1806,7 @@ void World::Update(uint32 diff)
 
     sMapMgr.Update(diff);
     sBattleGroundMgr.Update(diff);
+    sLFGMgr.Update(diff);
     sZoneScriptMgr.Update(diff);
     sAutoTestingMgr->Update(diff);
     sNodesMgr->OnWorldUpdate(diff);
@@ -2639,6 +2673,13 @@ bool World::configNoReload(bool reload, eConfigBoolValues index, char const* fie
     return false;
 }
 
+void World::InvalidatePlayerDataToAllClient(ObjectGuid guid)
+{
+    WorldPacket data(SMSG_INVALIDATE_PLAYER, 8);
+    data << guid;
+    SendGlobalMessage(&data);
+}
+
 void World::SetSessionDisconnected(WorldSession* sess)
 {
     SessionMap::iterator itr = m_sessions.find(sess->GetAccountId());
@@ -2706,6 +2747,8 @@ void World::LogChat(WorldSession* sess, const char* type, std::string const& msg
 
     if (target)
         sLog.out(LOG_CHAT, "[%s] %s:%u -> %s:%u : %s", type, plr->GetName(), plr->GetObjectGuid().GetCounter(), target->GetName(), target->GetObjectGuid().GetCounter(), msg.c_str());
+    else if (chanId && chanStr)
+        sLog.out(LOG_CHAT, "[%s:%u:%s] %s:%u : %s", type, chanId, chanStr, plr->GetName(), plr->GetObjectGuid().GetCounter(), msg.c_str());
     else if (chanId)
         sLog.out(LOG_CHAT, "[%s:%u] %s:%u : %s", type, chanId, plr->GetName(), plr->GetObjectGuid().GetCounter(), msg.c_str());
     else if (chanStr)
@@ -2781,4 +2824,28 @@ World::ArchivedLogMessage* World::GetLog(uint32 logId, AccountTypes my_sec)
     if (it == m_logMessages.end() || it->second.sec > my_sec)
         return nullptr;
     return &(it->second);
+}
+
+void World::SetWorldUpdateTimer(WorldTimers timer, uint32 current)
+{
+    if (timer >= WUPDATE_COUNT)
+        return;
+
+    m_timers[timer].SetCurrent(current);
+}
+
+time_t World::GetWorldUpdateTimer(WorldTimers timer)
+{
+    if (timer >= WUPDATE_COUNT)
+        return 0;
+
+    return m_timers[timer].GetCurrent();
+}
+
+time_t World::GetWorldUpdateTimerInterval(WorldTimers timer)
+{
+    if (timer >= WUPDATE_COUNT)
+        return 0;
+
+    return m_timers[timer].GetInterval();
 }

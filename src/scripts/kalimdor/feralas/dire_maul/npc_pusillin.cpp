@@ -9,11 +9,11 @@
 
 enum
 {
-    TEXT_1 = NOST_TEXT(50),
-    TEXT_2 = NOST_TEXT(51),
-    TEXT_3 = NOST_TEXT(52),
-    TEXT_4 = NOST_TEXT(53),
-    TEXT_5 = NOST_TEXT(54),
+    TEXT_1 = 9349,
+    TEXT_2 = 9353,
+    TEXT_3 = 9357,
+    TEXT_4 = 9360,
+    TEXT_5 = 9363,
     MOVE_SPEED       =  20,
 };
 /*
@@ -141,31 +141,41 @@ struct npc_pusillinAI : public ScriptedAI
                 bInCombat = true;
                 AttackStart(pl);
                 Creature* tmp;
-                tmp = ME->SummonCreature(13276,  6.562f, -712.43f, -12.64f, 4.25f, TEMPSUMMON_DEAD_DESPAWN, 0);
-                tmp->SetWalk(false);
-                tmp->SetHomePosition(18.19f, -701.15f, -12.64f, 0);
-                tmp->Attack(pl,true);
+                if (tmp = ME->SummonCreature(13276, 6.562f, -712.43f, -12.64f, 4.25f, TEMPSUMMON_DEAD_DESPAWN, 0))
+                {
+                    tmp->SetWalk(false);
+                    tmp->SetHomePosition(18.19f, -701.15f, -12.64f, 0);
+                    tmp->Attack(pl, true);
+                }
 
-                tmp = ME->SummonCreature(13276, 23.994f, -697.89f, -12.64f, 4.25f, TEMPSUMMON_DEAD_DESPAWN, 0);
-                tmp->SetWalk(false);
-                tmp->SetHomePosition(18.19f, -701.15f, -12.64f, 0);
-                tmp->Attack(pl,true);
+                if (tmp = ME->SummonCreature(13276, 23.994f, -697.89f, -12.64f, 4.25f, TEMPSUMMON_DEAD_DESPAWN, 0))
+                {
+                    tmp->SetWalk(false);
+                    tmp->SetHomePosition(18.19f, -701.15f, -12.64f, 0);
+                    tmp->Attack(pl, true);
+                }
 
-                tmp = ME->SummonCreature(13276, 22.216f, -688.01f, -12.64f, 4.25f, TEMPSUMMON_DEAD_DESPAWN, 0);
-                tmp->SetWalk(false);
-                tmp->SetHomePosition(18.19f, -701.15f, -12.64f, 0);
-                tmp->Attack(pl,true);
+                if (tmp = ME->SummonCreature(13276, 22.216f, -688.01f, -12.64f, 4.25f, TEMPSUMMON_DEAD_DESPAWN, 0))
+                {
+                    tmp->SetWalk(false);
+                    tmp->SetHomePosition(18.19f, -701.15f, -12.64f, 0);
+                    tmp->Attack(pl, true);
+                }
 
-                tmp = ME->SummonCreature(13276, 17.943f, -679.68f, -12.64f, 4.25f, TEMPSUMMON_DEAD_DESPAWN, 0);
-                tmp->SetWalk(false);
-                tmp->SetHomePosition(18.19f, -701.15f, -12.64f, 0);
-                tmp->Attack(pl,true);
 
-                tmp = ME->SummonCreature(13276,  9.540f, -671.08f, -12.64f, 4.25f, TEMPSUMMON_DEAD_DESPAWN, 0);
-                tmp->SetWalk(false);
-                tmp->SetHomePosition(18.19f, -701.15f, -12.64f, 0);
-                tmp->Attack(pl,true);
+                if (tmp = ME->SummonCreature(13276, 17.943f, -679.68f, -12.64f, 4.25f, TEMPSUMMON_DEAD_DESPAWN, 0))
+                {
+                    tmp->SetWalk(false);
+                    tmp->SetHomePosition(18.19f, -701.15f, -12.64f, 0);
+                    tmp->Attack(pl, true);
+                }
 
+                if (tmp = ME->SummonCreature(13276, 9.540f, -671.08f, -12.64f, 4.25f, TEMPSUMMON_DEAD_DESPAWN, 0))
+                {
+                    tmp->SetWalk(false);
+                    tmp->SetHomePosition(18.19f, -701.15f, -12.64f, 0);
+                    tmp->Attack(pl, true);
+                }
                 break;
         }
         uiStep++;

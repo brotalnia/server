@@ -157,6 +157,7 @@ void WorldSession::HandleMessagechatOpcode(WorldPacket & recv_data)
     }
 
     std::string msg, channel, to;
+    uint32 channelid = 0;
     // Message parsing
     switch (type)
     {
@@ -258,8 +259,8 @@ void WorldSession::HandleMessagechatOpcode(WorldPacket & recv_data)
                         }
                     }
 
-                    chn->Say(playerPointer->GetObjectGuid(), msg.c_str(), lang);
-
+                    chn->Say(playerPointer->GetObjectGuid(), msg.c_str(), channel.c_str(), lang);
+                    channelid = chn->GetChannelId();
                     if (lang != LANG_ADDON && chn->HasFlag(Channel::ChannelFlags::CHANNEL_FLAG_GENERAL))
                         if (AntispamInterface *a = sAnticheatLib->GetAntispam())
                             a->addMessage(msg, type, GetPlayerPointer(), nullptr);
@@ -271,7 +272,7 @@ void WorldSession::HandleMessagechatOpcode(WorldPacket & recv_data)
             if (lang != LANG_ADDON)
             {
                 normalizePlayerName(channel);
-                sWorld.LogChat(this, "Chan", msg, NULL, 0, channel.c_str());
+                sWorld.LogChat(this, "Chan", msg, NULL, channelid, channel.c_str());
             }
         }
         break;
