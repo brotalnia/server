@@ -1342,7 +1342,11 @@ void Map::UnloadAll(bool pForce)
         Remove<Transport>(transport, true);
     }
 
-    // Bones are already added to the grid, and hence deleted when unloading
+    // Remove any bones left in the map
+    for (auto iter = _bones.begin(); iter != _bones.end(); ++iter)
+    {
+        delete *iter;
+    }
     _bones.clear();
 }
 
