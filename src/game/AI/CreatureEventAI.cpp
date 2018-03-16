@@ -530,6 +530,15 @@ void CreatureEventAI::ProcessAction(CreatureEventAI_Action const& action, uint32
                 return;
             }
 
+            if ((castResult != CAST_OK) && (castResult != CAST_FAIL_IS_CASTING) && (action.cast.target != TARGET_T_SELF))
+            {
+                if (Unit* pVictim = m_creature->getVictim())
+                {
+                    m_MeleeEnabled = true;
+                    m_creature->GetMotionMaster()->MoveChase(pVictim);
+                }
+            }
+
             bool bGoMelee = false;
             if (!(action.cast.castFlags & CAST_NO_MELEE_IF_OOM)) // Add specific flag if silenced?
             {
@@ -639,6 +648,15 @@ void CreatureEventAI::ProcessAction(CreatureEventAI_Action const& action, uint32
                 return;
 
             m_CombatMovementEnabled = action.combat_movement.state != 0;
+
+            if (!m_CombatMovementEnabled)
+            {
+                if (Unit* pVictim = m_creature->getVictim())
+                {
+                    if (m_creature->GetDistance2d(pVictim) <= 5.0f)
+                        m_CombatMovementEnabled = true;
+                }
+            }
 
             //Allow movement (create new targeted movement gen only if idle)
             if (m_CombatMovementEnabled)
