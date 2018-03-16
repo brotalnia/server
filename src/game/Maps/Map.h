@@ -496,8 +496,6 @@ class MANGOS_DLL_SPEC Map : public GridRefManager<NGridType>, public MaNGOS::Obj
 
         // Get Holder for Creature Linking
         CreatureLinkingHolder* GetCreatureLinkingHolder() { return &m_creatureLinkingHolder; }
-
-        void AddCorpseToRemove(Corpse* corpse, ObjectGuid looter_guid);
         GameObject* SummonGameObject(uint32 entry, float x, float y, float z, float ang, float rotation0, float rotation1, float rotation2, float rotation3, uint32 respawnTime, uint32 worldMask);
 
     private:
@@ -551,17 +549,6 @@ class MANGOS_DLL_SPEC Map : public GridRefManager<NGridType>, public MaNGOS::Obj
 
         mutable MapMutexType    unitsMvtUpdate_lock;
         std::set<Unit*>         unitsMvtUpdate;
-
-        mutable MapMutexType    _corpseRemovalLock;
-        typedef std::list<std::pair<Corpse*, ObjectGuid>> CorpseRemoveList;
-        CorpseRemoveList        _corpseToRemove;
-
-        MapMutexType            _bonesLock;
-        uint32                  _bonesCleanupTimer;
-        std::list<Corpse*>      _bones;
-
-        void RemoveCorpses();
-        void RemoveOldBones(const uint32 diff);
 
     protected:
         MapEntry const* i_mapEntry;
