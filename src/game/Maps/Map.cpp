@@ -75,9 +75,6 @@ Map::~Map()
     //release reference count
     if (m_TerrainData->Release())
         sTerrainMgr.UnloadTerrain(m_TerrainData->GetMapId());
-
-    if (_corpseToRemove.size() > 0)
-        sLog.outError("[MAP] Map %u (instance %u) deleted while there are still corpses to remove", GetId(), GetInstanceId());
 }
 
 void Map::LoadMapAndVMap(int gx, int gy)
@@ -1331,8 +1328,6 @@ bool Map::UnloadGrid(const uint32 &x, const uint32 &y, bool pForce)
 void Map::UnloadAll(bool pForce)
 {
     m_unloading = true;
-    RemoveCorpses(true);
-
     for (GridRefManager<NGridType>::iterator i = GridRefManager<NGridType>::begin(); i != GridRefManager<NGridType>::end();)
     {
         NGridType &grid(*i->getSource());
@@ -3285,7 +3280,7 @@ void Map::AddCorpseToRemove(Corpse* corpse, ObjectGuid looter_guid)
 /**
  * Remove any recovered corpses in the map.
  */
-void Map::RemoveCorpses(bool unload)
+void Map::RemoveCorpses()
 {
     ACE_Guard<MapMutexType> guard(_corpseRemovalLock);
     for (auto iter = _corpseToRemove.begin(); iter != _corpseToRemove.end();)
@@ -3300,8 +3295,7 @@ void Map::RemoveCorpses(bool unload)
 
         bool mapSpawnsBones = IsBattleGround() ? sWorld.getConfig(CONFIG_BOOL_DEATH_BONES_BG) : sWorld.getConfig(CONFIG_BOOL_DEATH_BONES_WORLD);
         // Create the bones only if the map and the grid is loaded at the corpse's location
-        // Don't spawn bones if the map is unloading
-        if ((looterGuid || mapSpawnsBones) && !unload && !IsRemovalGrid(corpse->GetPositionX(), corpse->GetPositionY()))
+        if ((looterGuid || mapSpawnsBones) && !IsRemovalGrid(corpse->GetPositionX(), corpse->GetPositionY()))
         {
             // Create bones, don't change Corpse
             Corpse* bones = new Corpse;
