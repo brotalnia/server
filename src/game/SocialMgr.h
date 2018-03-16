@@ -145,7 +145,7 @@ class SocialMgr
         SocialMgr();
         ~SocialMgr();
         // Misc
-        void RemovePlayerSocial(uint32 guid);
+        void RemovePlayerSocial(uint32 guid) { m_socialMap.erase(guid); }
 
         void GetFriendInfo(MasterPlayer *player, uint32 friendGUID, FriendInfo &friendInfo);
         // Packet management
@@ -156,8 +156,6 @@ class SocialMgr
         PlayerSocial *LoadFromDB(QueryResult *result, ObjectGuid guid);
     private:
         SocialMap m_socialMap;
-
-        ACE_Thread_Mutex _socialMapLock;
 };
 
 #define sSocialMgr MaNGOS::Singleton<SocialMgr>::Instance()
