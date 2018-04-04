@@ -496,6 +496,7 @@ class MANGOS_DLL_SPEC Map : public GridRefManager<NGridType>, public MaNGOS::Obj
 
         // Get Holder for Creature Linking
         CreatureLinkingHolder* GetCreatureLinkingHolder() { return &m_creatureLinkingHolder; }
+        GameObject* SummonGameObject(uint32 entry, float x, float y, float z, float ang, float rotation0, float rotation1, float rotation2, float rotation3, uint32 respawnTime, uint32 worldMask);
 
     private:
         void LoadMapAndVMap(int gx, int gy);
@@ -531,6 +532,7 @@ class MANGOS_DLL_SPEC Map : public GridRefManager<NGridType>, public MaNGOS::Obj
 
         void setNGrid(NGridType* grid, uint32 x, uint32 y);
         void ScriptsProcess();
+        bool FindScriptTargets(Object*& source, Object*& target, const ScriptAction& step);
 
         void SendObjectUpdates();
         void UpdateVisibilityForRelocations();
@@ -667,6 +669,9 @@ class MANGOS_DLL_SPEC Map : public GridRefManager<NGridType>, public MaNGOS::Obj
         bool ScriptCommand_MeetingStone(ScriptAction& step, Object* source, Object* target);
         bool ScriptCommand_SetData(ScriptAction& step, Object* source, Object* target);
         bool ScriptCommand_SetData64(ScriptAction& step, Object* source, Object* target);
+        bool ScriptCommand_StartScript(ScriptAction& step, Object* source, Object* target);
+        bool ScriptCommand_RemoveItem(ScriptAction& step, Object* source, Object* target);
+        bool ScriptCommand_RemoveGameObject(ScriptAction& step, Object* source, Object* target);
 
         // Add any new script command functions to the array.
         const ScriptCommandFunction m_ScriptCommands[SCRIPT_COMMAND_MAX] =
@@ -700,7 +705,7 @@ class MANGOS_DLL_SPEC Map : public GridRefManager<NGridType>, public MaNGOS::Obj
             &Map::ScriptCommand_AttackStart,            // 26
             &Map::ScriptCommand_UpdateEntry,            // 27
             &Map::ScriptCommand_SetStandState,          // 28
-            &Map::ScriptCommand_ModifyThreat,         // 29
+            &Map::ScriptCommand_ModifyThreat,           // 29
             &Map::ScriptCommand_SendTaxiPath,           // 30
             &Map::ScriptCommand_TerminateScript,        // 31
             &Map::ScriptCommand_TerminateCondition,     // 32
@@ -710,6 +715,9 @@ class MANGOS_DLL_SPEC Map : public GridRefManager<NGridType>, public MaNGOS::Obj
             &Map::ScriptCommand_MeetingStone,           // 36
             &Map::ScriptCommand_SetData,                // 37
             &Map::ScriptCommand_SetData64,              // 38
+            &Map::ScriptCommand_StartScript,            // 39
+            &Map::ScriptCommand_RemoveItem,             // 40
+            &Map::ScriptCommand_RemoveGameObject,       // 41
         };
 
     public:

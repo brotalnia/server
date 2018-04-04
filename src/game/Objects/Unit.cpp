@@ -106,7 +106,7 @@ Unit::Unit()
     : WorldObject(), i_motionMaster(this), m_ThreatManager(this), m_HostileRefManager(this),
       movespline(new Movement::MoveSpline()), _debugFlags(0), m_needUpdateVisibility(false),
       m_AutoRepeatFirstCast(true), m_castingSpell(0), m_regenTimer(0), _lastDamageTaken(0),
-      m_meleeZLimit(MELEE_Z_LIMIT), m_lastSanctuaryTime(0)
+      m_meleeZLimit(MELEE_Z_LIMIT), m_meleeZReach(MELEE_Z_LIMIT), m_lastSanctuaryTime(0)
 {
     m_objectType |= TYPEMASK_UNIT;
     m_objectTypeId = TYPEID_UNIT;
@@ -699,8 +699,7 @@ uint32 Unit::DealDamage(Unit *pVictim, uint32 damage, CleanDamage const* cleanDa
             }
 
             //PMonsterSay("-> Absorb %5u | Resist %5u. AttackType %u", cleanDamage->absorb, cleanDamage->resist, cleanDamage->hitOutCome);
-            if (Player* attackedPlayer = pVictim->GetCharmerOrOwnerPlayerOrPlayerItself())
-                SetContestedPvP(attackedPlayer);
+            SetContestedPvP(pVictim);
         }
         return 0;
     }
@@ -779,8 +778,7 @@ uint32 Unit::DealDamage(Unit *pVictim, uint32 damage, CleanDamage const* cleanDa
         if (GetTypeId() == TYPEID_PLAYER && pVictim->GetTypeId() == TYPEID_UNIT)
             pVictim->ToCreature()->ResetLastDamageTakenTime();
 
-        if (Player* attackedPlayer = pVictim->GetCharmerOrOwnerPlayerOrPlayerItself())
-            SetContestedPvP(attackedPlayer);
+        SetContestedPvP(pVictim);
     }
     if (pVictim->GetTypeId() == TYPEID_UNIT)
         pVictim->ToCreature()->CountDamageTaken(damage, GetCharmerOrOwnerOrOwnGuid().IsPlayer() || pVictim == this);
@@ -2457,7 +2455,7 @@ void Unit::AttackerStateUpdate(Unit *pVictim, WeaponAttackType attType, bool ext
         return;                                             // ignore ranged case
 
     // Nostalrius: check ligne de vision
-    if (!IsWithinLOSInMap(pVictim))
+    if (!hasUnitState(UNIT_STAT_ALLOW_LOS_ATTACK) && !IsWithinLOSInMap(pVictim))
         return;
 
     if (GetExtraAttacks() && !extra)
@@ -4321,6 +4319,11 @@ bool Unit::RemoveNoStackAurasDueToAuraHolder(SpellAuraHolder *holder)
 
         if (is_spellSpecPerTarget || (is_spellSpecPerTargetPerCaster && holder->GetCasterGuid() == (*i).second->GetCasterGuid()))
         {
+            // cannot remove stronger snare / haste debuff
+            if (spellId_spec == SPELL_SNARE || spellId_spec == SPELL_NEGATIVE_HASTE)
+                if (!CompareSpellSpecificAuras(spellProto, i_spellProto))
+                    return false;
+
             // cannot remove higher rank
             if (sSpellMgr.IsRankSpellDueToSpell(spellProto, i_spellId))
                 if (CompareAuraRanks(spellId, i_spellId) < 0)
@@ -5483,7 +5486,7 @@ void Unit::setPowerType(Powers new_powertype)
 
 FactionTemplateEntry const* Unit::getFactionTemplateEntry() const
 {
-    FactionTemplateEntry const* entry = sFactionTemplateStore.LookupEntry(getFaction());
+    FactionTemplateEntry const* entry = sObjectMgr.GetFactionTemplateEntry(getFaction());
     if (!entry)
     {
         static ObjectGuid guid;                             // prevent repeating spam same faction problem
@@ -5571,7 +5574,7 @@ ReputationRank Unit::GetReactionTo(Unit const* target) const
             {
                 if (ReputationRank const* repRank = selfPlayerOwner->GetReputationMgr().GetForcedRankIfAny(targetFactionTemplateEntry))
                     return *repRank;
-                if (FactionEntry const* targetFactionEntry = sFactionStore.LookupEntry(targetFactionTemplateEntry->faction))
+                if (FactionEntry const* targetFactionEntry = sObjectMgr.GetFactionEntry(targetFactionTemplateEntry->faction))
                 {
                     if (targetFactionEntry->CanHaveReputation())
                     {
@@ -5612,7 +5615,7 @@ ReputationRank Unit::GetFactionReactionTo(FactionTemplateEntry const* factionTem
             return REP_HOSTILE;
         if (ReputationRank const* repRank = targetPlayerOwner->GetReputationMgr().GetForcedRankIfAny(factionTemplateEntry))
             return *repRank;
-        if (FactionEntry const* factionEntry = sFactionStore.LookupEntry(factionTemplateEntry->faction))
+        if (FactionEntry const* factionEntry = sObjectMgr.GetFactionEntry(factionTemplateEntry->faction))
         {
             if (factionEntry->CanHaveReputation())
             {
@@ -5655,7 +5658,7 @@ bool Unit::IsHostileToPlayers() const
     if (!my_faction || !my_faction->faction)
         return false;
 
-    FactionEntry const* raw_faction = sFactionStore.LookupEntry(my_faction->faction);
+    FactionEntry const* raw_faction = sObjectMgr.GetFactionEntry(my_faction->faction);
     if (raw_faction && raw_faction->reputationListID >= 0)
         return false;
 
@@ -5668,7 +5671,7 @@ bool Unit::IsNeutralToAll() const
     if (!my_faction || !my_faction->faction)
         return true;
 
-    FactionEntry const* raw_faction = sFactionStore.LookupEntry(my_faction->faction);
+    FactionEntry const* raw_faction = sObjectMgr.GetFactionEntry(my_faction->faction);
     if (raw_faction && raw_faction->reputationListID >= 0)
         return false;
 
@@ -7402,8 +7405,20 @@ bool Unit::isTargetableForAttack(bool inverseAlive /*=false*/) const
     if (!CanBeDetected())
         return false;
 
-    if (GetTypeId() == TYPEID_PLAYER && (((Player *)this)->isGameMaster() || ((Player*)this)->watching_cinematic_entry != 0))
-        return false;
+    if (const Player* player = GetCharmerOrOwnerPlayerOrPlayerItself())
+    {
+        if (player->isGameMaster())
+            return false;
+
+        // in such case, unlike a creature, a charmed Player can be targeted even if his charmer can't
+        if (const Player* charmedPlayer = ToPlayer())
+            player = charmedPlayer;
+
+        if (player->watching_cinematic_entry != 0 ||
+            player->IsPendingFarTeleport() ||
+            player->IsPendingInstanceSwitch())
+            return false;
+    }
 
     if (HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_NOT_SELECTABLE))
         return false;
@@ -7469,7 +7484,7 @@ bool Unit::_IsValidAttackTarget(Unit const* target, SpellEntry const* bySpell, W
             if (FactionTemplateEntry const* factionTemplate = creature->getFactionTemplateEntry())
             {
                 if (!(player->GetReputationMgr().GetForcedRankIfAny(factionTemplate)))
-                    if (FactionEntry const* factionEntry = sFactionStore.LookupEntry(factionTemplate->faction))
+                    if (FactionEntry const* factionEntry = sObjectMgr.GetFactionEntry(factionTemplate->faction))
                         if (FactionState const* repState = player->GetReputationMgr().GetState(factionEntry))
                             if (!(repState->Flags & FACTION_FLAG_AT_WAR))
                                 return false;
@@ -10104,11 +10119,14 @@ Aura* Unit::GetDummyAura(uint32 spell_id) const
     return nullptr;
 }
 
-void Unit::SetContestedPvP(Player *attackedPlayer)
+void Unit::SetContestedPvP(Unit *attackedUnit)
 {
     Player* player = GetCharmerOrOwnerPlayerOrPlayerItself();
 
-    if (!player || (attackedPlayer && (attackedPlayer == player || player->IsInDuelWith(attackedPlayer))))
+    if (!player || (attackedUnit && attackedUnit->IsPlayer() && (attackedUnit == player || player->IsInDuelWith(attackedUnit->ToPlayer()))))
+        return;
+
+    if (attackedUnit && attackedUnit->GetTypeId() == TYPEID_UNIT && !attackedUnit->IsPvP())
         return;
 
     player->SetContestedPvPTimer(30000);
@@ -10247,16 +10265,14 @@ void Unit::TeleportPositionRelocation(float x, float y, float z, float orientati
     }
 }
 
-void Unit::MonsterMoveWithSpeed(float x, float y, float z, float speed, bool generatePath, bool forceDestination)
+void Unit::MonsterMoveWithSpeed(float x, float y, float z, float o, float speed, uint32 options)
 {
-    uint32 options = 0;
-    if (generatePath)
-        options |= MOVE_PATHFINDING;
-    if (forceDestination)
-        options |= MOVE_FORCE_DESTINATION;
     Movement::MoveSplineInit init(*this, "MonsterMoveWithSpeed");
     init.MoveTo(x, y, z, options);
-    init.SetVelocity(speed);
+    if (speed > 0.0f)
+        init.SetVelocity(speed);
+    if (o > -7.0f)
+        init.SetFacing(o);
     init.Launch();
 }
 
@@ -10765,7 +10781,11 @@ bool Unit::CanReachWithMeleeAttackAtPosition(Unit const* pVictim, float x, float
     float dy = y - pVictim->GetPositionY();
     float dz = z - pVictim->GetPositionZ();
 
-    return (dx * dx + dy * dy < reach * reach) && ((dz * dz) < pVictim->GetMeleeZLimit());
+    // Some units have long Z reach (tall), use whichever is highest of the victim Z limit or
+    // the unit's Z reach
+    float victimZLimit = pVictim->GetMeleeZLimit();
+    float zReach = m_meleeZReach > victimZLimit ? m_meleeZReach : victimZLimit;
+    return (dx * dx + dy * dy < reach * reach) && ((dz * dz) < zReach);
 }
 
 bool Unit::CanReachWithMeleeSpellAttack(Unit const* pVictim, float flat_mod /*= 0.0f*/) const
@@ -11136,7 +11156,7 @@ void Unit::UpdateSplineMovement(uint32 t_diff)
 
 void Unit::MonsterMove(float x, float y, float z)
 {
-    MonsterMoveWithSpeed(x, y, z, GetSpeed(MOVE_RUN));
+    MonsterMoveWithSpeed(x, y, z, -10.0f, GetSpeed(MOVE_RUN), 0u);
 }
 
 

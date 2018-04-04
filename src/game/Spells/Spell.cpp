@@ -1566,8 +1566,7 @@ void Spell::DoSpellHitOnUnit(Unit *unit, uint32 effectMask)
                 if (Unit* owner = realCaster->GetOwner())
                     owner->SetInCombatWith(unit);
 
-                if (Player *attackedPlayer = unit->GetCharmerOrOwnerPlayerOrPlayerItself())
-                    realCaster->SetContestedPvP(attackedPlayer);
+                realCaster->SetContestedPvP(unit);
             }
         }
         else
@@ -2305,7 +2304,7 @@ void Spell::SetTargetMap(SpellEffectIndex effIndex, uint32 targetMode, UnitList&
         {
             if (m_spellInfo->Effect[effIndex] == SPELL_EFFECT_PERSISTENT_AREA_AURA)
                 break;
-            else if (m_spellInfo->Effect[effIndex] == SPELL_EFFECT_SUMMON)
+            else if (m_spellInfo->Effect[effIndex] == SPELL_EFFECT_SUMMON || m_spellInfo->Effect[effIndex] == SPELL_EFFECT_SUMMON_OBJECT_WILD)
             {
                 targetUnitMap.push_back(m_caster);
                 break;
@@ -4425,10 +4424,9 @@ void Spell::SendLogExecute()
 
     uint32 effectCount = 0;
 
-    /* for (std::vector<ExecuteLogInfo> effectInfo : m_executeLogInfo) */
-    for (std::vector<ExecuteLogInfo>::const_iterator it = m_executeLogInfo->begin(); it != m_executeLogInfo->end(); ++it)
+    for (uint32 i = 0; i < MAX_EFFECT_INDEX; ++i)
     {
-        if (it != m_executeLogInfo->end())
+        if (!m_executeLogInfo[i].empty())
             effectCount++;
     }
 
@@ -4445,9 +4443,9 @@ void Spell::SendLogExecute()
         data << uint32(m_spellInfo->Effect[i]);
         data << uint32(m_executeLogInfo[i].size());
 
-        for (std::vector<ExecuteLogInfo>::const_iterator it = m_executeLogInfo->begin(); it != m_executeLogInfo->end(); ++it)
+        for (uint32 j = 0; j < m_executeLogInfo[i].size(); ++j)
         {
-            ExecuteLogInfo info = *it;
+            ExecuteLogInfo info = m_executeLogInfo[i][j];
             switch (m_spellInfo->Effect[i])
             {
                 case SPELL_EFFECT_POWER_DRAIN:
@@ -4823,7 +4821,7 @@ void Spell::TakeReagents()
                 {
                     // CastItem will be used up and does not count as reagent
                     int32 charges = m_CastItem->GetSpellCharges(s);
-                    if (proto->Spells[s].SpellCharges < 0 && abs(charges) < 2)
+                    if (proto->Spells[s].SpellCharges < 0 && abs(charges) < 2 && itemcount > 1)
                     {
                         ++itemcount;
                         break;
@@ -6220,6 +6218,12 @@ SpellCastResult Spell::CheckCast(bool strict)
                 // Black Qiraji Battle Tank
                 if (m_spellInfo->Id == 26656)
                 {
+                    if (m_caster->IsMounted())
+                    {
+                        m_caster->RemoveSpellsCausingAura(SPELL_AURA_MOUNTED);
+                        return SPELL_FAILED_DONT_REPORT;
+                    }
+
                     if (m_caster->IsInWater())
                         return SPELL_FAILED_ONLY_ABOVEWATER;
 
@@ -6707,7 +6711,7 @@ SpellCastResult Spell::CheckCasterAuras() const
     return SPELL_CAST_OK;
 }
 
-bool Spell::CanAutoCast(Unit* target)
+bool Spell::CanAutoCast(Unit* target, bool isPositive)
 {
     ObjectGuid targetguid = target->GetObjectGuid();
 
@@ -6725,6 +6729,8 @@ bool Spell::CanAutoCast(Unit* target)
     bool fullHealSpell = true;
     for (int j = 0; j < MAX_EFFECT_INDEX; ++j)
     {
+        if (!isPositive)
+            break;
         if (m_spellInfo->Effect[j] && m_spellInfo->EffectApplyAuraName[j] != SPELL_AURA_PERIODIC_HEAL)
             fullHealSpell = false;
         if (m_spellInfo->Effect[j] == SPELL_EFFECT_APPLY_AURA)
@@ -7116,7 +7122,7 @@ SpellCastResult Spell::CheckItems()
                     {
                         // CastItem will be used up and does not count as reagent
                         int32 charges = m_CastItem->GetSpellCharges(s);
-						if (proto->Spells[s].SpellCharges < 0 && abs(charges) < 2)
+                        if (proto->Spells[s].SpellCharges < 0 && abs(charges) < 2 && itemcount > 1)
                         {
                             ++itemcount;
                             break;
@@ -8230,7 +8236,8 @@ void Spell::OnSpellLaunch()
         m_caster->setAttackTimer(OFF_ATTACK,  m_caster->getAttackTimer(OFF_ATTACK)  + 200 + 40 * m_caster->GetDistance(unitTarget));
     }
     
-    m_caster->GetMotionMaster()->MoveCharge(unitTarget, sWorld.getConfig(CONFIG_UINT32_SPELLS_CCDELAY), unitTarget != m_caster && !IsPositiveSpell(m_spellInfo->Id));
+    bool triggerAutoAttack = unitTarget != m_caster && !IsPositiveSpell(m_spellInfo->Id) && !(m_spellInfo->Attributes & SPELL_ATTR_STOP_ATTACK_TARGET);
+    m_caster->GetMotionMaster()->MoveCharge(unitTarget, sWorld.getConfig(CONFIG_UINT32_SPELLS_CCDELAY), triggerAutoAttack);
 }
 
 bool Spell::HasModifierApplied(SpellModifier* mod)

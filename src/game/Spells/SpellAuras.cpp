@@ -404,11 +404,15 @@ AreaAura::AreaAura(SpellEntry const* spellproto, SpellEffectIndex eff, int32 *cu
     {
         case SPELL_EFFECT_APPLY_AREA_AURA_PARTY:
             m_areaAuraType = AREA_AURA_PARTY;
+            if (target->GetCharmerOrOwnerOrSelf()->GetTypeId() == TYPEID_UNIT)
+                m_areaAuraType = AREA_AURA_FRIEND;
             if (target->GetTypeId() == TYPEID_UNIT && ((Creature*)target)->IsTotem())
                 m_modifier.m_auraname = SPELL_AURA_NONE;
             break;
         case SPELL_EFFECT_APPLY_AREA_AURA_RAID:
             m_areaAuraType = AREA_AURA_RAID;
+            if (target->GetCharmerOrOwnerOrSelf()->GetTypeId() == TYPEID_UNIT)
+                m_areaAuraType = AREA_AURA_FRIEND;
             if (target->GetTypeId() == TYPEID_UNIT && ((Creature*)target)->IsTotem())
                 m_modifier.m_auraname = SPELL_AURA_NONE;
             // Light's Beacon not applied to caster itself (TODO: more generic check for another similar spell if any?)
@@ -1067,6 +1071,10 @@ void Aura::TriggerSpell()
     Unit* target = GetTarget();
 
     uint32 spellRandom;
+
+    // not in banished state
+    if (triggerTarget->hasUnitState(UNIT_STAT_ISOLATED))
+        return;
 
     // specific code for cases with no trigger spell provided in field
     if (triggeredSpellInfo == nullptr)
@@ -2312,9 +2320,13 @@ void Aura::HandleAuraModShapeshift(bool apply, bool Real)
         }
         case FORM_BERSERKERSTANCE:
         {
-            // do nothing when removing Nefarian warrior call
+            // cast regular berserker stance when removing Nefarian warrior call
             if (!apply && GetSpellProto()->Id == 23397)
+            {
+                HandleShapeshiftBoosts(apply);
+                target->CastSpell(target, 2458, true);
                 return;
+            }
         }
         default:
             break;
@@ -2776,11 +2788,10 @@ void Aura::HandleFarSight(bool apply, bool /*Real*/)
     if (!caster || caster->GetTypeId() != TYPEID_PLAYER)
         return;
 
-    Camera& camera = ((Player*)caster)->GetCamera();
     if (apply)
-        camera.SetView(GetTarget());
+        caster->ToPlayer()->SetLongSight(this);
     else
-        camera.ResetView();
+        caster->ToPlayer()->SetLongSight();
 }
 
 void Aura::HandleAuraTrackCreatures(bool apply, bool /*Real*/)
@@ -4543,19 +4554,28 @@ void Aura::HandleAuraModIncreaseEnergy(bool apply, bool /*Real*/)
 
 void Aura::HandleAuraModIncreaseEnergyPercent(bool apply, bool /*Real*/)
 {
+    Unit *target = GetTarget();
     Powers powerType = Powers(m_modifier.m_miscvalue);
+    float powerPercent = target->GetPowerPercent(powerType);
 
     UnitMods unitMod = UnitMods(UNIT_MOD_POWER_START + powerType);
+    target->HandleStatModifier(unitMod, TOTAL_PCT, float(m_modifier.m_amount), apply);
 
-    GetTarget()->HandleStatModifier(unitMod, TOTAL_PCT, float(m_modifier.m_amount), apply);
+    if (target->isAlive())
+        target->SetPower(powerType, target->GetMaxPower(powerType) * powerPercent / 100.0f);
 }
 
 void Aura::HandleAuraModIncreaseHealthPercent(bool apply, bool /*Real*/)
 {
-    GetTarget()->HandleStatModifier(UNIT_MOD_HEALTH, TOTAL_PCT, float(m_modifier.m_amount), apply);
+    Unit *target = GetTarget();
+    float healthPercent = target->GetHealthPercent();
+    target->HandleStatModifier(UNIT_MOD_HEALTH, TOTAL_PCT, float(m_modifier.m_amount), apply);
 
-    if (GetTarget()->GetMaxHealth() == 1)
-        GetTarget()->DoKillUnit(GetTarget());
+    if (target->isAlive())
+        target->SetHealthPercent(healthPercent);
+
+    if (target->GetMaxHealth() == 1)
+        target->DoKillUnit(target);
 }
 
 /********************************/
@@ -5293,6 +5313,10 @@ void Aura::PeriodicTick(SpellEntry const* sProto, AuraType auraType, uint32 data
                 else
                     pdamage = uint32(target->GetMaxHealth() * amount / 100);
             }
+
+            // Consecration: recalculate the damage on each tick
+            if (spellProto->IsFitToFamily<SPELLFAMILY_PALADIN, CF_PALADIN_CONSECRATION>())
+                pdamage = pCaster->SpellDamageBonusDone(target, GetSpellProto(), m_currentBasePoints, DOT, GetStackAmount());
 
             // SpellDamageBonus for magic spells
             if (spellProto->DmgClass == SPELL_DAMAGE_CLASS_NONE || spellProto->DmgClass == SPELL_DAMAGE_CLASS_MAGIC)
@@ -7114,6 +7138,13 @@ bool _IsExclusiveSpellAura(SpellEntry const* spellproto, SpellEffectIndex eff, A
         case 24427: // Diamond Flask
         case 17528: // Mighty Rage Potion
         case 23697: // Alterac Spring Water
+        // Love is in the Air buffs
+        case 27664:
+        case 27665:
+        case 27666:
+        case 27669:
+        case 27670:
+        case 27671:
             return false;
 
         case 17538: // Le +crit du buff de l'Elixir de la Mangouste 17538, devrait se stack avec TOUT.
@@ -7186,6 +7217,12 @@ bool _IsExclusiveSpellAura(SpellEntry const* spellproto, SpellEffectIndex eff, A
                     spellproto->SpellFamilyName == SPELLFAMILY_PRIEST)
                 return false;
             return true;
+        case SPELL_AURA_MOD_MELEE_HASTE:
+        case SPELL_AURA_MOD_DECREASE_SPEED:
+            // Attack and movement speed reduction
+            if (spellproto->EffectBasePoints[eff] >= 0)
+                return false;
+            return true;
         default:
             return false;
     }
@@ -7195,7 +7232,7 @@ void Aura::ComputeExclusive()
 {
     m_exclusive = false;
     //return;
-    if (GetHolder()->IsPassive() || !GetHolder()->IsPositive())
+    if (GetHolder()->IsPassive())
         return;
     m_exclusive = _IsExclusiveSpellAura(GetSpellProto(), GetEffIndex(), GetModifier()->m_auraname);
 }
@@ -7217,8 +7254,11 @@ int Aura::CheckExclusiveWith(Aura const* other) const
         return 0;
 
     // Lui est mieux
-    if (other->GetModifier()->m_amount > GetModifier()->m_amount)
+    if (other->GetModifier()->m_amount > GetModifier()->m_amount && GetModifier()->m_amount >= 0)
         return 2;
+    else if (other->GetModifier()->m_amount < GetModifier()->m_amount && GetModifier()->m_amount < 0)
+        return 2;
+
     return 1;
 }
 

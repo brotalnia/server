@@ -420,6 +420,8 @@ enum UnitState
     UNIT_STAT_RUNNING            = 0x02000000,
     UNIT_STAT_IGNORE_MOVE_LOS    = 0x04000000,
 
+    UNIT_STAT_ALLOW_INCOMPLETE_PATH = 0x08000000, // allow movement with incomplete or partial paths
+    UNIT_STAT_ALLOW_LOS_ATTACK      = 0x10000000, // allow melee attacks without LoS
     // masks (only for check)
 
     // can't move currently
@@ -1326,9 +1328,9 @@ class MANGOS_DLL_SPEC Unit : public WorldObject
         void NearTeleportTo(float x, float y, float z, float orientation, uint32 teleportOptions = TELE_TO_NOT_LEAVE_TRANSPORT | TELE_TO_NOT_LEAVE_COMBAT | TELE_TO_NOT_UNSUMMON_PET);
         void NearLandTo(float x, float y, float z, float orientation);
         void TeleportPositionRelocation(float x, float y, float z, float o);
-
-        void MonsterMoveWithSpeed(float x, float y, float z, float speed, bool generatePath = false, bool forceDestination = false);
+        void MonsterMoveWithSpeed(float x, float y, float z, float o, float speed, uint32 options);
         void MonsterMove(float x, float y, float z); // Utilise vitesse de course
+
         // recommend use MonsterMove/MonsterMoveWithSpeed for most case that correctly work with movegens
         // if used additional args in ... part then floats must explicitly casted to double
         void SendHeartBeat(bool includingSelf = true);
@@ -1698,6 +1700,7 @@ class MANGOS_DLL_SPEC Unit : public WorldObject
         SpellAuraProcResult HandleMechanicImmuneResistanceAuraProc(Unit *pVictim, uint32 damage, Aura* triggeredByAura, SpellEntry const *procSpell, uint32 procFlag, uint32 procEx, uint32 cooldown);
         SpellAuraProcResult HandleAddTargetTriggerAuraProc(Unit *pVictim, uint32 damage, Aura* triggeredByAura, SpellEntry const *procSpell, uint32 procFlag, uint32 procEx, uint32 cooldown);
         SpellAuraProcResult HandleModResistanceAuraProc(Unit* pVictim, uint32 damage, Aura* triggeredByAura, SpellEntry const *procSpell, uint32 procFlag, uint32 procEx, uint32 cooldown);
+        SpellAuraProcResult HandleModDamageAuraProc(Unit* pVictim, uint32 damage, Aura* triggeredByAura, SpellEntry const *procSpell, uint32 procFlag, uint32 procEx, uint32 cooldown);
         SpellAuraProcResult HandleNULLProc(Unit* /*pVictim*/, uint32 /*damage*/, Aura* /*triggeredByAura*/, SpellEntry const* /*procSpell*/, uint32 /*procFlag*/, uint32 /*procEx*/, uint32 /*cooldown*/)
         {
             // no proc handler for this aura type
@@ -1712,7 +1715,7 @@ class MANGOS_DLL_SPEC Unit : public WorldObject
         void SetLastManaUse() { m_lastManaUseTimer = 5000; }
         bool IsUnderLastManaUseEffect() const { return m_lastManaUseTimer; }
 
-        void SetContestedPvP(Player *attackedPlayer = nullptr);
+        void SetContestedPvP(Unit *attackedUnit = nullptr);
 
         void ApplySpellImmune(uint32 spellId, uint32 op, uint32 type, bool apply);
         void ApplySpellDispelImmunity(const SpellEntry * spellProto, DispelType type, bool apply);
@@ -1986,6 +1989,8 @@ class MANGOS_DLL_SPEC Unit : public WorldObject
         void UnitDamaged(ObjectGuid from, uint32 damage) { _damageTakenHistory[from] += damage; _lastDamageTaken = 0; }
         void SetMeleeZLimit(float newZLimit) { m_meleeZLimit = newZLimit; }
         float GetMeleeZLimit() const { return m_meleeZLimit; }
+        void SetMeleeZReach(float newZReach) { m_meleeZReach = newZReach; }
+        float GetMeleeZReach() const { return m_meleeZReach; }
 
     protected:
         typedef std::map<ObjectGuid /*attackerGuid*/, uint32 /*damage*/ > DamageTakenHistoryMap;
@@ -2032,6 +2037,7 @@ class MANGOS_DLL_SPEC Unit : public WorldObject
         ObjectGuid m_TotemSlot[MAX_TOTEM_SLOT];
 
         float m_meleeZLimit;
+        float m_meleeZReach;
 
         // Error traps for some wrong args using
         // this will catch and prevent build for any cases when all optional args skipped and instead triggered used non boolean type

@@ -96,7 +96,9 @@ void ScriptedAI::EnterEvadeMode()
     if (m_creature->isAlive())
         m_creature->GetMotionMaster()->MoveTargetedHome();
 
-    m_creature->SetLootRecipient(nullptr);
+    // Prevent raid loot loss on grid unload
+    if (!m_creature->IsWorldBoss() || !m_creature->isDead())
+        m_creature->SetLootRecipient(nullptr);
 
     // Reset back to default spells template. This also resets timers.
     SetSpellsTemplate(m_creature->GetCreatureInfo()->spells_template);
@@ -144,7 +146,7 @@ void ScriptedAI::DoPlaySoundToSet(WorldObject* pSource, uint32 uiSoundId)
     if (!pSource)
         return;
 
-    if (!GetSoundEntriesStore()->LookupEntry(uiSoundId))
+    if (!sObjectMgr.GetSoundEntry(uiSoundId))
     {
         sLog.outError("Invalid soundId %u used in DoPlaySoundToSet (Source: TypeId %u, GUID %u)", uiSoundId, pSource->GetTypeId(), pSource->GetGUIDLow());
         return;
@@ -321,6 +323,24 @@ Player* ScriptedAI::GetPlayerAtMinimumRange(float fMinimumRange)
     return pPlayer;
 }
 
+void ScriptedAI::GetPlayersWithinRange(std::list<Player*>& players, float range)
+{
+    MaNGOS::AnyPlayerInObjectRangeCheck check(m_creature, range);
+    MaNGOS::PlayerListSearcher<MaNGOS::AnyPlayerInObjectRangeCheck> searcher(players, check);
+
+    Cell::VisitWorldObjects(m_creature, searcher, range);
+}
+
+Player* ScriptedAI::GetNearestPlayer(float range)
+{
+    Player* target = nullptr;
+    MaNGOS::NearestHostileUnitCheck check(m_creature, range);
+    MaNGOS::PlayerSearcher<MaNGOS::NearestHostileUnitCheck> searcher(target, check);
+    Cell::VisitWorldObjects(m_creature, searcher, range);
+
+    return target;
+}
+
 void ScriptedAI::SetEquipmentSlots(bool bLoadDefault, int32 uiMainHand, int32 uiOffHand, int32 uiRanged)
 {
     if (bLoadDefault)
@@ -445,13 +465,9 @@ void ScriptedAI::DoModifyThreatPercent(Unit* pUnit, int32 pct)
     me->getThreatManager().modifyThreatPercent(pUnit, pct);
 }
 
-void ScriptedAI::DoTeleportTo(float fX, float fY, float fZ, uint32 uiTime)
+void ScriptedAI::DoTeleportTo(float fX, float fY, float fZ)
 {
     me->NearTeleportTo(fX, fY, fZ, me->GetOrientation());
-/*
-    me->Relocate(fX, fY, fZ);
-    me->MonsterMoveWithSpeed(fX, fY, fZ, 100000);
-*/
 }
 
 void ScriptedAI::DoTeleportTo(const float fPos[4])

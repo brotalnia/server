@@ -177,7 +177,7 @@ Creature::Creature(CreatureSubtype subtype) :
     m_combatStartX(0.0f), m_combatStartY(0.0f), m_combatStartZ(0.0f),
     m_HomeX(0.0f), m_HomeY(0.0f), m_HomeZ(0.0f), m_HomeOrientation(0.0f), m_reactState(REACT_PASSIVE),
     m_CombatDistance(0.0f), _lastDamageTakenForEvade(0), _playerDamageTaken(0), _nonPlayerDamageTaken(0), m_creatureInfo(nullptr),
-    m_AI_InitializeOnRespawn(false), m_callForHelpDist(5.0f), m_combatPulseTimer(0), m_combatWithZoneState(false)
+    m_AI_InitializeOnRespawn(false), m_callForHelpDist(5.0f), m_combatWithZoneState(false)
 {
     m_regenTimer = 200;
     m_valuesCount = UNIT_END;
@@ -540,7 +540,7 @@ bool Creature::UpdateEntry(uint32 Entry, Team team, const CreatureData *data /*=
         SetLootAndXPModDist(150.0f);
 
     // checked and error show at loading templates
-    if (FactionTemplateEntry const* factionTemplate = sFactionTemplateStore.LookupEntry(GetCreatureInfo()->faction_A))
+    if (FactionTemplateEntry const* factionTemplate = sObjectMgr.GetFactionTemplateEntry(GetCreatureInfo()->faction_A))
     {
         if (factionTemplate->factionFlags & FACTION_TEMPLATE_FLAG_PVP || IsCivilian())
             SetPvP(true);
@@ -788,13 +788,8 @@ void Creature::Update(uint32 update_diff, uint32 diff)
             // Raid bosses do a periodic combat pulse
             if (m_combatState && m_combatWithZoneState)
             {
-                if (m_combatPulseTimer > 3000)
-                {
+                if (WorldTimer::tickTime() % 3000 <= update_diff)
                     SetInCombatWithZone(false);
-                    m_combatPulseTimer = 0;
-                }
-                else
-                    m_combatPulseTimer += update_diff;
             }
 
             if (AI())
@@ -3123,6 +3118,13 @@ void Creature::OnLeaveCombat()
     UpdateCombatState(false);
     UpdateCombatWithZoneState(false);
 
+    // a delayed spell event could set the creature in combat again
+    auto itEvent = m_Events.GetEvents().begin();
+    for (; itEvent != m_Events.GetEvents().end(); ++itEvent)
+        if (SpellEvent* event = dynamic_cast<SpellEvent*>(itEvent->second))
+            if (event->GetSpell()->getState() != SPELL_STATE_FINISHED)
+                event->GetSpell()->cancel();
+
     if (_creatureGroup)
         _creatureGroup->OnLeaveCombat(this);
 
@@ -3152,7 +3154,6 @@ void Creature::OnEnterCombat(Unit* pWho, bool notInCombat)
 
         SetStandState(UNIT_STAND_STATE_STAND);
         _pacifiedTimer = 0;
-        m_combatPulseTimer = 0;
 
         if (m_zoneScript)
             m_zoneScript->OnCreatureEnterCombat(this);

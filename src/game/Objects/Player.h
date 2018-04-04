@@ -1697,6 +1697,7 @@ class MANGOS_DLL_SPEC Player final: public Unit
         bool IsBeingTeleported() const { return mSemaphoreTeleport_Near || mSemaphoreTeleport_Far || mPendingFarTeleport; }
         bool IsBeingTeleportedNear() const { return mSemaphoreTeleport_Near; }
         bool IsBeingTeleportedFar() const { return mSemaphoreTeleport_Far; }
+        bool IsPendingFarTeleport() const { return mPendingFarTeleport; }
         void SetSemaphoreTeleportNear(bool semphsetting);
         void SetSemaphoreTeleportFar(bool semphsetting);
         void SetPendingFarTeleport(bool pending) { mPendingFarTeleport = pending; }
@@ -2030,6 +2031,10 @@ class MANGOS_DLL_SPEC Player final: public Unit
 
         Camera& GetCamera() { return m_camera; }
 
+        uint32 GetLongSight() const { return m_longSightSpell; }
+        void SetLongSight(const Aura* aura = nullptr);
+        void UpdateLongSight();
+
         bool HasAtLoginFlag(AtLoginFlags f) const { return m_atLoginFlags & f; }
         void SetAtLoginFlag(AtLoginFlags f) { m_atLoginFlags |= f; }
         void RemoveAtLoginFlag(AtLoginFlags f, bool in_db_also = false);
@@ -2173,8 +2178,11 @@ class MANGOS_DLL_SPEC Player final: public Unit
 
         inline bool HasScheduledEvent() const { return m_Events.HasScheduledEvent(); }
         void SetAutoInstanceSwitch(bool v) { m_enableInstanceSwitch = v; }
+        void SetPendingInstanceSwitch(bool v) { m_pendingInstanceSwitch = v; }
+        bool IsPendingInstanceSwitch() const { return m_pendingInstanceSwitch; }
     protected:
         bool   m_enableInstanceSwitch;
+        bool   m_pendingInstanceSwitch;
         uint32 m_skippedUpdateTime;
         uint32 m_DetectInvTimer;
 
@@ -2418,6 +2426,9 @@ class MANGOS_DLL_SPEC Player final: public Unit
 
         Unit *m_mover;
         Camera m_camera;
+
+        float m_longSightRange;
+        uint32 m_longSightSpell;
 
         GridReference<Player> m_gridRef;
         MapReference m_mapRef;
